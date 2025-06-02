@@ -1,9 +1,0 @@
-#!/bin/bash
-
-for file in /etc/firewall.d/*; do
-	source $file
-done
-
-firewall-cmd --runtime-to-permanent
-
-

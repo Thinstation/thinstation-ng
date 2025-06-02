@@ -1,7 +1,0 @@
-#fdfff6b1123b67782d908c9264a3bf96  .dna
-rm /ts/build/packages/lightdm-guest/bin/gettext
-rm /ts/build/packages/lightdm-guest/sbin/usermod
-rm /ts/build/packages/lightdm-guest/sbin/userdel
-rm /ts/build/packages/lightdm-guest/bin/useradd
-rm -f /ts/build/packages/lightdm-guest/sbin/useradd
-

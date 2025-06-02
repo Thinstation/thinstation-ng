@@ -1,4 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=cups_lexmark
-repackage -c

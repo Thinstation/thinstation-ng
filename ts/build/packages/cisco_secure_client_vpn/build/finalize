@@ -1,4 +1,0 @@
-#cisco_secure_connect_vpn 90
-. /build/scripts/cisco-secure-client-vpn_preinstall.sh 1
-
-. /build/scripts/cisco-secure-client-vpn_postinstall.sh 1

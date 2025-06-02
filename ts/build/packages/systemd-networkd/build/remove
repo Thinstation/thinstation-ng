@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=systemd-networkd
-repackage -c
-

@@ -1,6 +1,0 @@
-#logrotate 80
-if [ ! -d /var/lib/logrotate/ -a -f /var/lib/logrotate.status ]; then
-  mkdir -p /var/lib/logrotate
-  cp -a /var/lib/logrotate.status /var/lib/logrotate
-fi
-/usr/lib/systemd/systemd-update-helper install-system-units logrotate.{service,timer}

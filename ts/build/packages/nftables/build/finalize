@@ -1,3 +1,0 @@
-#nftables 60
-. /build/scripts/nftables_postinstall.sh 1
-. /build/scripts/iptables-legacy_postinstall.sh 1

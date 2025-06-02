@@ -1,7 +1,0 @@
-#114780f2db5e3b5a38746e3be806809e  .dna
-
-mkdir -p /ts/build/packages/ica/build/extra/bin
-mkdir -p /ts/build/packages/ica/sbin
-ln /usr/bin/logger /ts/build/packages/ica/build/extra/bin/logger
-ln /usr/bin/useradd /ts/build/packages/ica/build/extra/bin/useradd
-ln -sf /build/extra/bin/useradd /ts/build/packages/ica/sbin/useradd

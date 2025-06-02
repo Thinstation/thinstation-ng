@@ -1,7 +1,0 @@
-# XORG_VNC_CMD       Define the x11vnc commdand that will be executed by the user session.
-#                    Really think about this. The following command is pretty open and 
-#                    provides no encryption. Please think about setting up host server certs
-#                    and options like -ssl and -unixpw along with sssd and persistent-files.
-#                    Refer to `man x11vnc` for all options and technicalities.
-
-XORG_VNC_CMD="/bin/x11vnc -rfbauth /etc/.vncpasswd -many -bg"

@@ -1,8 +1,0 @@
-#lvm2 50
-#systemctl enable dm-event.socket
-#systemctl enable lvm2-lvmpolld.socket
-#systemctl enable lvm2-monitor
-. /build/scripts/device-mapper-event_postinstall.sh 1
-. /build/scripts/device-mapper-multipath_postinstall.sh 1
-. /build/scripts/lvm2_postinstall.sh 1
-

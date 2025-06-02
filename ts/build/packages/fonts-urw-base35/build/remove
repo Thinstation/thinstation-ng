@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=fonts-urw-base35
-repackage -c
-

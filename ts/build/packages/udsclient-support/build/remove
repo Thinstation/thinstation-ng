@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=udsclient-support
-repackage -c
-

@@ -1,8 +1,0 @@
-#!/bin/sh
-
-for tagfile in `find /sys/devices -name mount_tag`; do
-	for tag in `cat $tagfile`; do
-		mkdir -p /vm-media/$tag
-		systemd-mount -t 9p -o trans=virtio,msize=512000 $tag /vm-media/$tag
-	done
-done

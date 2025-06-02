@@ -1,4 +1,0 @@
-#ebtables 75
-. /build/scripts/ebtables-legacy_postinstall.sh 1
-. /build/scripts/ebtables-services_postinstall.sh 1
-

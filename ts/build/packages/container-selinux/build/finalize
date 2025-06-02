@@ -1,3 +1,0 @@
-#container-selinux 90
-. /build/scripts/container-selinux_preinstall.sh 1
-. /build/scripts/container-selinux_postinstall.sh 1

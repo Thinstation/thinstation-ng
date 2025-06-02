@@ -1,7 +1,0 @@
-#1d327b894041f86501976de172503401  .dna
-rm /ts/build/packages/mesa-basic/lib64/gallium-pipe/pipe_swrast.so
-rm /ts/build/packages/mesa-basic/lib64/gallium-pipe/pipe_kmsro.so
-rm /ts/build/packages/mesa-basic/lib64/dri/libdril_dri.so
-rm -f /ts/build/packages/mesa-basic/lib64/dri/kms_swrast_dri.so
-rm -f /ts/build/packages/mesa-basic/lib64/dri/swrast_dri.so
-

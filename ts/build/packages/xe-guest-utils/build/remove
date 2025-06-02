@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=xe-guest-utils
-repackage -c
-

@@ -1,4 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=horizon
-repackage -c

@@ -1,4 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=selinux
-repackage -c

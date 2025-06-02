@@ -1,9 +1,0 @@
-#1d327b894041f86501976de172503401  .dna
-
-mkdir -p /ts/build/packages/mesa-basic/lib64/dri
-mkdir -p /ts/build/packages/mesa-basic/lib64/gallium-pipe
-ln /usr/lib64/dri/libdril_dri.so /ts/build/packages/mesa-basic/lib64/dri/libdril_dri.so
-ln /usr/lib64/gallium-pipe/pipe_kmsro.so /ts/build/packages/mesa-basic/lib64/gallium-pipe/pipe_kmsro.so
-ln /usr/lib64/gallium-pipe/pipe_swrast.so /ts/build/packages/mesa-basic/lib64/gallium-pipe/pipe_swrast.so
-ln -sf libdril_dri.so /ts/build/packages/mesa-basic/lib64/dri/kms_swrast_dri.so
-ln -sf libdril_dri.so /ts/build/packages/mesa-basic/lib64/dri/swrast_dri.so

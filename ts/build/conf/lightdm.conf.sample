@@ -1,4 +1,0 @@
-# To add a banner to the login, update /build/packages/lightdm/build/banner.html with any necessary text, then run
-# wkhtmltoimage --format svg --width 1920 --height 1080 /build/packages/lightdm/build/banner.html /build/packages/lightdm/build/banner.svg
-# Then set LIGHTDM_BANNER=true, it's false by default.
-#LIGHTDM_BANNER=true

@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=pkcs11
-repackage -c
-

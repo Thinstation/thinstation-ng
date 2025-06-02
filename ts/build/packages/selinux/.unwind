@@ -1,4 +1,0 @@
-#90003f6bf2f265e9c4237421b1feb06e  .dna
-
-mkdir -p /ts/build/packages/selinux/build/extra/bin
-ln /usr/bin/grep /ts/build/packages/selinux/build/extra/bin/grep

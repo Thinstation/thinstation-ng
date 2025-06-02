@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=cisco_secure_client_vpn
-repackage -c
-

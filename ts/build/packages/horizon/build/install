@@ -1,5 +1,0 @@
-#!/bin/sh
-export PACKAGE=horizon
-export RPM=`basename $1`
-repackage -e
-

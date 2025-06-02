@@ -1,1 +1,0 @@
-package="pinta"; icon="applications-graphics"; needs="x11"; menu="Utilities"; title="Paint"; command="pinta"; nodesktop="true"

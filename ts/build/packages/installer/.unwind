@@ -1,6 +1,0 @@
-#7f6e7604a8a332c19cbfbeae408ad4ed  .dna
-
-mkdir -p /ts/build/packages/installer/bin
-ln /usr/bin/chroot /ts/build/packages/installer/bin/chroot
-ln /usr/bin/mkpasswd /ts/build/packages/installer/bin/mkpasswd
-ln /usr/bin/tar /ts/build/packages/installer/bin/tar

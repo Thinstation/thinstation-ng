@@ -1,7 +1,0 @@
-#selinux 80
-. /build/scripts/policycoreutils_postinstall.sh 1
-. /build/scripts/selinux-policy-targeted_preinstall.sh 1
-. /build/scripts/selinux-policy-targeted_postinstall.sh 1
-. /build/scripts/selinux-policy_postinstall.sh 1
-
-sed -i -e 's/=enforcing/=permissive/g' /etc/selinux/config

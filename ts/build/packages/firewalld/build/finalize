@@ -1,4 +1,0 @@
-#firewalld 30
-systemctl enable firewalld
-ln -sf firewalld-standard.conf /etc/firewalld/firewalld.conf
-

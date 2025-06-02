@@ -1,3 +1,0 @@
-rng-tools,rngd,0,0,bin,1,sbin/rngd,,,,,,,,
-,rngd,0,0,etc/init.d,0,,,,,,,,,
-,dependencies,0,0,,0,,,,,,,,,

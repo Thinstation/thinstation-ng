@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=ssh
-repackage -c
-

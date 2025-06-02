@@ -1,3 +1,0 @@
-#openssh 35
-
-/usr/lib/systemd/systemd-update-helper install-system-units sshd.service sshd.socket

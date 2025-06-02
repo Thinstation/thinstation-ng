@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=openldap-clients
-repackage -c
-

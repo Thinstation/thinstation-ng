@@ -1,4 +1,0 @@
-#0b2389cde78d990ec8bc909537e4afa4  .dna
-
-mkdir -p /ts/build/packages/udsclient/build/extra/bin
-ln /usr/bin/env /ts/build/packages/udsclient/build/extra/bin/env

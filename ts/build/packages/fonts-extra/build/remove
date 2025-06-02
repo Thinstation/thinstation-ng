@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=fonts-extra
-repackage -c
-

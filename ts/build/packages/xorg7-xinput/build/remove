@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=xorg7-xinput
-repackage -c
-

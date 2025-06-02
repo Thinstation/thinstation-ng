@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=libnl3
-repackage -c
-

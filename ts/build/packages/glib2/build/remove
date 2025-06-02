@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=glib2
-repackage -c
-

@@ -1,7 +1,0 @@
-#180214583bb7e0b2678f83a8803a7142  .dna
-rm /ts/build/packages/sssd/build/extra/bin/su
-rm /ts/build/packages/sssd/build/extra/bin/id
-rm /ts/build/packages/sssd/build/extra/bin/chown
-rm /ts/build/packages/sssd/build/extra/bin/chgrp
-rm /ts/build/packages/sssd/build/extra/bin/ls
-

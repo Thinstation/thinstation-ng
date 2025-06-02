@@ -1,5 +1,0 @@
-#!/bin/sh
-
-export PACKAGE=container-selinux
-repackage -c
-

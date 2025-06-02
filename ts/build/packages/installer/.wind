@@ -1,5 +1,0 @@
-#7f6e7604a8a332c19cbfbeae408ad4ed  .dna
-rm /ts/build/packages/installer/bin/chroot
-rm /ts/build/packages/installer/bin/tar
-rm /ts/build/packages/installer/bin/mkpasswd
-

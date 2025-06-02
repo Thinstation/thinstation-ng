@@ -1,5 +1,0 @@
-LANG=fr_CA.UTF-8
-KEYBOARD_MAP=cf
-CONSOLE_KEYBOARD=cf.map.gz
-CONSOLE_FONT=default8x16.psfu.gz
-XKEYBOARD=ca

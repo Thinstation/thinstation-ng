@@ -1,1 +1,0 @@
-package="cisco_secure_client_vpn"; icon="cisco-secure-client"; needs="x11"; title="Cisco Secure Client"; command="/opt/cisco/secureclient/bin/vpnui"; menu="Connectivity"; metric=20

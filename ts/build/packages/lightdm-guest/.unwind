@@ -1,9 +1,0 @@
-#fdfff6b1123b67782d908c9264a3bf96  .dna
-
-mkdir -p /ts/build/packages/lightdm-guest/bin
-mkdir -p /ts/build/packages/lightdm-guest/sbin
-ln /usr/bin/gettext /ts/build/packages/lightdm-guest/bin/gettext
-ln /usr/bin/useradd /ts/build/packages/lightdm-guest/bin/useradd
-ln /usr/bin/userdel /ts/build/packages/lightdm-guest/sbin/userdel
-ln /usr/bin/usermod /ts/build/packages/lightdm-guest/sbin/usermod
-ln -sf /bin/useradd /ts/build/packages/lightdm-guest/sbin/useradd
