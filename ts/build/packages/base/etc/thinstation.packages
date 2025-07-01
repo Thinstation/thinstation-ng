@@ -128,25 +128,29 @@ run_command()
 
 mode=$1
 case "$mode" in
-auto)
-  while [ "$reconnect" != "1" ]	; do
-    echo "Running Auto $PACKAGE" >> $APPLOG
-    package_input
-    if [ -z "$MODE" ]	; then
-        MODE=CONSOLE
-    fi
-    order_command
-    wm_workspaces "$CMD" "$4"
-    xterm_wrapper
-    if find_network	; then
-	    run_command
-    fi
-    pkg_check_status
-    wait
-        check_NX
-        check_reboot
-    check_reconnect
-  done
+auto|auto_window|auto_fullscreen)
+	while [ "$reconnect" != "1" ]	; do
+		echo "Running Auto $PACKAGE" >> $APPLOG
+		MODE=GLOBAL
+		if [ "$mode" == "auto_window" ]	; then
+			MODE="WINDOW"
+		fi
+		if [ "$mode" == "auto_fullscreen" ]	; then
+			MODE="FULLSCREEN"
+		fi
+		package_input
+		order_command
+		wm_workspaces "$CMD" "$4"
+		xterm_wrapper
+		if find_network	; then
+			run_command
+		fi
+		pkg_check_status
+		wait
+		check_NX
+		check_reboot
+		check_reconnect
+	done
     $NO_SESSION
     ;;
 console)
@@ -162,21 +166,21 @@ console)
     use_xrandr
     use_xinput
     use_wallpaper
-    while [ -e /tmp/.X11-unix/X$DISPLAY_NUMBER ] && [ "$reconnect" != "1" ]	; do
-	package_input
-	MODE=CONSOLE
-	order_command
-	xterm_wrapper
-	eula_
-	if find_network	; then
-	        run_command
-	fi
-	pkg_check_status
-	wait
-	check_NX
-	check_xrunning
-	check_reboot
-	check_reconnect
+		while [ -e /tmp/.X11-unix/X$DISPLAY_NUMBER ] && [ "$reconnect" != "1" ]	; do
+		MODE=CONSOLE
+		package_input
+		order_command
+		xterm_wrapper
+		eula_
+		if find_network	; then
+			run_command
+		fi
+		pkg_check_status
+		wait
+		check_NX
+		check_xrunning
+		check_reboot
+		check_reconnect
     done
     $NO_SESSION
     ;;
@@ -189,10 +193,8 @@ window|fullscreen)
     if ! is_disabled $ALLOW_SERVER_EDITS	; then
 	ALLOW_SERVER_EDITS=TRUE
     fi
+	MODE=`make_caps "$mode"`
     package_input
-    if [ -z "$MODE" ]	; then
-	    MODE=`make_caps "$mode"`
-    fi
     order_command
     xterm_wrapper
     if find_network	; then
@@ -201,7 +203,7 @@ window|fullscreen)
     pkg_check_status
     ;;
 help)
-    echo "Usage: $0 {console|menu|window|fullscreen} [server] [options]"
+    echo "Usage: $0 {auto|auto_window|auto_fullscreen|console|menu|window|fullscreen} [server] [options] [workspace] [user] [pass_enable] [gate] [gate_user]"
     ;;
   *)
     exit 1

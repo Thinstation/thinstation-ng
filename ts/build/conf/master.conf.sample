@@ -138,8 +138,11 @@ ALLOW_EXIT=Off
 #                           - xterm            Start xterm client
 #                           - tn5250           Start AS400 client in linux console
 #                           - nx               Start NX Client Session
-# SESSION_#_AUTOSTART       ON      Application will be executed immediately at startup
-#                           OFF     Application will appear in a menu to be started manually
+# SESSION_#_AUTOSTART       ON      	Application will be executed immediately at startup
+#                           WINDOW     	Application will be executed immediately at startup in window mode
+#                           FULLSCREEN	Application will be executed immediately at startup in fullscreen mode
+#                           CONSOLE     Application will be executed immediately at startup in console mode
+#                           OFF     	Application will appear in a menu to be started manually
 # SESSION_#_CUSTOM_CONFIG   ON      Allows choosing custom config for when session starts
 #                           OFF     Session boots normally
 # SESSION_#_ICON            ON      Places Icon on Desktop if package xtdesk is selected and

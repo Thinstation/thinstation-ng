@@ -382,9 +382,25 @@ wm_menu()
 					fi
 				;;
 			esac
+			autostart=`make_caps $autostart`
 			case "$autostart" in
-				ON)
+				TRUE|ON|ENABLED|ENABLE|YES|POSITIVE|Y|AUTO)
 					command="pkg auto $type \"$server\" \"$options\" \"$workspace\" \"$user\" \"$pass_enable\" \"$gate\" \"$gate_user\""
+					ICONDIR=$HOME/.config/autostart
+					make_desktop
+				;;
+				WINDOW|WINDOWS)
+					command="pkg auto_window $type \"$server\" \"$options\" \"$workspace\" \"$user\" \"$pass_enable\" \"$gate\" \"$gate_user\""
+					ICONDIR=$HOME/.config/autostart
+					make_desktop
+				;;
+				FULLSCREEN|FULL)
+					command="pkg auto_fullscreen $type \"$server\" \"$options\" \"$workspace\" \"$user\" \"$pass_enable\" \"$gate\" \"$gate_user\""
+					ICONDIR=$HOME/.config/autostart
+					make_desktop
+				;;
+				CONSOLE)
+					command="pkg console $type \"$server\" \"$options\" \"$workspace\" \"$user\" \"$pass_enable\" \"$gate\" \"$gate_user\""
 					ICONDIR=$HOME/.config/autostart
 					make_desktop
 				;;
