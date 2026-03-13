@@ -7,3 +7,5 @@ bash
 crypto-policies
 libbpf
 libgcc
+authselect
+liblastlog2

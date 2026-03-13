@@ -1,3 +1,5 @@
 base
 gtk-engines
 glib2
+libepoxy
+glycin
