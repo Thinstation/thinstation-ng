@@ -1,12 +1,10 @@
-#3dd745f3d5e975a07676a55b2b6ac62c  .dna
+#a0467b79a141ecbf467d857d1641fda8  .dna
 
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/C
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.JIS
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.SJIS
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/xkb/compat
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/xkb/symbols
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/gconv
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/kbd/keymaps
@@ -54,8 +52,5 @@ ln /usr/share/X11/locale/ja/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11
 ln /usr/share/X11/locale/ja/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja/XLC_LOCALE
 ln /usr/share/X11/locale/ja_JP.UTF-8/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/XI18N_OBJS
 ln /usr/share/X11/locale/ja_JP.UTF-8/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/XLC_LOCALE
-ln /usr/share/X11/xkb/compat/japan /ts/build/packages/locale-ja_JP/lib64/X11/xkb/compat/japan
-ln /usr/share/X11/xkb/symbols/jp /ts/build/packages/locale-ja_JP/lib64/X11/xkb/symbols/jp
-ln /usr/share/X11/xkb/symbols/us /ts/build/packages/locale-ja_JP/lib64/X11/xkb/symbols/us
 touch /ts/build/packages/locale-ja_JP/lib64/X11/locale/C/Compose
 touch /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/Compose

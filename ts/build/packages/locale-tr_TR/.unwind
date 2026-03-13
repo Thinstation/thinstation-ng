@@ -1,8 +1,7 @@
-#c83536016f1037c765ae5f0d873670be  .dna
+#2a7f9951441c05696f1241d9b2260632  .dna
 
 mkdir -p /ts/build/packages/locale-tr_TR/lib64/X11/locale/C
 mkdir -p /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9
-mkdir -p /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols
 mkdir -p /ts/build/packages/locale-tr_TR/lib64/gconv
 mkdir -p /ts/build/packages/locale-tr_TR/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-tr_TR/lib64/kbd/keymaps
@@ -39,9 +38,4 @@ ln /usr/share/X11/locale/C/XLC_LOCALE /ts/build/packages/locale-tr_TR/lib64/X11/
 ln /usr/share/X11/locale/iso8859-9/Compose /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/Compose
 ln /usr/share/X11/locale/iso8859-9/XI18N_OBJS /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/XI18N_OBJS
 ln /usr/share/X11/locale/iso8859-9/XLC_LOCALE /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/XLC_LOCALE
-ln /usr/share/X11/xkb/symbols/kpdl /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/kpdl
-ln /usr/share/X11/xkb/symbols/latin /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/latin
-ln /usr/share/X11/xkb/symbols/level3 /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/level3
-ln /usr/share/X11/xkb/symbols/tr /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/tr
-ln /usr/share/X11/xkb/symbols/us /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/us
 touch /ts/build/packages/locale-tr_TR/lib64/X11/locale/C/Compose

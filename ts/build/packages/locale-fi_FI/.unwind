@@ -1,10 +1,9 @@
-#160a2d890ebf0ff8648e10a32f0b4cbb  .dna
+#61d5f33bb3877f46b386e1149cfb8b65  .dna
 
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/X11/locale/C
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/X11/locale/en_US.UTF-8
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-1
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15
-mkdir -p /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/gconv
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-fi_FI/lib64/kbd/keymaps
@@ -42,11 +41,4 @@ ln /usr/share/X11/locale/iso8859-1/XLC_LOCALE /ts/build/packages/locale-fi_FI/li
 ln /usr/share/X11/locale/iso8859-15/Compose /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/Compose
 ln /usr/share/X11/locale/iso8859-15/XI18N_OBJS /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/XI18N_OBJS
 ln /usr/share/X11/locale/iso8859-15/XLC_LOCALE /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/XLC_LOCALE
-ln /usr/share/X11/xkb/symbols/compose /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/compose
-ln /usr/share/X11/xkb/symbols/fi /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/fi
-ln /usr/share/X11/xkb/symbols/kpdl /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/kpdl
-ln /usr/share/X11/xkb/symbols/latin /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/latin
-ln /usr/share/X11/xkb/symbols/level3 /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/level3
-ln /usr/share/X11/xkb/symbols/nbsp /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/nbsp
-ln /usr/share/X11/xkb/symbols/us /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/us
 touch /ts/build/packages/locale-fi_FI/lib64/X11/locale/C/Compose

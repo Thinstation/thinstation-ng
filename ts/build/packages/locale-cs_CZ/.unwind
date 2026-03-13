@@ -1,9 +1,8 @@
-#1d879ccfbc50877c8edd5f0b747240dc  .dna
+#dbf9d9f0419fbeb3b6a3659d70f1a9b1  .dna
 
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/X11/locale/C
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/X11/locale/en_US.UTF-8
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/X11/locale/iso8859-2
-mkdir -p /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/gconv
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-cs_CZ/lib64/kbd/keymaps
@@ -42,10 +41,5 @@ ln /usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE /ts/build/packages/locale-cs_CZ/
 ln /usr/share/X11/locale/iso8859-2/Compose /ts/build/packages/locale-cs_CZ/lib64/X11/locale/iso8859-2/Compose
 ln /usr/share/X11/locale/iso8859-2/XI18N_OBJS /ts/build/packages/locale-cs_CZ/lib64/X11/locale/iso8859-2/XI18N_OBJS
 ln /usr/share/X11/locale/iso8859-2/XLC_LOCALE /ts/build/packages/locale-cs_CZ/lib64/X11/locale/iso8859-2/XLC_LOCALE
-ln /usr/share/X11/xkb/symbols/cz /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols/cz
-ln /usr/share/X11/xkb/symbols/kpdl /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols/kpdl
-ln /usr/share/X11/xkb/symbols/latin /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols/latin
-ln /usr/share/X11/xkb/symbols/level3 /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols/level3
-ln /usr/share/X11/xkb/symbols/us /ts/build/packages/locale-cs_CZ/lib64/X11/xkb/symbols/us
 ln -sf /lib64/kbd/keymaps/qwerty/cz.map.gz /ts/build/packages/locale-cs_CZ/lib64/kbd/keymaps/cz.map.gz
 touch /ts/build/packages/locale-cs_CZ/lib64/X11/locale/C/Compose
