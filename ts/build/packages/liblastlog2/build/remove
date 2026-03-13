@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export PACKAGE=liblastlog2
+repackage -c
+
