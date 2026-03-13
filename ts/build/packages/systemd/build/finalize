@@ -84,4 +84,3 @@ xargs -0 -I {} -P $num_procs bash -c '
 '
 
 /usr/lib/systemd/systemd-update-helper install-system-units systemd-udev{d,-settle,-trigger}.service systemd-udevd-{control,kernel}.socket systemd-homed.service systemd-oomd.service systemd-pstore.service
-rm /sbin/init
