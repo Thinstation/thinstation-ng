@@ -25,3 +25,5 @@ fi
 
 # Don't enable mkhomedir module. We have our own routine for this.
 #sed -i -e '/pam_oddjob_mkhomedir.so/d' /lib64/authselect/default/*/*
+
+authselect select sssd
