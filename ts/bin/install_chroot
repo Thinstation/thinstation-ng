@@ -44,7 +44,7 @@ stage1()
         if ! mountpoint sys >/dev/null 2>&1 ; then mount -t sysfs none sys ; fi
 
 	ROOT=$PWD
-	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --releasever=42 $core_ports $kernel_ports $grub_ports $firmware_ports
+	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --releasever=43 $core_ports $kernel_ports $grub_ports $firmware_ports
 	cd $ROOT
 	touch $ROOT/dostage2
 }
@@ -78,7 +78,7 @@ stage3()
 {
 	cp -a /ts/repos/* /etc/yum.repos.d/.
 	dnf makecache
-        dnf install --setopt=keepcache=1 -y --releasever=42 $system_ports
+        dnf install --setopt=keepcache=1 -y --releasever=43 $system_ports
 	dnf install --setopt=keepcache=1 -y --allowerasing $ts_ports $other_ports
 	for Root in $TSWRKNG $XTRWRKNG; do
 		if [ $Root = $TSWRKNG ]

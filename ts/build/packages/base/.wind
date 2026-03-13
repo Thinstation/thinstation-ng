@@ -1,4 +1,4 @@
-#2012d647cd9c4723d322236e84ee610e  .dna
+#e0c9e450527db8244ef7c2c96ed1da67  .dna
 rm /ts/build/packages/base/bin/vmtouch
 rm /ts/build/packages/base/bin/ps
 rm /ts/build/packages/base/bin/getent
@@ -62,7 +62,6 @@ rm /ts/build/packages/base/lib64/security/pam_deny.so
 rm /ts/build/packages/base/lib64/security/pam_env.so
 rm /ts/build/packages/base/lib64/security/pam_faildelay.so
 rm /ts/build/packages/base/lib64/security/pam_keyinit.so
-rm /ts/build/packages/base/lib64/security/pam_lastlog.so
 rm /ts/build/packages/base/lib64/security/pam_limits.so
 rm /ts/build/packages/base/lib64/security/pam_localuser.so
 rm /ts/build/packages/base/lib64/security/pam_loginuid.so

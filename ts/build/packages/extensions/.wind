@@ -1,4 +1,4 @@
-#a30b52ded7c3824bd67830cc30466058  .dna
+#10f27555317c979d052851a700961b97  .dna
 rm /ts/build/packages/extensions/lib64/terminfo/l/linux
 rm /ts/build/packages/extensions/lib64/terminfo/v/vt220
 rm /ts/build/packages/extensions/lib64/terminfo/v/vt100
@@ -21,5 +21,5 @@ rm /ts/build/packages/extensions/bin/umount
 rm /ts/build/packages/extensions/bin/gzip
 rm /ts/build/packages/extensions/bin/setserial
 rm /ts/build/packages/extensions/bin/bzip2
-rm /ts/build/packages/extensions/bin/chroot
+rm /ts/build/packages/extensions/sbin/chroot
 

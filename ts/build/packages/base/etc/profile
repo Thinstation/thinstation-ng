@@ -32,15 +32,20 @@ if [ "`tty`" == "$CONSOLE" ]; then
 		fi
 	fi
 	chvt 1
-	if ! is_disabled $FASTBOOT && ! mountpoint /lib64; then
+	if ! is_disabled $FASTBOOT; then
 		echo "Fastboot was enabled, but something went wrong with the transfer or mount."
 		echo "Hopefully only Administrators ever see this message, and then only when they fail. :)"
 		echo "Review the log at /var/log/fastboot.log"
+		if is_enabled $FASTBOOT; then
+			mountpoint /lib64
+		fi
 		case $LM in
 		hd)	if ! module_available vfat; then
 				echo "hd: vfat module not available"
 			else
-				echo "hd: /boot was not mounted, maybe check your mount declarations"
+				if ! mountpoint /boot >/dev/null; then
+					echo "hd: /boot was not mounted, maybe check your mount declarations"
+				fi
 			fi
 		;;
 		pxe)
@@ -56,7 +61,9 @@ if [ "`tty`" == "$CONSOLE" ]; then
 			if ! module_available isofs && ! module_available udf; then
 				echo "iso: No CD Rom modules available"
 			else
-				echo "iso: $BASE_MOUNT_PATH/cdrom0 was not mounted, maybe check your mount declarations"
+				if ! mountpoint $BASE_MOUNT_PATH/cdrom0 >/dev/null; then
+					echo "iso: $BASE_MOUNT_PATH/cdrom0 was not mounted, maybe check your mount declarations"
+				fi
 			fi
 		;;
 		*)

@@ -1,13 +1,14 @@
-#a30b52ded7c3824bd67830cc30466058  .dna
+#10f27555317c979d052851a700961b97  .dna
 
 mkdir -p /ts/build/packages/extensions/bin
 mkdir -p /ts/build/packages/extensions/lib64/terminfo/a
 mkdir -p /ts/build/packages/extensions/lib64/terminfo/d
 mkdir -p /ts/build/packages/extensions/lib64/terminfo/l
 mkdir -p /ts/build/packages/extensions/lib64/terminfo/v
+mkdir -p /ts/build/packages/extensions/sbin
 ln /bin/setserial /ts/build/packages/extensions/bin/setserial
 ln /usr/bin/bzip2 /ts/build/packages/extensions/bin/bzip2
-ln /usr/bin/chroot /ts/build/packages/extensions/bin/chroot
+ln /usr/bin/chroot /ts/build/packages/extensions/sbin/chroot
 ln /usr/bin/grep /ts/build/packages/extensions/bin/grep
 ln /usr/bin/gzip /ts/build/packages/extensions/bin/gzip
 ln /usr/bin/ifconfig /ts/build/packages/extensions/bin/ifconfig

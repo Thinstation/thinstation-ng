@@ -109,31 +109,31 @@ pxe()
 iso()
 {
 	timeout=150
-        if ! mountpoint /mnt/cdrom0; then
+        if ! [ -e $BASE_MOUNT_PATH/cdrom0 ] || ! /bin/busybox.shared mountpoint $BASE_MOUNT_PATH/cdrom0; then
 		while [ ! -e /dev/disk/by-label/$CDVOLNAME ] && [ "$timeout" -ne "0" ]; do
+			echo "Waiting for ISO to show up"
 			sleep .1
 			let timeout-=1
 		done
-		systemd-mount --fsck=no -o x-mount.mkdir,defaults /dev/disk/by-label/$CDVOLNAME /mnt/cdrom0
+		systemd-mount --fsck=no -o x-mount.mkdir,defaults /dev/disk/by-label/$CDVOLNAME $BASE_MOUNT_PATH/cdrom0
 	fi
-	FILE=$BASE_MOUNT_PATH/cdrom0/"$squash_location"lib.squash
 	timeout=150
 	while ! /bin/busybox.shared mountpoint $BASE_MOUNT_PATH/cdrom0 && [ $timeout -ne 0 ]; do
+		echo "Waiting for ISO to mount"
 		sleep .1
 		let timeout-=1
 	done
-	if [ ! -e $FILE ]; then
-		if [ -z $squash_location ]; then
-			filename=lib.squash
-			if [ -e $BASE_MOUNT_PATH/cdrom0/boot/$filename ]; then
-				squash_location="boot/"
-			fi
-		fi
-		if [ -z $squash_location ]; then
+	if [ -z $squash_location ]; then
+		if [ -e $BASE_MOUNT_PATH/cdrom0/boot/lib.squash ]; then
+			FILE=$BASE_MOUNT_PATH/cdrom0/boot/lib.squash
+		else
 			echo "Could not find the image on the CDROM!"
 			exit 1
-		else
-			FILE=$BASE_MOUNT_PATH/cdrom0/"$squash_location"lib.squash
+		fi
+	else
+		FILE=$BASE_MOUNT_PATH/cdrom0/"$squash_location"lib.squash
+		if ! [ -e $FILE ]; then
+			echo "Could not find the image on the CDROM at the expected location"
 		fi
 	fi
 }
@@ -157,15 +157,19 @@ squash_loc()
 
 mount_squash()
 {
+	echo "SquashFS is file $FILE"
 	if [ "$FASTBOOT" == "lotsofmem" ] ; then
+		echo "Decompressing data directly to /"
 		/sbin/unsquashfs -f -d / -f $FILE
 		if [ -e /tmp/lib.squash ] ; then
 			rm /tmp/lib.squash
 		fi
 	else
 		if is_enabled $MEMORY_CONSTRAINED ; then
+			echo "Mounting data without copy to /lib64"
 			systemd-mount --fsck=no -o ro,loop -t squashfs $FILE /lib64
 		else
+			echo "Mounting data after copy to /lib64"
 			if [ ! -e /tmp/lib.squash ] ; then
 				cp $FILE /tmp/lib.squash
 			fi
@@ -173,6 +177,7 @@ mount_squash()
 		fi
 	fi
 }
+
 # This has to be a double negative test. Only is_disabled() will
 # return false with a non-null value that isn't explicitly disabled.
 if ! is_disabled $FASTBOOT; then
@@ -189,14 +194,17 @@ if ! is_disabled $FASTBOOT; then
 
 	# Continue based on the value of $boot_device
 	if [[ "$boot_device" == cd* || "$boot_device" == hd96 || "$boot_device" == hd31 ]]; then
+		echo "Loading data from ISO"
 		echo "LM=iso" >> /etc/thinstation.runtime
 		iso
 	elif [[ "$boot_device" == hd* ]]; then
-		disk
+		echo "Loading data from disk"
 		echo "LM=hd" >> /etc/thinstation.runtime
+		disk
 	elif [[ "$boot_device" == *tftp* || "$boot_device" == *http* ]]; then
-		pxe
+		echo "Loading data from network"
 		echo "LM=pxe" >> /etc/thinstation.runtime
+		pxe
 	else
 		echo "boot_device UNKNOWN!"
 	fi

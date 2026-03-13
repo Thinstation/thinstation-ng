@@ -1,4 +1,4 @@
-#2012d647cd9c4723d322236e84ee610e  .dna
+#e0c9e450527db8244ef7c2c96ed1da67  .dna
 
 mkdir -p /ts/build/packages/base/bin
 mkdir -p /ts/build/packages/base/etc
@@ -66,7 +66,6 @@ ln /usr/lib64/security/pam_deny.so /ts/build/packages/base/lib64/security/pam_de
 ln /usr/lib64/security/pam_env.so /ts/build/packages/base/lib64/security/pam_env.so
 ln /usr/lib64/security/pam_faildelay.so /ts/build/packages/base/lib64/security/pam_faildelay.so
 ln /usr/lib64/security/pam_keyinit.so /ts/build/packages/base/lib64/security/pam_keyinit.so
-ln /usr/lib64/security/pam_lastlog.so /ts/build/packages/base/lib64/security/pam_lastlog.so
 ln /usr/lib64/security/pam_limits.so /ts/build/packages/base/lib64/security/pam_limits.so
 ln /usr/lib64/security/pam_localuser.so /ts/build/packages/base/lib64/security/pam_localuser.so
 ln /usr/lib64/security/pam_loginuid.so /ts/build/packages/base/lib64/security/pam_loginuid.so
