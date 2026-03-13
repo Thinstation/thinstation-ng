@@ -1,0 +1,50 @@
+#!/bin/sh
+
+export PACKAGE="vlc"
+export PORTS="vlc
+SDL_image
+aalib-libs
+aribb25
+daala-libs
+gnu-free-fonts-common
+gnu-free-sans-fonts
+gpm-libs
+libcddb
+libdvbpsi
+libebml
+libkate
+libmad
+libmatroska
+libmicrodns
+libmpcdec
+libspatialaudio
+libtiger
+libupnp
+lirc-libs
+live555
+protobuf-lite
+schroedinger
+speexdsp
+vlc-cli
+vlc-libs
+vlc-plugin-lua
+vlc-plugin-pipewire
+vlc-plugin-pulseaudio
+vlc-plugins-base
+vlc-plugins-video-out
+libproxy-bin
+vlc-gui-skins2
+vlc-plugin-ffmpeg
+vlc-plugin-gnome
+vlc-plugin-notify
+vlc-plugin-visualization
+vlc-plugins-extra
+"
+export DROP_FILES=""
+export DROP_DIRS=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+
+returnval=$?
+
+exit $returnval
