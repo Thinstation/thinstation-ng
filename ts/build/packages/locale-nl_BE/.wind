@@ -1,10 +1,4 @@
-#037dd45a31c9ba3b7a940f67265b5ba7  .dna
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/level3
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/us
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/kpdl
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/be
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/latin
-rm /ts/build/packages/locale-nl_BE/lib64/X11/xkb/symbols/nl
+#44d6ce5a12a5a61bf55be1adf4d20575  .dna
 rm /ts/build/packages/locale-nl_BE/lib64/X11/locale/en_US.UTF-8/Compose
 rm /ts/build/packages/locale-nl_BE/lib64/X11/locale/en_US.UTF-8/XLC_LOCALE
 rm /ts/build/packages/locale-nl_BE/lib64/X11/locale/en_US.UTF-8/XI18N_OBJS

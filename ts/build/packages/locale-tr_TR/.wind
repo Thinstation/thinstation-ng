@@ -1,4 +1,4 @@
-#c83536016f1037c765ae5f0d873670be  .dna
+#2a7f9951441c05696f1241d9b2260632  .dna
 rm /ts/build/packages/locale-tr_TR/lib64/gconv/HP-TURKISH8.so
 rm /ts/build/packages/locale-tr_TR/lib64/gconv/UNICODE.so
 rm /ts/build/packages/locale-tr_TR/lib64/gconv/CP1254.so
@@ -32,9 +32,4 @@ rm /ts/build/packages/locale-tr_TR/lib64/X11/locale/C/Compose
 rm /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/XLC_LOCALE
 rm /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/XI18N_OBJS
 rm /ts/build/packages/locale-tr_TR/lib64/X11/locale/iso8859-9/Compose
-rm /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/level3
-rm /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/latin
-rm /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/kpdl
-rm /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/tr
-rm /ts/build/packages/locale-tr_TR/lib64/X11/xkb/symbols/us
 

@@ -1,4 +1,4 @@
-#79f0b1a69676cfae1631e1b57e4f9bf2  .dna
+#7d8226d0f1d51761c37d0e08e7b347bb  .dna
 rm /ts/build/packages/locale-es_ES/lib64/gconv/UNICODE.so
 rm /ts/build/packages/locale-es_ES/lib64/gconv/CP1252.so
 rm /ts/build/packages/locale-es_ES/lib64/gconv/UTF-7.so
@@ -32,9 +32,4 @@ rm /ts/build/packages/locale-es_ES/lib64/X11/locale/en_US.UTF-8/Compose
 rm /ts/build/packages/locale-es_ES/lib64/X11/locale/iso8859-1/XLC_LOCALE
 rm /ts/build/packages/locale-es_ES/lib64/X11/locale/iso8859-1/XI18N_OBJS
 rm /ts/build/packages/locale-es_ES/lib64/X11/locale/iso8859-1/Compose
-rm /ts/build/packages/locale-es_ES/lib64/X11/xkb/symbols/level3
-rm /ts/build/packages/locale-es_ES/lib64/X11/xkb/symbols/latin
-rm /ts/build/packages/locale-es_ES/lib64/X11/xkb/symbols/kpdl
-rm /ts/build/packages/locale-es_ES/lib64/X11/xkb/symbols/es
-rm /ts/build/packages/locale-es_ES/lib64/X11/xkb/symbols/us
 

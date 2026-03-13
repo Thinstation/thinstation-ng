@@ -1,4 +1,4 @@
-#160a2d890ebf0ff8648e10a32f0b4cbb  .dna
+#61d5f33bb3877f46b386e1149cfb8b65  .dna
 rm /ts/build/packages/locale-fi_FI/lib64/kbd/consolefonts/default8x16.psfu.gz
 rm /ts/build/packages/locale-fi_FI/lib64/kbd/keymaps/include/euro1.map.gz
 rm /ts/build/packages/locale-fi_FI/lib64/kbd/keymaps/include/qwerty-layout.inc
@@ -33,11 +33,4 @@ rm /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-1/Compose
 rm /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/XI18N_OBJS
 rm /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/XLC_LOCALE
 rm /ts/build/packages/locale-fi_FI/lib64/X11/locale/iso8859-15/Compose
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/fi
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/level3
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/us
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/kpdl
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/compose
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/nbsp
-rm /ts/build/packages/locale-fi_FI/lib64/X11/xkb/symbols/latin
 
