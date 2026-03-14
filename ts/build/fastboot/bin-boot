@@ -115,6 +115,7 @@ udevd
 udevinfo
 uniq
 unix_chkpwd
+unshare
 unsquashfs
 used
 usermod
