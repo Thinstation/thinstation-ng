@@ -3,7 +3,7 @@
 if [ -z "`mount |grep -e overlay`" ]; then
 	mount -t devtmpfs none /dev
 
-	NEWROOT=/newroot
+	NEWROOT=/pivot
 	mkdir -p $NEWROOT
 	mount --make-rprivate /
 	mount --rbind / $NEWROOT
