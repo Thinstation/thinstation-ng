@@ -328,7 +328,7 @@ param rootpasswd     pleasechangeme
 param defaultconfig  thinstation.conf.buildtime
 param baseurl        https://www.thinstation.net
 param basename       thinstation                # Used for all config/tftp/scp file names
-param basepath       ts7.3                      # Used to determine path to tftp/scp files
+param basepath       ts7.4                      # Used to determine path to tftp/scp files
 #param keyfile        ./id_rsa       			# Path for private key file used for ssh/scp
 #param knownhosts     ./known_hosts  			# Path for ssh known_hosts file for ssh/scp
 

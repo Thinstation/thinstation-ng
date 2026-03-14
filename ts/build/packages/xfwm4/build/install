@@ -23,7 +23,6 @@ export PORTS="	exo \
 		iceauth \
 		gtk-xfce-engine \
 "
-#xfce-polkit
 
 export DROP_DIRS="	lib64/xfce4/backdrops \
 			lib64/xfce4/xfwm4 \
