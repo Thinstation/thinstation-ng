@@ -8,7 +8,7 @@ Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=/etc/thinstation.env
 ExecStart=/etc/init.d/crontab
-SyslogIdentifier=thinstation
+SyslogIdentifier=ts-crontab
 
 [Install]
 WantedBy=tsinit.target
