@@ -1,6 +1,6 @@
 [thinstation-rpms]
 name=ThinStation RPM Repository
-baseurl=https://thinstation.github.io/thinstation-rpms/7.2/x86_64/
+baseurl=https://thinstation.github.io/thinstation-rpms/7.4/x86_64/
 enabled=1
 gpgcheck=0
 priority=10
