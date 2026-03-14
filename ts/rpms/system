@@ -48,7 +48,6 @@ util-linux-core
 vmtouch
 wget
 which
-wkhtmltopdf
 x11vnc
 xdialog
 xdpyinfo

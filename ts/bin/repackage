@@ -290,7 +290,7 @@ clean()
 {
 	package=$PACKAGE
 	if [ -n "$PACKAGE" ] && package_path; then
-		for object in `ls -A --color=never $pkgpath |grep -E -v 'build|.dna|.gitignore|.wind|.unwind|dependencies'`; do
+		for object in `ls -A --color=never $pkgpath |grep -E -v 'build|.dna|.gitignore|.wind|.unwind|dependencies|configurator.yaml|session_configurator.yaml'`; do
 			rm -rf $pkgpath/$object
 		done
 		rm -f $pkgpath/build/installed
