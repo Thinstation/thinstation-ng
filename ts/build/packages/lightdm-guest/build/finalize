@@ -2,6 +2,6 @@
 
 LDM_CONF=/etc/lightdm/lightdm.conf
 
-sed -i -e '/^autologin/d' /etc/lightdm/lightdm.conf
+sed -i -e '/^autologin/d'						$LDM_CONF
 sed -i -e 's/#greeter-allow-guest=true/greeter-allow-guest=true/g'	$LDM_CONF
 sed -i -e 's/#allow-guest=true/allow-guest=true/g'			$LDM_CONF
