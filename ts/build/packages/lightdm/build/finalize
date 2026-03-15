@@ -1,22 +1,29 @@
 #lightdm 29
 
+LDM_CONF=/etc/lightdm/lightdm.conf
+
 rm /etc/systemd/system/display-manager.service
 systemctl enable lightdm
 
 mkdir -p /var/lib/lightdm/.cache/lightdm-gtk-greeter
 chown -R lightdm:lightdm /var/lib/lightdm
 
-sed -i -e "s/tsuser/$TSUSER/g" /etc/lightdm/lightdm.conf
+sed -i -e "s/tsuser/$TSUSER/g" $LDM_CONF
 
-LDM_CONF=/etc/lightdm/lightdm-gtk-greeter.conf
-
-echo "theme-name = Adwaita"			>> $LDM_CONF
 if is_enabled $LIGHTDM_BANNER; then
-	sed -i -e '/^autologin/d' /etc/lightdm/lightdm.conf
-	cp /build/banner.png /etc/banner.png
-	sed -i -e '/^background/d'		$LDM_CONF
-	echo "background=/etc/banner.png"	>> $LDM_CONF
-	echo "position = 50%,center 70%,center" >> $LDM_CONF
-	echo "screensaver-timeout = 60"		>> $LDM_CONF
-	echo "user-background = false"		>> $LDM_CONF
+
+	LDMG_CONF=/etc/lightdm/lightdm-gtk-greeter.conf
+	BANNER_SRC=banner.svg
+	cp /build/$BANNER_SRC /etc/banner.svg
+
+	sed -i -e '/^autologin/d'		$LDM_CONF
+	sed -i 's|^#\?greeter-setup-script=.*|greeter-setup-script=/sbin/lightdm-banner|' $LDM_CONF
+
+	sed -i -e '/^background/d'		$LDMG_CONF
+	echo "theme-name = Adwaita"             >> $LDMG_CONF
+	echo "background=/etc/banner.png"	>> $LDMG_CONF
+	echo "position = 50%,center 80%,center" >> $LDMG_CONF
+	echo "screensaver-timeout = 60"		>> $LDMG_CONF
+	echo "user-background = false"		>> $LDMG_CONF
+
 fi

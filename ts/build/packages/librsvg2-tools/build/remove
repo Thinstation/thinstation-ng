@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export PACKAGE=librsvg2-tools
+repackage -c
+

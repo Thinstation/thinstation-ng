@@ -1,0 +1,44 @@
+#!/bin/sh
+
+BANNER_SRC=/etc/banner.svg
+BANNER_DST=/etc/banner.png
+
+read width height < <(
+  sed -n 's/.*viewBox="[0-9.]* [0-9.]* \([0-9.]*\) \([0-9.]*\)".*/\1 \2/p' $BANNER_SRC
+)
+
+#echo "src width=$width"
+#echo "src height=$height"
+
+RES="$(xrandr | awk '/\*/ {print $1; exit}')"
+DST_W="${RES%x*}"
+DST_H="${RES#*x}"
+
+#echo "dst width=$DST_W"
+#echo "dst height=$DST_H"
+
+read scale rwidth rheight pad_x pad_y < <(
+  awk -v sw="$width" -v sh="$height" -v dw="$DST_W" -v dh="$DST_H" '
+    BEGIN {
+      sx = dw / sw
+      sy = dh / sh
+      s = (sx < sy) ? sx : sy
+
+      rw = sw * s
+      rh = sh * s
+
+      px = (dw - rw) / 2
+      py = (dh - rh) / 2
+
+      printf "%.8f %.2f %.2f %.2f %.2f\n", s, rw, rh, px, py
+    }
+  '
+)
+
+#echo "scale=$scale"
+#echo "rendered width=$rwidth"
+#echo "rendered height=$rheight"
+#echo "pad_x=$pad_x"
+#echo "pad_y=$pad_y"
+
+rsvg-convert --page-width $DST_W --page-height $DST_H -h $DST_H --left $pad_x --keep-aspect-ratio -b black $BANNER_SRC > $BANNER_DST
