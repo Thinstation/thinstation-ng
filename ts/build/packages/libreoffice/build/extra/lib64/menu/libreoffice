@@ -1,7 +1,1 @@
-package="libreoffice"; needs="x11"; icon=libreoffice-startcenter; title="LibreOffice"; command="pkg window libreoffice"; menu="LibreOffice"; nodesktop="false"
-package="libreoffice-math"; needs="x11"; icon=libreoffice-math; title="LibreOffice Math"; command="pkg window libreoffice-math"; menu="LibreOffice"; nodesktop="true"
-package="libreoffice-writer"; needs="x11"; icon=libreoffice-writer; title="LibreOffice Writer"; command="pkg window libreoffice-writer"; menu="LibreOffice"; nodesktop="true"
-package="libreoffice-calc"; needs="x11"; icon=libreoffice-calc; title="LibreOffice Calc"; command="pkg window libreoffice-calc"; menu="LibreOffice"; nodesktop="true"
-package="libreoffice-base"; needs="x11"; icon=libreoffice-base; title="LibreOffice Base"; command="pkg window libreoffice-base"; menu="LibreOffice"; nodesktop="true"
-package="libreoffice-impress"; needs="x11"; icon=libreoffice-impress; title="LibreOffice Impress"; command="pkg window libreoffice-impress"; menu="LibreOffice"; nodesktop="true"
-package="libreoffice-draw"; needs="x11"; icon=libreoffice-draw; title="LibreOffice Draw"; command="pkg window libreoffice-draw"; menu="LibreOffice"; nodesktop="true"
+package="libreoffice"; needs="x11"; icon=libreoffice-startcenter; title="LibreOffice"; command="pkg window libreoffice"; menu="Office"; nodesktop="false"
