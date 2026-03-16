@@ -21,9 +21,10 @@ if is_enabled $LIGHTDM_BANNER; then
 
 	sed -i -e '/^background/d'		$LDMG_CONF
 	echo "theme-name = Adwaita"             >> $LDMG_CONF
-	echo "background=/etc/banner.png"	>> $LDMG_CONF
+	echo "background=/etc/banner-scaled.svg"	>> $LDMG_CONF
 	echo "position = 50%,center 80%,center" >> $LDMG_CONF
 	echo "screensaver-timeout = 60"		>> $LDMG_CONF
 	echo "user-background = false"		>> $LDMG_CONF
+	echo "default-user-image = /lib64/icons/hicolor/128x128/apps/ThinStation.png" >> $LDMG_CONF
 
 fi

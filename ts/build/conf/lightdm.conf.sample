@@ -1,4 +1,3 @@
-# To add a banner to the login, update /build/packages/lightdm/build/banner.html with any necessary text, then run
-# /build/packages/chrome/opt/google/chrome/google-chrome --no-sandbox --headless --disable-gpu --screenshot=/build/packages/lightdm/build/banner.png --window-size=1920,1080 file:///build/packages/lightdm/build/banner.html 2>/dev/null
+# To add a banner to the login, update /build/packages/lightdm/build/banner.svg with any necessary text
 # Then set LIGHTDM_BANNER=true, it's false by default.
 #LIGHTDM_BANNER=true
