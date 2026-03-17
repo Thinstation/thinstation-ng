@@ -9,3 +9,4 @@ libbpf
 libgcc
 authselect
 liblastlog2
+hwdata
