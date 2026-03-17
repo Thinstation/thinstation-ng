@@ -1,2 +1,3 @@
 fuse
 squashfs
+binfmt_misc

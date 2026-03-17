@@ -1,7 +1,7 @@
 #!/bin/sh
 
 export PACKAGE=libva
-export PORTS="libva libva-utils libva-vdpau-driver"
+export PORTS="libva libva-utils"
 repackage -e
 
 #ln -sf libva-x11.so.2 /build/packages/libva/lib64/libva-x11.so.1

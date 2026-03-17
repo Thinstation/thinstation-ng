@@ -186,6 +186,7 @@ package chrome               # Google Chrome browser
 #package galculator           # Scientific calculator
 #package mousepad             # Simple Notepad like application
 #package file-roller          # Archive manager for compressed files
+#package libreoffice          # LibreOffice Office Suite
 
 ###########################################
 ### --- Remote Desktop Applications --- ###
@@ -288,6 +289,8 @@ package xfwm4                # XFCE window manager
 
 # Display Manager
 package lightdm              # Lightweight display manager
+#package lightdm-guest        # Enable guest session for lightdm
+                              # (Hint) Also disable tsuser
 #package light-locker         # Session locker for LightDM
 
 # Utilities

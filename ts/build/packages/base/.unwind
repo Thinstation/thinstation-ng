@@ -1,4 +1,4 @@
-#e0c9e450527db8244ef7c2c96ed1da67  .dna
+#d11545a9cf1a5a2d2d0c68f125f35994  .dna
 
 mkdir -p /ts/build/packages/base/bin
 mkdir -p /ts/build/packages/base/etc
@@ -51,7 +51,7 @@ ln /usr/bin/getent /ts/build/packages/base/bin/getent
 ln /usr/bin/grpconv /ts/build/packages/base/sbin/grpconv
 ln /usr/bin/ldconfig /ts/build/packages/base/sbin/ldconfig
 ln /usr/bin/login /ts/build/packages/base/bin/login
-ln /usr/bin/lspci /ts/build/packages/base/sbin/lspci
+ln /usr/bin/lspci /ts/build/packages/base/bin/lspci
 ln /usr/bin/mount /ts/build/packages/base/bin/mount
 ln /usr/bin/ps /ts/build/packages/base/bin/ps
 ln /usr/bin/pwconv /ts/build/packages/base/sbin/pwconv

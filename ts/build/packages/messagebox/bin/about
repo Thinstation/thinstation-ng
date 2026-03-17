@@ -1,20 +1,28 @@
-#!/bin/sh
-# echo Thinstation Linux version $TS_VERSION
+#!/bin/bash
 
-. $TS_GLOBAL
+KERNEL=$(uname -r)
+HOST=$(hostname)
+OS=$(grep '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
+MEM_TOTAL=$(free -h | awk '/Mem:/ {print $2}')
+MEM_USED=$(free -h | awk '/Mem:/ {print $3}')
+FREE_MEM=$(free -h | awk '/Mem:/ {print $4}')
+CPU=$(lscpu | awk -F: '/Model name/ {print $2}' | sed 's/^ *//')
+IP=$(ip route get 1.1.1.1 |awk '{print $7;exit}')
+X_VER=`grep ^"X.Org" /var/log/Xorg.0.log |cut -d " " -f4`
 
-KERNEL=`exec uname -r`
-X_VER=`grep ^"X.Org" /var/log/Xorg.0.log`
-TOTAL_MEM=`free | grep -e Mem | sed -r 's/[[:space:]]+/ /g' |cut -d" " -f2`
-USED_MEM=`free |grep -e Mem | sed -r 's/[[:space:]]+/ /g' |cut -d" " -f3`
-FREE_MEM=`free | grep -e Mem | sed -r 's/[[:space:]]+/ /g' |cut -d" " -f4`
+yad --info --image=dialog-information --plug=$$ --tabnum=1| \
+yad --list \
+  --no-headers \
+  --column="" \
+  --column="" \
+  "Hostname" "$HOST" \
+  "Operating System" "$OS" \
+  "Kernel Version" "$KERNEL" \
+  "Xorg Server Version" "$X_VER" \
+  "CPU" "$CPU" \
+  "Memory Used" "$MEM_USED / $MEM_TOTAL" \
+  "Free Memory" "$FREE_MEM" \
+  "IP Address" "$IP" \
+  --plug=$$ --tabnum=2 &
 
-
-Xdialog --icon /lib/pixmaps/information_32x32.xpm --left --title "ThinStation Linux" \
-        --msgbox "Thinstation version: $TS_VERSION
-Linux kernel version: $KERNEL
-$X_VER
-Client IP: $CLIENT_IP
-Total memory: $TOTAL_MEM bytes
-Used memory: $USED_MEM bytes
-Free memory: $FREE_MEM bytes" 15 55 2>&1
+yad --paned --center --title="ThinStation About" --window-icon="ThinStation" --key=$$ --orient=hor --width=540 --height=290 --button "Advanced":"bash -c /bin/about2" --button=yad-close
