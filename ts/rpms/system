@@ -8,6 +8,7 @@ dropbear
 e2fsprogs
 fedpkg
 gcc
+gettext
 glib2-devel
 glibc-locale-source
 glx-utils

@@ -200,7 +200,7 @@ create_dialog()
 		<vbox visible="'"$SHOW_USER"'">
 			<vseparator height-request="1"></vseparator>
 			<text visible="'"$GET_USER"'" space-expand="false" space-fill="false" use-markup="true" xalign="0">
-				<label>Username</label>
+				<label>'$(gettext "Username")'</label>
 			</text>
 			<entry visible="'"$GET_USER"'" activates_default="true" has-focus="'$USER_FOCUS'">
 				'$(set_default $DIALOG_USER)'
@@ -209,7 +209,7 @@ create_dialog()
 				<action signal="focus-out-event">refresh:DIALOG_USER</action>
 			</entry>
 			<text visible="'"$GET_PASSWORD"'" space-expand="false" space-fill="false" use-markup="true" xalign="0">
-				<label>Password</label>
+				<label>'$(gettext "Password")'</label>
 			</text>
 			<entry visible="'"$GET_PASSWORD"'" visibility="false" caps-lock-warning="true" has-focus="'$PASS_FOCUS'" activates_default="true">
 				<variable>DIALOG_PASSWORD</variable>
@@ -219,7 +219,7 @@ create_dialog()
 		<vbox visible="'"$ALLOW_SERVER_EDITS"'">
 			<vseparator height-request="1"></vseparator>
 			<text space-expand="false" space-fill="false" use-markup="true" xalign="0">
-				<label>Server DNS name or IP address</label>
+				<label>'$(gettext "Server DNS name or IP address")'</label>
 			</text>
 			<entry activates_default="true" editable="'"$ALLOW_SERVER_EDITS"'" has-focus="true">
 				'$(set_default $DIALOG_SERVER)'
@@ -228,7 +228,7 @@ create_dialog()
 				<action signal="focus-out-event">refresh:DIALOG_SERVER</action>
 			</entry>
 			<text space-expand="false" space-fill="false" use-markup="true" xalign="0">
-				<label>Options</label>
+				<label>'$(gettext "Options")'</label>
 			</text>
 			<entry activates_default="true" editable="'"$ALLOW_SERVER_EDITS"'">
 				'$(set_default $DIALOG_OPTIONS)'
@@ -242,17 +242,17 @@ create_dialog()
 	<vseparator height-request="1"></vseparator>
 		<hbox>
 			<checkbox visible="'"$WINDOWED_SELECTABLE"'">
-				<label>Windowed</label>
+				<label>'$(gettext "Windowed")'</label>
 				<variable>windowed</variable>
 				<default>'$windowed_default'</default>
 			</checkbox>
 			<hbox>
 				<button>
-					<label>"Exit"</label>
+					<label>'$(gettext "Exit")'</label>
 					<action>EXIT:abort</action>
 				</button>
 				<button can-default="true" has-default="true">
-					<label>"Connect"</label>
+					<label>'$(gettext "Connect")'</label>
 					<action>EXIT:ok</action>
 				</button>
 			</hbox>
@@ -348,6 +348,7 @@ dialog_get_server_address()
 	GTKDIALOG=gtkdialog
 	client=$1
 	notcomplete=true
+	export TEXTDOMAIN='thinstation'
 	while $notcomplete; do
 		read_options
 		if $SHOW_USER || $ALLOW_SERVER_EDITS; then

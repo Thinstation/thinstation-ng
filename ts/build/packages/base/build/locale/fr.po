@@ -1,0 +1,27 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Utilisateur"
+
+msgid "Password"
+msgstr "Mot de passe"
+
+msgid "Server DNS name or IP address"
+msgstr "Nom DNS du serveur ou adresse IP"
+
+msgid "Options"
+msgstr "Options"
+
+msgid "Windowed"
+msgstr "Fenêtré"
+
+msgid "Exit"
+msgstr "Quitter"
+
+msgid "Connect"
+msgstr "Se connecter"

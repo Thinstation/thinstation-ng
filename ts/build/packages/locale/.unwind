@@ -4,3 +4,4 @@ mkdir -p /ts/build/packages/locale/bin
 ln /usr/bin/loadkeys /ts/build/packages/locale/bin/loadkeys
 ln /usr/bin/locale /ts/build/packages/locale/bin/locale
 ln /usr/bin/setfont /ts/build/packages/locale/bin/setfont
+ln /usr/bin/gettext /ts/build/packages/locale/bin/gettext
