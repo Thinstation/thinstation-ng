@@ -53,8 +53,11 @@ msgstr "Délai d'attente dépassé pour le réseau !"
 msgid "Network"
 msgstr "Réseau"
 
-msgid "Application PACKAGE failed with an error (STATUS)\nWould you like to review the command output log?"
-msgstr "L'application PACKAGE a retourné une erreur (STATUS)\nVoulez-vous analyser le journal de la commande ?"
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "L'application PACKAGE a retourné une erreur (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Voulez-vous analyser le journal de la commande ?"
 
 msgid "OK"
 msgstr "OK"

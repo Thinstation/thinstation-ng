@@ -8,11 +8,13 @@ x_check_status()
 		&& [ $STATUS != ${USER_DISCONNECT_CODE:=0} ] \
 		&& [ $STATUS != ${USER_LOGOUT_CODE:=0} ] \
 		&& [ ! -e /etc/console/$PACKAGE ]; then
+			ERROR_LINE1="$(gettext "Application PACKAGE failed with an error (STATUS)" | sed -e "s/PACKAGE/$PACKAGE/" | sed -e "s/STATUS/$STATUS/")"
+			ERROR_LINE2="$(gettext "Would you like to review the command output log?")"
 			Xdialog --title $PACKAGE \
 				--ok-label "$(gettext "View Log")" \
 				--cancel-label "$(gettext "OK")" \
 				--icon /lib/icons/hicolor/32x32/apps/${PACKAGE}.png \
-				--yesno "$(gettext "Application PACKAGE failed with an error (STATUS)\nWould you like to review the command output log?" | sed -e "s/PACKAGE/$PACKAGE/" | sed -e "s/STATUS/$STATUS/")" 10 80
+				--yesno "${ERROR_LINE1}\n${ERROR_LINE2}" 10 80
 
 			if [ $? == 0 ]; then
 				Xdialog --title $PACKAGE \
