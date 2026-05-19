@@ -30,4 +30,4 @@
 !/sbin/session
 !/sbin/shutdown
 
-/lib64/share/locale/
+/lib64/locale/

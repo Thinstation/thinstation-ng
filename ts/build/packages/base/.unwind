@@ -96,20 +96,20 @@ ln -sf /etc/authselect/system-auth /ts/build/packages/base/etc/pam.d/system-auth
 ln -sf pam_sepermit.so /ts/build/packages/base/lib64/security/pam_selinux_permit.so
 touch /ts/build/packages/base/etc/pam_debug
 
-mkdir -p /ts/build/packages/base/lib64/share/locale/fr/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/fr.po -o /ts/build/packages/base/lib64/share/locale/fr/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/share/locale/cs/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/da/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/de/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/es/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/fi/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/hr/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/hu/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/it/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/ja/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/nb/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/nl/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/pt/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/ru/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/sv/LC_MESSAGES/
-mkdir -p /ts/build/packages/base/lib64/share/locale/tr/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/fr.po -o /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/cs/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/da/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/de/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/es/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/fi/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/hr/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/hu/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/it/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/ja/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/nb/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/nl/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/pt/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/ru/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/sv/LC_MESSAGES/
+mkdir -p /ts/build/packages/base/lib64/locale/tr/LC_MESSAGES/

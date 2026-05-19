@@ -2,20 +2,21 @@
 
 x_check_status()
 {
+	export TEXTDOMAIN='thinstation'
 	if is_enabled $SHOW_ERROR_REPORT; then
 		if [ $STATUS != 0 ] \
 		&& [ $STATUS != ${USER_DISCONNECT_CODE:=0} ] \
 		&& [ $STATUS != ${USER_LOGOUT_CODE:=0} ] \
 		&& [ ! -e /etc/console/$PACKAGE ]; then
 			Xdialog --title $PACKAGE \
-				--ok-label "View Log" \
-				--cancel-label "OK" \
+				--ok-label "$(gettext "View Log")" \
+				--cancel-label "$(gettext "OK")" \
 				--icon /lib/icons/hicolor/32x32/apps/${PACKAGE}.png \
-				--yesno "Application $PACKAGE failed with an error ($STATUS)\nWould you like to review the command output log?" 10 80
+				--yesno "$(gettext "Application PACKAGE failed with an error (STATUS)\nWould you like to review the command output log?" | sed -e "s/PACKAGE/$PACKAGE/" | sed -e "s/STATUS/$STATUS/")" 10 80
 
 			if [ $? == 0 ]; then
 				Xdialog --title $PACKAGE \
-				--ok-label "Done" \
+				--ok-label "$(gettext "Done")" \
 				--no-cancel \
 				--logbox $APPLOG 40 100
 			fi
@@ -25,6 +26,7 @@ x_check_status()
 
 check_reconnect()
 {
+	export TEXTDOMAIN='thinstation'
 	if [ -e /tmp/.X11-unix/X$DISPLAY_NUMBER ] ; then
 		prompt=$(make_caps $RECONNECT_PROMPT | cut -c1-4)
 		NO_SESSION=$(make_lower $NO_SESSION)
@@ -43,10 +45,10 @@ check_reconnect()
 			unset choice_error
 			while [ "$choice_error" != "0" ] ; do
 				choice=$(Xdialog	--stdout \
-							--title "Reconnect/Shutdown?" \
+							--title "$(gettext "Reconnect/Shutdown?")" \
 							--clear \
 							--no-cancel \
-							--combobox "The session has ended. How would you like to continue?" 10 70 Reconnect Shutdown)
+							--combobox "$(gettext "The session has ended. How would you like to continue?")" 10 70 Reconnect Shutdown)
 				choice_error=$?
 			done
 			if [ "$choice" = "Shutdown" ] ; then
@@ -61,17 +63,17 @@ check_reconnect()
 			if [ -z "$prompt_time" ] ; then
 				prompt_time=10
 			fi
-			Xdialog --title "No Server Response" \
+			Xdialog --title "$(gettext "No Server Response")" \
 				--clear \
 				--timeout $prompt_time \
-				--msgbox "Server not responding - waiting $prompt_time seconds" 10 70
+				--msgbox "$(gettext "Server not responding - waiting TIME seconds" | sed -e "s/TIME/$prompt_time/")" 10 70
 			reconnect=0
 		elif [ "$prompt" == "FORC" ]; then
 			reconnect=0
 		elif [ "$prompt" != "OFF" ] ; then
-			Xdialog --title "Reconnect?" \
+			Xdialog --title "$(gettext "Reconnect?")" \
 				--clear \
-				--yesno "Click yes to reconnect." 10 70
+				--yesno "$(gettext "Click yes to reconnect.")" 10 70
 			reconnect=$?
 		else
 			reconnect=1
@@ -81,26 +83,30 @@ check_reconnect()
 
 confirm_exit()
 {
-	Xdialog --title "Logout" --clear --yesno "Click yes to Confirm Exit?" 10 70
+	export TEXTDOMAIN='thinstation'
+	Xdialog --title "$(gettext "Logout")" --clear --yesno "$(gettext "Click yes to Confirm Exit?")" 10 70
 }
 
 dialog_no_value()
 {
+	export TEXTDOMAIN='thinstation'
 	Xdialog --title "$1 Client" \
 		--clear \
-		--msgbox "You must enter value, aborted" 10 70 10000
+		--msgbox "$(gettext "You must enter value, aborted")" 10 70 10000
 }
 
 dialog_get_value()
 {
-	Xdialog --title "$1 Client" \
+	export TEXTDOMAIN='thinstation'
+	Xdialog --title "$(gettext "NAME Client" | sed -e "s/NAME/$1/")" \
 		--clear \
-		--inputbox "Enter $2:" 10 70 2>&1 1>/dev/null \
+		--inputbox "$(gettext "Enter FIELD:" | sed -e "s/FIELD/$2/")" 10 70 2>&1 1>/dev/null \
 	|grep -Ev '&|;|\(|`'
 }
 
 read_options()
 {
+	export TEXTDOMAIN='thinstation'
 	if $GET_USER; then
 		if [ -n "$REMUSER" ]; then
 			REMOTEUSER="$REMUSER"
@@ -137,7 +143,7 @@ read_options()
 		DIALOG_OPTIONS=$(cat /tmp/.dialog_${client}_options)
 	fi
 	if [ -z "$DIALOG_SERVER" ]; then
-		DIALOG_SERVER="type server name here"
+		DIALOG_SERVER=$(gettext "type server name here")
 	fi
 	if [ -z $ALLOW_SERVER_EDITS ]; then
 		ALLOW_SERVER_EDITS=false
@@ -186,9 +192,10 @@ choose_pixmap()
 
 dialog_no_value()
 {
-		Xdialog --title "$1 Client" \
-			--clear \
-			--msgbox "You must enter value for $2." 10 70 10000
+	export TEXTDOMAIN='thinstation'
+	Xdialog --title "$(gettext "NAME Client" | sed -e "s/NAME/$1/")" \
+		--clear \
+		--msgbox "$(gettext "You must enter value for FIELD." | sed -e "s/FIELD/$2/")" 10 70 10000
 }
 
 create_dialog()
@@ -196,7 +203,7 @@ create_dialog()
 	MAIN_DIALOG='
 <window title="'"$DIALOG_TITLE"'" decorated="true" width-request="325" height-request="225" allow-grow="false" allow-shrink="false" skip_taskbar_hint="true" image-name="'$(choose_pixmap)'">
 	<vbox>
-	<notebook labels="User|Server">
+	<notebook labels="'$(gettext "Authentication")'|'$(gettext "Connection")'">
 		<vbox visible="'"$SHOW_USER"'">
 			<vseparator height-request="1"></vseparator>
 			<text visible="'"$GET_USER"'" space-expand="false" space-fill="false" use-markup="true" xalign="0">
@@ -306,12 +313,13 @@ random_string()
 
 parse_results()
 {
+	export TEXTDOMAIN='thinstation'
 	if [ "$EXIT" == "ok" ]; then
 		# preserve settings
 		echo "$DIALOG_USER"	> /tmp/.dialog_${client}_user
 		echo "$DIALOG_SERVER"	> /tmp/.dialog_${client}_server
 		echo "$DIALOG_OPTIONS"	> /tmp/.dialog_${client}_options
-		if [ "$DIALOG_SERVER" != "type server name here" ]; then
+		if [ "$DIALOG_SERVER" != "$(gettext "type server name here")" ]; then
 			REMOTEUSER="$DIALOG_USER"
 			PASSWORD="$DIALOG_PASSWORD"
 			SERVER="$DIALOG_SERVER"
@@ -327,14 +335,15 @@ parse_results()
 
 check_results()
 {
+	export TEXTDOMAIN='thinstation'
 	if $GET_USER && [ -z "$SERVER" ] && [ -z "$REMOTEUSER" ]; then
-		dialog_no_value $client "Username and Server"
+		dialog_no_value $client "$(gettext "Username and Server")"
 	elif [ -z "$SERVER" ]; then
-		dialog_no_value $client "Server name or IP"
+		dialog_no_value $client "$(gettext "Server DNS name or IP address")"
 	elif $GET_USER && [ -z "$REMOTEUSER" ]; then
-		dialog_no_value $client "Username"
+		dialog_no_value $client "$(gettext "Username")"
 	elif $GET_PASS && [ -z "$PASSWORD" ] && ${PASS_REQUIRED:=false}; then
-		dialog_no_value $client "Password"
+		dialog_no_value $client "$(gettext "Password")"
 	else
 		notcomplete=false
 	fi
@@ -376,10 +385,12 @@ net_progress()
 {
 	let chunksize="99 / $PACKAGE_NET_WAIT"
 	progress=".    "
+	export TEXTDOMAIN='thinstation'
+	label=$(gettext "Scanning")
 	for i in $(seq 99 -$chunksize 0); do
-		if [ -z "`ifconfig |grep -e 'inet addr' |grep -v 127.0`" ]; then
+		if [ -z "`ifconfig |grep -e 'inet ' |grep -v 127.0`" ]; then
 			echo $i
-			echo "Scanning$progress"
+			echo "${label}${progress}"
 			if	[ "$progress" == ".    " ]; then progress="..   "
 			elif	[ "$progress" == "..   " ]; then progress="...  "
 			elif	[ "$progress" == "...  " ]; then progress=".... "
@@ -395,6 +406,7 @@ net_progress()
 x_error()
 {
 	title="$1"
+	export TEXTDOMAIN='thinstation'
 	shift
 	while [ -n "$1" ]; do
 		local text_widget="$text_widget `gen_text_widget \"$1\"`"
@@ -416,7 +428,7 @@ x_error()
 		<hseparator></hseparator>
 		<hbox>
 			<button has-focus="false" can-focus="false">
-				<label>"Exit"</label>
+				<label>"'$(gettext "Exit")'"</label>
 				<action>EXIT:ok</action>
 			</button>
 		</hbox>
@@ -433,11 +445,12 @@ find_network()
 		return 0
 	fi
 	export -f net_progress
+	export TEXTDOMAIN='thinstation'
 	export BAR_DIALOG='
-<window title="Kiosk Progress" decorated="false" width-request="325" height-request="95" allow-grow="false" allow-shrink="false" skip_taskbar_hint="true">
+<window title="'$(gettext "Kiosk Progress")'" decorated="false" width-request="325" height-request="95" allow-grow="false" allow-shrink="false" skip_taskbar_hint="true">
 	<vbox>
 		<text>
-			<label>Waiting for '$PACKAGE' network.</label>
+			<label>'$(gettext "Waiting for 'PACKAGE' network." | sed -e "s/PACKAGE/$PACKAGE/")'</label>
 		</text>
 		<vseparator height-request="5"></vseparator>
 		<progressbar>
@@ -458,7 +471,7 @@ find_network()
 		$GTKDIALOG -c --program=BAR_DIALOG
 	fi
 	if [ -z "`/bin/busybox.shared ifconfig |grep -e 'inet ' |grep -v 127.0`" ]; then
-		x_error "Network" "Timed out waiting for network!"
+		x_error "$(gettext "Network")" "$(gettext "Timed out waiting for network!")"
 		return 1
 	fi
 }

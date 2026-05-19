@@ -86,4 +86,4 @@ rm /ts/build/packages/base/sbin/grpconv
 rm /ts/build/packages/base/sbin/unix_chkpwd
 rm /ts/build/packages/base/bin/mount
 rm /ts/build/packages/base/bin/find
-rm -rf /ts/build/packages/base/lib64/share/
+rm -rf /ts/build/packages/base/lib64/locale/
