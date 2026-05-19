@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: nb\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Brukernavn"
+
+msgid "Password"
+msgstr "Passord"
+
+msgid "Username and Server"
+msgstr "Brukernavn og Server"
+
+msgid "Server DNS name or IP address"
+msgstr "Server DNS-navn eller IP-adresse"
+
+msgid "type server name here"
+msgstr "skriv inn servernavn her"
+
+msgid "Options"
+msgstr "Alternativer"
+
+msgid "Windowed"
+msgstr "I vindu"
+
+msgid "Exit"
+msgstr "Avslutt"
+
+msgid "Connect"
+msgstr "Koble til"
+
+msgid "Authentication"
+msgstr "Autentisering"
+
+msgid "Connection"
+msgstr "Tilkobling"
+
+msgid "Kiosk Progress"
+msgstr "Kiosk fremdrift"
+
+msgid "Scanning"
+msgstr "Søker"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Venter på nettverk for 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Tidsavbrudd ved venting på nettverk!"
+
+msgid "Network"
+msgstr "Nettverk"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Applikasjon PACKAGE feilet med en feil (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Vil du gjennomgå kommandoens utdatalog?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Vis logg"
+
+msgid "Done"
+msgstr "Ferdig"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Koble til igjen / Slå av?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Økten er avsluttet. Hvordan vil du fortsette?"
+
+msgid "Reconnect"
+msgstr "Koble til igjen"
+
+msgid "Shutdown"
+msgstr "Slå av"
+
+msgid "No Server Response"
+msgstr "Ingen respons fra server"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Serveren svarer ikke - venter TIME sekunder"
+
+msgid "Reconnect?"
+msgstr "Koble til igjen?"
+
+msgid "Click yes to reconnect."
+msgstr "Klikk ja for å koble til igjen."
+
+msgid "Logout"
+msgstr "Logg ut"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Klikk ja for å bekrefte avslutning."
+
+msgid "You must enter value, aborted"
+msgstr "Du må angi en verdi, avbrutt."
+
+msgid "NAME Client"
+msgstr "NAME Klient"
+
+msgid "Enter FIELD:"
+msgstr "Angi FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Du må angi en verdi for FIELD."
