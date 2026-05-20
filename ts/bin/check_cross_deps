@@ -1,0 +1,42 @@
+#!/bin/bash
+# Check cross-compilation dependencies
+
+echo "Checking cross-compilation dependencies..."
+
+# Check QEMU user-static
+if ! rpm -q qemu-user-static >/dev/null 2>&1; then
+	echo "❌ qemu-user-static not installed"
+	echo "   Install: dnf install qemu-user-static"
+	exit 1
+else
+	echo "✅ qemu-user-static installed"
+fi
+
+# Check binfmt support
+if [ ! -e /proc/sys/fs/binfmt_misc/status ]; then
+	echo "❌ binfmt_misc not enabled"
+	echo "   Enable: systemctl start systemd-binfmt"
+	exit 1
+else
+	status=$(cat /proc/sys/fs/binfmt_misc/status)
+	if [ "$status" = "enabled" ]; then
+		echo "✅ binfmt_misc enabled"
+	else
+		echo "❌ binfmt_misc disabled"
+		echo "   Enable: echo 1 > /proc/sys/fs/binfmt_misc/status"
+		exit 1
+	fi
+fi
+
+# Check QEMU binaries
+for qemu in qemu-aarch64-static qemu-arm-static; do
+	if which $qemu >/dev/null 2>&1; then
+		echo "✅ $qemu found: $(which $qemu)"
+	else
+		echo "⚠️  $qemu not found"
+	fi
+done
+
+echo ""
+echo "✅ All required dependencies are installed"
+echo "You can now use: ./setup-chroot --arch aarch64"

@@ -7,6 +7,7 @@ core_ports="`grep -v '^\s*#' ts/rpms/core |sed ':a;N;$!ba;s/\n/ /g'`"
 grub_ports="`grep -v '^\s*#' ts/rpms/grub |sed ':a;N;$!ba;s/\n/ /g'`"
 kernel_ports="`grep -v '^\s*#' ts/rpms/kernel |sed ':a;N;$!ba;s/\n/ /g'`"
 firmware_ports="`grep -v '^\s*#' ts/rpms/firmware |sed ':a;N;$!ba;s/\n/ /g'`"
+uboot_ports="uboot-tools"
 system_ports="`grep -v '^\s*#' ts/rpms/system |sed ':a;N;$!ba;s/\n/ /g'`"
 ts_ports="`grep -v '^\s*#' ts/rpms/ts |sed ':a;N;$!ba;s/\n/ /g'`"
 if [ -e ts/rpms/other ]; then
@@ -43,8 +44,28 @@ stage1()
         if ! mountpoint proc >/dev/null 2>&1 ; then mount -t proc proc proc ; fi
         if ! mountpoint sys >/dev/null 2>&1 ; then mount -t sysfs none sys ; fi
 
+	# Build dnf options according to target architecture
+	DNF_ARCH_OPTS=""
+	ARCH_SPECIFIC_PORTS=""
+	if [ -n "$TARGET_ARCH" ] && [ "$TARGET_ARCH" != "$(uname -m)" ]; then
+		DNF_ARCH_OPTS="--forcearch=$TARGET_ARCH"
+		echo "Using dnf --forcearch=$TARGET_ARCH"
+		# Architecture-specific packages
+		case "$TARGET_ARCH" in
+			aarch64|armv7l)
+				echo "Adding U-Boot tools for ARM, skipping x86_64-specific grub and firmware packages"
+				ARCH_SPECIFIC_PORTS="$uboot_ports"
+				;;
+			*)
+				ARCH_SPECIFIC_PORTS="$grub_portss"
+				;;
+		esac
+	else
+		ARCH_SPECIFIC_PORTS="$grub_ports"
+	fi
+	
 	ROOT=$PWD
-	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --releasever=42 $core_ports $kernel_ports $grub_ports $firmware_ports
+	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --releasever=42 $DNF_ARCH_OPTS --skip-unavailable $core_ports $kernel_ports $firmware_ports $ARCH_SPECIFIC_PORTS
 	cd $ROOT
 	touch $ROOT/dostage2
 }
@@ -78,8 +99,8 @@ stage3()
 {
 	cp -a /ts/repos/* /etc/yum.repos.d/.
 	dnf makecache
-        dnf install --setopt=keepcache=1 -y --releasever=42 $system_ports
-	dnf install --setopt=keepcache=1 -y --allowerasing $ts_ports $other_ports
+        dnf install --setopt=keepcache=1 -y --releasever=42 $DNF_ARCH_OPTS --skip-unavailable $system_ports
+	dnf install --setopt=keepcache=1 -y --allowerasing $DNF_ARCH_OPTS $ts_ports $other_ports
 	for Root in $TSWRKNG $XTRWRKNG; do
 		if [ $Root = $TSWRKNG ]
 			then export Cache=/ts
