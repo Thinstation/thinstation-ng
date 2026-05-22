@@ -26,6 +26,7 @@ help()
 
 	-a : Automatically download and build during unwind.
 	--arch ARCH : Specify target architecture (x86_64, aarch64, armv7l)
+	-d : Enable interactive mode for debug.
 	-h : Show this help message.
 	-i : Install the env only. Don't enter it after-wards.
 	-b : Run build after entering chroot and exit after-wards.
@@ -54,6 +55,7 @@ get_opts()
 		-e|--exec)	shift ; export exec_cmd=$@ ; shift $# ;;
 		-u|--user)	shift ; export chuser=$1 ;;
 		-k|--keys)	shift ; export keys=true;;
+		-d|--debug)	shift ; export DEBUG=true ;;
 		*)		echo "Invalid Argument: $1" ; help ; exit 255 ;;
 		esac
 		shift
