@@ -54,8 +54,8 @@ get_opts()
 		-c|--clean)	unset build exec_cmd; shift $# ; export clean=true ;;
 		-e|--exec)	shift ; export exec_cmd=$@ ; shift $# ;;
 		-u|--user)	shift ; export chuser=$1 ;;
-		-k|--keys)	shift ; export keys=true;;
-		-d|--debug)	shift ; export DEBUG=true ;;
+		-k|--keys)  export keys=true;;
+		-d|--debug) export DEBUG=true ;;
 		*)		echo "Invalid Argument: $1" ; help ; exit 255 ;;
 		esac
 		shift
