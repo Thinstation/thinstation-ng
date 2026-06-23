@@ -1,0 +1,85 @@
+#!/bin/bash
+# make-desktop-entries - Generate .desktop files from menu definition files at build time
+# Usage: make-desktop-entries <rootdir>
+#
+# Reads menu definition files (without extension) from <rootdir>/lib64/menu/
+# and generates corresponding .desktop files in the same directory.
+# The .desktop files are then available at runtime in /lib64/menu/ for xfwm4.functions
+# to copy into user directories.
+
+ROOTDIR=${1:-./tmp-tree}
+MENUDIR="$ROOTDIR/lib64/menu"
+
+if [ ! -d "$MENUDIR" ]; then
+	echo "No menu dir found at $MENUDIR, skipping."
+	exit 0
+fi
+
+make_desktop_build()
+{
+	local submenu
+	local LINK="$MENUDIR/$(echo "$title.desktop" | sed 's/[ \/]/_/g')"
+
+	if [ -n "$menu" ]; then
+		submenu="$(echo $menu | awk -F:: '{ print $NF }')"
+	else
+		submenu="X-Xfce-Toplevel"
+	fi
+
+	echo "[Desktop Entry]"				>"$LINK"
+	echo "Version=1.0"				>>"$LINK"
+	echo "Name=$title"				>>"$LINK"
+	echo "Comment=$title"				>>"$LINK"
+	echo "TryExec=$command"				>>"$LINK"
+	echo "Exec=$command"				>>"$LINK"
+	if [ -n "$Path" ]; then
+		echo "Path=$Path"			>>"$LINK"
+	fi
+	echo "StartupNotify=false"			>>"$LINK"
+	echo "Terminal=false"				>>"$LINK"
+	echo "Type=Application"				>>"$LINK"
+	echo "Icon=$icon"				>>"$LINK"
+	echo "Categories=GTK;GNOME;$submenu;"		>>"$LINK"
+
+	# Store TS-specific metadata as non-standard keys for runtime use
+	if [ -n "$nodesktop" ]; then
+		echo "X-TS-NoDesktop=$nodesktop"	>>"$LINK"
+	fi
+	if [ -n "$nomenu" ]; then
+		echo "X-TS-NoMenu=$nomenu"		>>"$LINK"
+	fi
+	if [ -n "$metric" ]; then
+		echo "X-TS-Metric=$metric"		>>"$LINK"
+	fi
+
+	chmod +x "$LINK"
+	# Note: gio set (xfce-exe-checksum) is not done here as it requires a running
+	# graphical session. It will be applied at runtime by xfwm4.functions when
+	# copying the .desktop files to user directories.
+}
+
+echo "Generating .desktop entries from $MENUDIR"
+
+for menufile in "$MENUDIR"/*; do
+	# Skip already-generated .desktop files
+	case "$menufile" in
+		*.desktop) continue ;;
+	esac
+	[ -f "$menufile" ] || continue
+
+	echo "  Processing: $(basename $menufile)"
+
+	while read entry; do
+		case "$entry" in
+			\#*|"") continue ;;
+		esac
+		eval "$entry"
+		[ -z "$title" ] && continue
+		[ -z "$icon" ] && icon="$package"
+		[ -n "$path" ] && Path="$path"
+		make_desktop_build
+		unset title package command nodesktop nomenu menu needs icon metric Path path
+	done < "$menufile"
+done
+
+echo "Done generating .desktop entries."

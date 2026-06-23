@@ -293,49 +293,39 @@ wm_menu()
 	rm -f $HOME/.local/share/applications/*
 	rm -f $HOME/.config/xfce4/desktop/*
 	if [ "`make_caps $ICONMODE`" == "AUTO" ]; then
-		IMENU=/tmp/icon.menu
-		rm -rf $IMENU
 		rm -rf /tmp/typelist
-		if [ -e /lib64/menu ] ; then
-			cat /lib64/menu/* > $IMENU
-		fi
-		(cat $IMENU) |
-			while read entry; do
-				case "$entry" in
-					\#*|"") continue ;;
-				esac
-				eval $entry
-				if ! is_enabled $nomenu ; then
-					ICONDIR=$HOME/.local/share/applications
-					if [ -z "$menu" ]; then
-						menu=X-Xfce-Toplevel
-					else
-						echo $menu >> /tmp/typelist
+		if [ -d /lib64/menu ]; then
+			for desktop in /lib64/menu/*.desktop; do
+				[ -f "$desktop" ] || continue
+				nomenu=$(grep "^X-TS-NoMenu=" "$desktop" | cut -d= -f2)
+				nodesktop=$(grep "^X-TS-NoDesktop=" "$desktop" | cut -d= -f2)
+				metric=$(grep "^X-TS-Metric=" "$desktop" | cut -d= -f2)
+				menu_cat=$(grep "^Categories=" "$desktop" | sed 's/Categories=//' | tr ';' '\n' | grep -v "^GTK$\|^GNOME$\|^X-Xfce-Toplevel$\|^$" | head -1)
+
+				if ! is_enabled $nomenu; then
+					dest="$HOME/.local/share/applications/$(basename $desktop)"
+					mkdir -p "$HOME/.local/share/applications"
+					cp "$desktop" "$dest"
+					gio set -t string "$dest" metadata::xfce-exe-checksum "$(sha256sum "$dest" | awk '{print $1}')"
+					if [ -n "$menu_cat" ]; then
+						echo "$menu_cat" >> /tmp/typelist
 					fi
-					if [ -z "$icon" ]; then
-						icon=$package
-					fi
-					if [ -n "$path" ]; then
-						Path=$path
-					fi
-					make_desktop
-					
 				fi
-				if ! is_enabled $nodesktop ; then
-					if [ -z "$metric" ]; then
-						metric=99
-					fi
+				if ! is_enabled $nodesktop; then
+					[ -z "$metric" ] && metric=99
 					ICONDIR=$HOME/Desktop
-					
-					make_desktop
-					desktop_icon_file=$ICONDIR/`replace_char "$title.desktop" "[ /]" "_"`
-					echo "$metric $desktop_icon_file" >> /tmp/icon.sort
+					mkdir -p "$ICONDIR"
+					dest="$ICONDIR/$(basename $desktop)"
+					cp "$desktop" "$dest"
+					gio set -t string "$dest" metadata::xfce-exe-checksum "$(sha256sum "$dest" | awk '{print $1}')"
+					echo "$metric $dest" >> /tmp/icon.sort
 				fi
-				unset title package command nodesktop nomenu menu needs icon metric desktop_icon_file
+				unset nomenu nodesktop metric menu_cat dest
 			done
-			screenrc=$HOME/.config/xfce4/desktop/icons.screen0.rc
-			mkdir -p $HOME/.config/xfce4/desktop
-			echo -e "[xfdesktop-version-4.10.3+-rcfile_format]\n4.10.3+=true\n" > $screenrc
+		fi
+		screenrc=$HOME/.config/xfce4/desktop/icons.screen0.rc
+		mkdir -p $HOME/.config/xfce4/desktop
+		echo -e "[xfdesktop-version-4.10.3+-rcfile_format]\n4.10.3+=true\n" > $screenrc
 	fi
 
 	sindex=50
@@ -499,7 +489,6 @@ wm_menu()
 		echo "</Menu>"									>>$menufile
 
 
-	rm -rf $IMENU
 	rm -rf /tmp/typelist
 
 }

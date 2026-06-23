@@ -1297,6 +1297,13 @@ for filename in `cat ./filelist | grep "\.param"` ; do
 	. $filename
 done
 rm ./filelist
+
+# Generate .desktop menu entries from /lib64/menu definition files
+echo -e "\nGenerating .desktop menu entries\n"
+if [ -e ./tmp-tree/lib64/menu ]; then
+	/ts/bin/make-desktop-entries ./tmp-tree
+fi
+
 # Set Additional Params
 
 #exit 1
