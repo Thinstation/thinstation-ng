@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: hr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Korisničko ime"
+
+msgid "Password"
+msgstr "Lozinka"
+
+msgid "Username and Server"
+msgstr "Korisničko ime i Poslužitelj"
+
+msgid "Server DNS name or IP address"
+msgstr "DNS naziv poslužitelja ili IP adresa"
+
+msgid "type server name here"
+msgstr "unesite naziv poslužitelja ovdje"
+
+msgid "Options"
+msgstr "Opcije"
+
+msgid "Windowed"
+msgstr "U prozoru"
+
+msgid "Exit"
+msgstr "Izlaz"
+
+msgid "Connect"
+msgstr "Poveži se"
+
+msgid "Authentication"
+msgstr "Autentifikacija"
+
+msgid "Connection"
+msgstr "Veza"
+
+msgid "Kiosk Progress"
+msgstr "Napredak kioska"
+
+msgid "Scanning"
+msgstr "Pretraživanje"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Čekanje na mrežu za 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Isteklo vrijeme čekanja na mrežu!"
+
+msgid "Network"
+msgstr "Mreža"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Aplikacija PACKAGE nije uspjela s greškom (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Želite li pregledati dnevnik izlaza naredbe?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Prikaži dnevnik"
+
+msgid "Done"
+msgstr "Gotovo"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Ponovno povezivanje / Isključivanje?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Sesija je završila. Kako želite nastaviti?"
+
+msgid "Reconnect"
+msgstr "Ponovno poveži"
+
+msgid "Shutdown"
+msgstr "Isključi"
+
+msgid "No Server Response"
+msgstr "Nema odgovora poslužitelja"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Poslužitelj ne odgovara - čekanje TIME sekundi"
+
+msgid "Reconnect?"
+msgstr "Ponovno povezivanje?"
+
+msgid "Click yes to reconnect."
+msgstr "Kliknite da za ponovno povezivanje."
+
+msgid "Logout"
+msgstr "Odjava"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Kliknite da za potvrdu izlaza."
+
+msgid "You must enter value, aborted"
+msgstr "Morate unijeti vrijednost, prekinuto."
+
+msgid "NAME Client"
+msgstr "NAME Klijent"
+
+msgid "Enter FIELD:"
+msgstr "Unesite FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Morate unijeti vrijednost za FIELD."

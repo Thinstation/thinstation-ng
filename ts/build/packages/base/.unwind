@@ -95,3 +95,36 @@ ln -sf /etc/authselect/smartcard-auth /ts/build/packages/base/etc/pam.d/smartcar
 ln -sf /etc/authselect/system-auth /ts/build/packages/base/etc/pam.d/system-auth
 ln -sf pam_sepermit.so /ts/build/packages/base/lib64/security/pam_selinux_permit.so
 touch /ts/build/packages/base/etc/pam_debug
+
+mkdir -p /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/fr.po -o /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/cs/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/cs.po -o /ts/build/packages/base/lib64/locale/cs/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/da/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/da.po -o /ts/build/packages/base/lib64/locale/da/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/de/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/de.po -o /ts/build/packages/base/lib64/locale/de/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/es/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/es.po -o /ts/build/packages/base/lib64/locale/es/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/fi/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/fi.po -o /ts/build/packages/base/lib64/locale/fi/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/hr/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/hr.po -o /ts/build/packages/base/lib64/locale/hr/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/hu/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/hu.po -o /ts/build/packages/base/lib64/locale/hu/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/it/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/it.po -o /ts/build/packages/base/lib64/locale/it/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/ja/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/ja.po -o /ts/build/packages/base/lib64/locale/ja/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/nb/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/nb.po -o /ts/build/packages/base/lib64/locale/nb/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/nl/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/nl.po -o /ts/build/packages/base/lib64/locale/nl/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/pt/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/pt.po -o /ts/build/packages/base/lib64/locale/pt/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/ru/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/ru.po -o /ts/build/packages/base/lib64/locale/ru/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/sv/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/sv.po -o /ts/build/packages/base/lib64/locale/sv/LC_MESSAGES/thinstation.mo
+mkdir -p /ts/build/packages/base/lib64/locale/tr/LC_MESSAGES/
+msgfmt /ts/build/packages/base/build/locale/tr.po -o /ts/build/packages/base/lib64/locale/tr/LC_MESSAGES/thinstation.mo

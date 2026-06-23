@@ -2,4 +2,4 @@
 rm /ts/build/packages/locale/bin/locale
 rm /ts/build/packages/locale/bin/loadkeys
 rm /ts/build/packages/locale/bin/setfont
-
+rm /ts/build/packages/locale/bin/gettext

@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Utilisateur"
+
+msgid "Password"
+msgstr "Mot de passe"
+
+msgid "Username and Server"
+msgstr "Utilisateur et Serveur"
+
+msgid "Server DNS name or IP address"
+msgstr "Nom DNS du serveur ou adresse IP"
+
+msgid "type server name here"
+msgstr "entrer le nom du serveur ici"
+
+msgid "Options"
+msgstr "Options"
+
+msgid "Windowed"
+msgstr "Fenêtré"
+
+msgid "Exit"
+msgstr "Quitter"
+
+msgid "Connect"
+msgstr "Se connecter"
+
+msgid "Authentication"
+msgstr "Authentification"
+
+msgid "Connection"
+msgstr "Connexion"
+
+msgid "Kiosk Progress"
+msgstr "Gestion du Kiosk"
+
+msgid "Scanning"
+msgstr "Recherche"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Attente du réseau pour 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Délai d'attente dépassé pour le réseau !"
+
+msgid "Network"
+msgstr "Réseau"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "L'application PACKAGE a retourné une erreur (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Voulez-vous analyser le journal de la commande ?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Voir le journal"
+
+msgid "Done"
+msgstr "Terminé"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Reconnecter / éteindre ?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "La session s'est terminé. Que souhaitez-vous faire ?"
+
+msgid "Reconnect"
+msgstr "Se reconnecter"
+
+msgid "Shutdown"
+msgstr "Eteindre"
+
+msgid "No Server Response"
+msgstr "Aucune réponse du serveur"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Le serveur ne répond pas - attente de TIME secondes"
+
+msgid "Reconnect?"
+msgstr "Se reconnecter ?"
+
+msgid "Click yes to reconnect."
+msgstr "Cliquez sur oui pour vous reconnecter."
+
+msgid "Logout"
+msgstr "Déconnexion"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Cliquez sur oui pour confirmer la déconnexion."
+
+msgid "You must enter value, aborted"
+msgstr "Vous devez entrer une valeur, abandon."
+
+msgid "NAME Client"
+msgstr "Client NAME"
+
+msgid "Enter FIELD:"
+msgstr "Saisissez FIELD :"
+
+msgid "You must enter value for FIELD."
+msgstr "Vous devez saisir une valeur pour FIELD."

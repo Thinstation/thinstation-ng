@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: ru\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Имя пользователя"
+
+msgid "Password"
+msgstr "Пароль"
+
+msgid "Username and Server"
+msgstr "Имя пользователя и Сервер"
+
+msgid "Server DNS name or IP address"
+msgstr "DNS-имя сервера или IP-адрес"
+
+msgid "type server name here"
+msgstr "введите имя сервера здесь"
+
+msgid "Options"
+msgstr "Параметры"
+
+msgid "Windowed"
+msgstr "В окне"
+
+msgid "Exit"
+msgstr "Выход"
+
+msgid "Connect"
+msgstr "Подключиться"
+
+msgid "Authentication"
+msgstr "Аутентификация"
+
+msgid "Connection"
+msgstr "Подключение"
+
+msgid "Kiosk Progress"
+msgstr "Прогресс киоска"
+
+msgid "Scanning"
+msgstr "Поиск"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Ожидание сети для 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Превышено время ожидания сети!"
+
+msgid "Network"
+msgstr "Сеть"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Приложение PACKAGE завершилось с ошибкой (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Хотите просмотреть журнал вывода команды?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Просмотреть журнал"
+
+msgid "Done"
+msgstr "Готово"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Переподключиться / Выключить?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Сеанс завершен. Как вы хотите продолжить?"
+
+msgid "Reconnect"
+msgstr "Переподключиться"
+
+msgid "Shutdown"
+msgstr "Выключить"
+
+msgid "No Server Response"
+msgstr "Нет ответа от сервера"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Сервер не отвечает - ожидание TIME секунд"
+
+msgid "Reconnect?"
+msgstr "Переподключиться?"
+
+msgid "Click yes to reconnect."
+msgstr "Нажмите да для переподключения."
+
+msgid "Logout"
+msgstr "Выйти"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Нажмите да для подтверждения выхода."
+
+msgid "You must enter value, aborted"
+msgstr "Вы должны ввести значение, прервано."
+
+msgid "NAME Client"
+msgstr "Клиент NAME"
+
+msgid "Enter FIELD:"
+msgstr "Введите FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Вы должны ввести значение для FIELD."

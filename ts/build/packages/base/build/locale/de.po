@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Benutzername"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "Username and Server"
+msgstr "Benutzername und Server"
+
+msgid "Server DNS name or IP address"
+msgstr "Server DNS-Name oder IP-Adresse"
+
+msgid "type server name here"
+msgstr "Servernamen hier eingeben"
+
+msgid "Options"
+msgstr "Optionen"
+
+msgid "Windowed"
+msgstr "Im Fenster"
+
+msgid "Exit"
+msgstr "Beenden"
+
+msgid "Connect"
+msgstr "Verbinden"
+
+msgid "Authentication"
+msgstr "Authentifizierung"
+
+msgid "Connection"
+msgstr "Verbindung"
+
+msgid "Kiosk Progress"
+msgstr "Kiosk-Fortschritt"
+
+msgid "Scanning"
+msgstr "Suche"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Warte auf Netzwerk für 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Zeitüberschreitung beim Warten auf Netzwerk!"
+
+msgid "Network"
+msgstr "Netzwerk"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Anwendung PACKAGE ist mit einem Fehler fehlgeschlagen (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Möchten Sie das Befehlsausgabeprotokoll überprüfen?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Protokoll anzeigen"
+
+msgid "Done"
+msgstr "Fertig"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Neu verbinden / Herunterfahren?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Die Sitzung ist beendet. Wie möchten Sie fortfahren?"
+
+msgid "Reconnect"
+msgstr "Neu verbinden"
+
+msgid "Shutdown"
+msgstr "Herunterfahren"
+
+msgid "No Server Response"
+msgstr "Keine Serverantwort"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Server antwortet nicht - warte TIME Sekunden"
+
+msgid "Reconnect?"
+msgstr "Neu verbinden?"
+
+msgid "Click yes to reconnect."
+msgstr "Klicken Sie auf Ja, um erneut zu verbinden."
+
+msgid "Logout"
+msgstr "Abmelden"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Klicken Sie auf Ja, um das Beenden zu bestätigen."
+
+msgid "You must enter value, aborted"
+msgstr "Sie müssen einen Wert eingeben, abgebrochen."
+
+msgid "NAME Client"
+msgstr "NAME Client"
+
+msgid "Enter FIELD:"
+msgstr "FIELD eingeben:"
+
+msgid "You must enter value for FIELD."
+msgstr "Sie müssen einen Wert für FIELD eingeben."
