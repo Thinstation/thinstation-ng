@@ -1917,7 +1917,7 @@ until [ -z "$1" ]; do
 		BUILDTIME=$1
 	elif [ "$1" = "--noimages" ]; then
 		NOIMAGES=true
-	elif [ "$1" = "--help" ]; then
+	elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
 		showhelp
 		remove_files
 		exit 0
