@@ -442,12 +442,6 @@ wm_menu()
 		echo "        <Menuname>Settings</Menuname>"					>>$menufile
 	if is_enabled $MENU_SHOWABOUT; then
 		echo "        <Filename>About.desktop</Filename>"				>>$menufile
-		ICONDIR=$HOME/.local/share/applications
-		command=about
-		icon=help-about
-		menu=X-Xfce-Toplevel
-		title=About
-		make_desktop
 	fi
 	if is_enabled $MENU_SHOWLOGOUT; then
 		echo "        <Filename>xfce4-session-logout.desktop</Filename>"		>>$menufile

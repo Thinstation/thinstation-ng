@@ -18,7 +18,10 @@ fi
 make_desktop_build()
 {
 	local submenu
+	local menufile="$1"
 	local LINK="$MENUDIR/$(echo "$title.desktop" | sed 's/[ \/]/_/g')"
+	local ref_file="${source:-$(basename "$menufile").desktop}"
+	local ref_desktop="$ROOTDIR/usr/share/applications/$ref_file"
 
 	if [ -n "$menu" ]; then
 		submenu="$(echo $menu | awk -F:: '{ print $NF }')"
@@ -29,6 +32,10 @@ make_desktop_build()
 	echo "[Desktop Entry]"				>"$LINK"
 	echo "Version=1.0"				>>"$LINK"
 	echo "Name=$title"				>>"$LINK"
+	# Inject translated Name/Comment/GenericName/Keywords from usr/share/applications if available
+	if [ -f "$ref_desktop" ]; then
+		awk '/^\[Desktop Entry\]/{found=1; next} /^\[/{found=0} found && /^(Name|Comment|GenericName|Keywords)\[/' "$ref_desktop"	>>"$LINK"
+	fi
 	echo "Comment=$title"				>>"$LINK"
 	echo "TryExec=$command"				>>"$LINK"
 	echo "Exec=$command"				>>"$LINK"
@@ -77,8 +84,8 @@ for menufile in "$MENUDIR"/*; do
 		[ -z "$title" ] && continue
 		[ -z "$icon" ] && icon="$package"
 		[ -n "$path" ] && Path="$path"
-		make_desktop_build
-		unset title package command nodesktop nomenu menu needs icon metric Path path
+		make_desktop_build "$menufile"
+		unset title package command nodesktop nomenu menu needs icon metric Path path source
 	done < "$menufile"
 done
 
