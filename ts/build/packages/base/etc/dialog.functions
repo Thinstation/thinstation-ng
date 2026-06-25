@@ -376,7 +376,7 @@ net_progress()
 	let chunksize="99 / $PACKAGE_NET_WAIT"
 	progress=".    "
 	for i in $(seq 99 -$chunksize 0); do
-		if [ -z "`ifconfig |grep -e 'inet addr' |grep -v 127.0`" ]; then
+		if [ -z "`/bin/busybox.shared ifconfig |grep -e 'inet ' |grep -v 127.0`" ]; then
 			echo $i
 			echo "Scanning$progress"
 			if	[ "$progress" == ".    " ]; then progress="..   "
