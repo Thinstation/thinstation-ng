@@ -11,17 +11,19 @@ build-image:
   #   - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
   script:
     - sudo ./setup-chroot -i
+    - sudo ./setup-chroot -e dnf install -y docker
     #- ./setup-chroot -e cp /build/conf/tiny/* /build/.
+    - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e stb
     #- make image
     # or: ./build.sh
     # or: ./build-image.sh
-    - sudo mkdir out
-    - sudo cp -v ts/build/boot-images/grub/thinstation-efi.iso out/npm.iso
+    - sudo mkdir ../out
+    - sudo cp -v ts/build/boot-images/grub/thinstation-efi.iso ../out/npm.iso
   artifacts:
     name: "image-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
     paths:
-      - out/
+      - "$CI_PROJECT_DIR"/../out/
     expire_in: 14 days
   after_script:
     - sudo rm -rf "$CI_PROJECT_DIR"
