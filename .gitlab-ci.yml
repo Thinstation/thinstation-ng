@@ -10,8 +10,8 @@ build-image:
     - dnf -y update
     - dnf -y install git make xz tar gzip sudo curl findutils util-linux
   script:
-    - mkdir -p out
-    - make image
+    - ./setup-chroot -e stb
+    #- make image
     # or: ./build.sh
     # or: ./build-image.sh
     - find . -type f \( -name "*.iso" -o -name "*.img" -o -name "*.qcow2" -o -name "*.raw" -o -name "*.xz" \) -exec cp -v {} out/ \;
