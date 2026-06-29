@@ -149,4 +149,4 @@ systemctl enable session
 systemctl enable session-setup
 systemctl enable fastboot
 
-authselect select local
+#authselect select local

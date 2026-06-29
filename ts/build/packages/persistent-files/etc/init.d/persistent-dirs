@@ -149,7 +149,7 @@ backup_file() {
 	# Construct the backup destination path
 	local BACKUP_PATH="${BACKUP_DIR}${SOURCE_PATH}"
 
-	if [ -e $SOURCE_PATH ] && [ -f $SOURCE_PATH ]; then
+	if [ -e $SOURCE_PATH ] && [ -f $SOURCE_PATH ] || [ -d $SOURCE_PATH ]; then
 		# Ensure that the directory structure exists and has the correct permissions
 		ensure_backup_directory_structure "$(dirname "$SOURCE_PATH")"
 

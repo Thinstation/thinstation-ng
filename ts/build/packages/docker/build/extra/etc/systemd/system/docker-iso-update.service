@@ -1,0 +1,12 @@
+[Unit]
+Description=Load Docker images from boot ISO and update containers
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/docker-iso-update
+RemainAfterExit=yes
+
+[Install]
+WantedBy=tsinit.target

@@ -62,8 +62,8 @@
 #machine NT-535
 #machine Dell-FX170
 machine qemu                 # Default profile for QEMU virtual machines
-#machine Virtualbox-4.1       # A good set of modules for VirtualBox
-#machine VMWare               # A good set of modules for VMWare
+machine Virtualbox-4.1       # A good set of modules for VirtualBox
+machine VMWare               # A good set of modules for VMWare
 
 ###################################
 ### --- File System Modules --- ###
@@ -76,7 +76,7 @@ module isofs                 # ISO9660 file system for CD-ROMs
 module udf                   # Universal Disk Format for CD/DVDs
 module fuse                  # Filesystem in Userspace
 module fuse3                 # Updated FUSE version
-#module ntfs                  # NTFS file system support
+#module ntfs3                 # NTFS file system support
 #module cifs                  # CIFS/SMB file system support
 #module autofs4               # Automount file system support
 
@@ -86,16 +86,16 @@ module fuse3                 # Updated FUSE version
 # Essential hardware modules for power, storage, and device management.
 
 #package acpi                 # ACPI power and thermal management
-#package lvm2                 # Logical Volume Manager for storage management
+package lvm2                 # Logical Volume Manager for storage management
 #package cpupower             # CPU frequency and power management
 
 ####################################
 ### --- ThinStation Packages --- ###
 ####################################
 #package automount            # Automatically mount storage volumes during boot
-#package netfiles             # Package that downloads additional runtime config files during boot.
+#package netfiles             # Package that downloads additional runtime config files during boot
 package persistent-files     # Scripts that will backup and restore files that need to persist
-#package idle-shutdown        # Package that lets you specify automatic shutdown settings and logic.
+#package idle-shutdown        # Package that lets you specify automatic shutdown settings and logic
 
 #####################
 ### --- Sound --- ###
@@ -106,6 +106,7 @@ package persistent-files     # Scripts that will backup and restore files that n
 #package pipewire             # Modern sound server
 #package pavucontrol          # PulseAudio mixer application
 #package pasystray            # Systray volume icon
+#package xfce4-pulseaudio-plugin # Systray volume icon
 
 #####################
 ### --- Video --- ###
@@ -134,13 +135,14 @@ package persistent-files     # Scripts that will backup and restore files that n
 ##########################
 # Networking-related packages and utilities.
 
-package autonet              # Legacy automatic network configuration
-#package networkmanager       # Modern network management service
+#package autonet              # Legacy automatic network configuration
+package networkmanager       # Modern network management service
 #package sssd                 # LDAP/AD authentication for a multiuser system
 #package bluetooth            # Bluetooth support and applets
 #package wireless             # Wireless tools and drivers
 #package wpa_supplicant       # WPA/WPA2/802.1X supplicant for Wi-Fi
 #package nftables             # Netfilter tables for firewalling
+#package firewalld            # A whole firewalling daemon
 #package avahi                # Service discovery using mDNS/DNS-SD (e.g., local printers and file shares)
 
 ###############################
@@ -156,17 +158,19 @@ package autonet              # Legacy automatic network configuration
 #########################
 # Miscellaneous utilities and tools.
 
-#package e2fsprogs            # Filesystem utilities for ext2/3/4
-#package parted               # Command-line partition manager
+#package audit                # System audit daemon
+#package logrotate            # logrotation package
+package e2fsprogs            # Filesystem utilities for ext2/3/4
+package gdisk                # An fdisk-like partitioning tool for GPT disks
+package parted               # Command-line partition manager
 #package gparted              # Graphical partition manager
 #package git                  # Version control system
-#package nano                 # Lightweight text editor
+package nano                 # Lightweight text editor
 package sudo                 # Privileged command execution
 #package yad                  # Yet Another Dialog - GTK-based dialog boxes
 #package extensions           # Extra system utilities
 #package extensions-x         # Extra X11 utilities and tools
 #package jq                   # Lightweight JSON processor
-#package file-roller          # Archive manager for compressed files
 #package nmap                 # Network analysis tool
 
 ############################
@@ -179,20 +183,33 @@ package sudo                 # Privileged command execution
 #package filezilla            # FileZilla FTP client
 #package meld                 # Visual diff and merge tool
 #package geany                # Lightweight IDE
+#package pinta                # Simple Paint like application
+#package galculator           # Scientific calculator
+#package mousepad             # Simple Notepad like application
+#package file-roller          # Archive manager for compressed files
+#package libreoffice          # LibreOffice Office Suite
 
 ###########################################
 ### --- Remote Desktop Applications --- ###
 ###########################################
 #package freerdp              # RDP client
-#package ica                  # Citrix ICA, this one might need a bit for work for ctxusb
+#package udsclient            # UDS Virtual Cable agent
+#package ica                  # Citrix ICA
+#package vmview               # VMware Horizon (Legacy 8.13.0 or lower)
+#package horizon              # Omnissa Horizon (8.14.0 or newer)
+#package spice                # virt-viewer package for spice and vnc
+#package thinlinc             # Cendio ThinLinc
 
 ##############################
 ### --- Virtualization --- ###
 ##############################
 # Virtualization tools and utilities.
 
-#package open-vm-tools        # VMware guest tools
-#package vboxguest            # VirtualBox guest additions
+package open-vm-tools        # VMware guest tools
+package vboxguest            # VirtualBox guest additions
+package qemu-guest-agent     # QEMU guest agent
+package xe-guest-utils       # XCP-ng guest utilities
+package docker               # Docker container service
 
 #######################
 ### --- Locales --- ###
@@ -201,7 +218,28 @@ package sudo                 # Privileged command execution
 
 #param fulllocales    true    # Generate extra locales for each language. Usually not needed.
 
+#package locale-cs_CZ         # Czech
+#package locale-da_DK         # Danish
+#package locale-de_DE         # German
+#package locale-en_GB         # English (Great Britain)
 package locale-en_US         # English (US)
+#package locale-es_ES         # Spanish
+#package locale-fi_FI         # Finnish
+#package locale-fr_BE         # French (Belgium)
+#package locale-fr_CA         # French (Canadian)
+#package locale-fr_CH         # French (Switzerland)
+#package locale-fr_FR         # French
+#package locale-hr_HR         # Croation
+#package locale-hu_HU         # Hungarian
+#package locale-it_IT         # Italian
+#package locale-ja_JP         # Japanese
+#package locale-nb_NO         # Norwegian (bokm  l)
+#package locale-pl_PL         # Polish
+#package locale-pt_PT         # Portuguese
+#package locale-pt_BR         # Portuguese (Brazil)
+#package locale-ru_RU         # Russian
+#package locale-sv_SE         # Swedish
+#package locale-tr_TR         # Turkish
 
 #############################
 ### --- Date and Time --- ###
@@ -218,8 +256,9 @@ package locale-en_US         # English (US)
 #package lighttpd             # Lightweight web server
 #package tftpd                # TFTP server for PXE booting
 #package dnsmasq              # DNS and DHCP server
-#package sshd                 # Secure shell server for remote login
-package docker               # Docker and container system
+#package sshd                 # Secure shell server for remote login using dropbear
+#package openssh              # Secure shell server for remote login using openssh
+package nginx-proxy-manager  # A reverse proxy with ACME support
 
 ####################
 ### --- Xorg --- ###
@@ -232,6 +271,12 @@ package docker               # Docker and container system
 #package xorg7-nouveau        # NVIDIA open-source GPU drivers
 #package xorg7-qxl            # QXL drivers for QEMU/SPICE virtual machines
 #package xorg7-vmware         # VMware GPU drivers
+#package xorg7vnc             # Include a VNC server for remote administration
+                              # This should be considered very carefully
+                              # You might consider using persistent-files and
+                              # generating per host server certificates.
+                              # Considerable thought should be applied to the
+                              # cmdline that will be used to launch this.
 
 # Optional proprietary drivers
 # package xorg7_nvidia       # NVIDIA proprietary driver
@@ -244,9 +289,12 @@ package docker               # Docker and container system
 
 #package xfwm4                # XFCE window manager
 #package xfce4-power-manager  # Power management for XFCE
+#package xfce4-screensaver    # Session locker for xfce4
 
 # Display Manager
 #package lightdm              # Lightweight display manager
+#package lightdm-guest        # Enable guest session for lightdm
+                              # (Hint) Also disable tsuser
 #package light-locker         # Session locker for LightDM
 
 # Utilities
@@ -273,11 +321,11 @@ package docker               # Docker and container system
 ######################################
 # Adjust parameters for fine-tuning the build process.
 
-param desktop        file:./backgrounds/Hive_Lite.jpg # Custom image to load as desktop background
+#param desktop        file:./backgrounds/Hive_Lite.jpg # Custom image to load as desktop background
 
 param grubtheme		"docker"
 
-param tsuser         docker-admin
+param tsuser         tsuser
 param tsuserpasswd   pleasechangeme
 param rootpasswd     pleasechangeme
 #param xorgvncpasswd  pleasechangeme			# VNC Access Password
@@ -292,8 +340,8 @@ param basepath       ts7.4                      # Used to determine path to tftp
 #param knownhosts     ./known_hosts  			# Path for ssh known_hosts file for ssh/scp
 
 #param localpkgs      false                     # to determine if PKG files are to be loaded locally
-param hardlinkfs     false                       # When enabled, duplicate files will be hardlinked to save space
-param sametimestmp   false                       # When enabled, the timestamps for all files and folders will be set to 00:00 of todays date in your timezone
+param hardlinkfs     true                       # When enabled, duplicate files will be hardlinked to save space
+param sametimestmp   true                       # When enabled, the timestamps for all files and folders will be set to 00:00 of todays date in your timezone
 #param stripelf       yes                       # Strip extraneous information from elf binaries (Maybe not Safe)
 
 param haltonerror    false
@@ -315,17 +363,17 @@ param fastboot       lotsofmem              # Mangles the filesystem a special w
                                             # memory utilization. Cool/Dangerous . Harder to dubug other packages. (Finishing Touch)
                                             # Set to 'true' for memory constrained systems or 'lotsofmem' for anything modern.
 param squashopt      "-comp xz"             # Settings to be passed to mksquashfs for fastboot
-param initrdcmd      "xz"                   # Can be any compression utility and settings, such as gzip, xz, bzip2 or lzo4
+param initrdcmd      "xz"                   # Can be any compression utility and settings, such as gzip, xz, bzip2, lzo4 or squashfs
 
 # Kernel command-line options
-#param bootlogo       true                   # Enable or Disable the use of the Boot splash.
+param bootlogo       false                   # Enable or Disable the use of the Boot splash.
 #param bootresolution 2560x1440              # Override the kernel detected video resolution with this value. Not usually needed.
 #param acpisupport    disable                # Tells the kernel not to load acpi modules. (Breaks some Intel Chipsets if disabled)
 #param kernelcmdline "selinux=0"             # Just disable selinux, but show all the kernel and boot messages
-param kernelcmdline "selinux=0 loglevel=3 udev.log_priority=3 quiet" # A quiet kernel command line
+param kernelcmdline "selinux=0 vt.global_cursor_default=0 loglevel=3 udev.log_priority=3 systemd.show_status=true rd.systemd.show_status=true quiet" # A very quiet kernel command line
 
 # Additional modules and settings
-param allfirmware    true
+#param allfirmware    true
 param blacklist      "snd-pcsp.ko pcspkr.ko"
 #param earlymicrocode	true
 

@@ -16,11 +16,12 @@ if [ "$INTERFACE" != "lo" ]; then
 		if [ -e /run/log/net/$INTERFACE ]; then
 			. /run/log/net/$INTERFACE
 		fi
-		if [ -n "$DHCP4_HOST_NAME" ] && [ -z "`pidof Xorg`" ]; then
-			CLIENT_NAME="$DHCP4_HOST_NAME"
+                if [ -n "$DHCP4_HOST_NAME" ]; then
+                        CLIENT_NAME="$DHCP4_HOST_NAME"
+		fi
+		if [ -n "$IP4_ADDRESS_0" ] && [ -z "`pidof Xorg`" ]; then
 			hostnamectl set-hostname $CLIENT_NAME
-			sed -i '/localhost/d' /etc/hosts
-			echo "127.0.0.1 `hostname` localhost" >> /etc/hosts
+                        echo "`echo $IP4_ADDRESS_0 | cut -d/ -f1` `hostname -f` `hostname -s`" >> /etc/hosts
 
 			# Update the .Xauthority with the new hostname
 			if `which xauth >/dev/null` && [ -n "`xauth list`" ]; then
@@ -29,7 +30,7 @@ if [ "$INTERFACE" != "lo" ]; then
 				KEY=`xauth list | awk '{print $3}' | head -1`
 
 				# Get the current hostname
-				NEWHOST=`hostname`/unix:0
+				NEWHOST=localhost/unix:0
 
 				# Add new entry
 				xauth add $NEWHOST MIT-MAGIC-COOKIE-1 $KEY

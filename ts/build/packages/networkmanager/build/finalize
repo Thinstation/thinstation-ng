@@ -3,3 +3,4 @@ echo "/bin/nm-applet &" >> /etc/skel/.xinitrc
 systemctl enable NetworkManager
 systemctl enable NetworkManager-wait-online
 systemctl enable hostname-reconfigure
+systemctl enable networkmanager-reload

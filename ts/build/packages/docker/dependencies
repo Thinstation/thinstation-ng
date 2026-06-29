@@ -6,8 +6,8 @@ ca-certificates
 container-selinux selinux
 #nano
 #tar
-#util-linux
-#coreutils
+util-linux
+coreutils
 #test
 #rtkit
 #test2

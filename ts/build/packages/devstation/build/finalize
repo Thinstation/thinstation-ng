@@ -16,4 +16,3 @@ sed -i -e '/sufficient/d' /etc/pam.d/login
 chmod 777 /etc/geany-build
 
 systemctl enable dnsmasq
-systemctl enable networkmanager-reload

@@ -1,1 +1,1 @@
-package="mixer"; icon="multimedia-volume-control"; needs="x11"; title="Volume Control"; command="pavucontrol"; menu="Multimedia"; nodesktop="true"
+package="mixer"; icon="multimedia-volume-control"; needs="x11"; title="Audio Settings"; command="pavucontrol"; menu="Configuration"; nodesktop="true"

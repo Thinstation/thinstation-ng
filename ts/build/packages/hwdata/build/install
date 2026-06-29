@@ -2,7 +2,7 @@
 
 export PACKAGE="hwdata"
 export PORTS="hwdata"
-export DROP_FILES=""
+export DROP_FILES="oui.txt iab.txt"
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""
 repackage -e

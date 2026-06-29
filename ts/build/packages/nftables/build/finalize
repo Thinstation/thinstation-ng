@@ -1,3 +1,9 @@
 #nftables 60
-. /build/scripts/nftables_postinstall.sh 1
+#. /build/scripts/nftables_postinstall.sh 1
 . /build/scripts/iptables-legacy_postinstall.sh 1
+. /build/scripts/iptables-services_postinstall.sh 1
+. /build/scripts/iptables-nft_postinstall.sh 1
+
+for name in ip{,6}tables{,-save,-restore} ebtables{,-save,-restore} arptables{,-save,-restore}; do
+    test -h /sbin || ln -s /bin/$name /sbin/$name 2>/dev/null || :
+done

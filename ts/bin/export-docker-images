@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG="${1:-images.conf}"
+OUT_DIR="${2:-./Docker}"
+
+mkdir -p "$OUT_DIR/images" "$OUT_DIR/manifests"
+
+safe_name() {
+  echo "$1" | sed 's#[/:@]#_#g'
+}
+
+while IFS= read -r image || [[ -n "$image" ]]; do
+  image="$(echo "$image" | xargs)"
+  [[ -z "$image" || "$image" =~ ^# ]] && continue
+
+  name="$(safe_name "$image")"
+
+  echo "Pulling $image"
+  docker pull "$image"
+
+  digest="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+  image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+
+  echo "Saving $image"
+  docker save "$image" -o "$OUT_DIR/images/${name}.tar"
+
+  cat > "$OUT_DIR/manifests/${name}.digest" <<EOF
+IMAGE=$image
+DIGEST=$digest
+IMAGE_ID=$image_id
+EOF
+
+done < "$CONFIG"

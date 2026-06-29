@@ -1,0 +1,2 @@
+#qemu-guest-agent 79
+. /build/scripts/qemu-guest-agent_postinstall.sh 1

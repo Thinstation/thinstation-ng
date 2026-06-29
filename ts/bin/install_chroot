@@ -3,6 +3,8 @@
 # URL: http://www.thinstation.org
 # Maintainer: Donald A. Cupp Jr. (don cupp jr at ya hoo dot com)
 
+DIST_VER=44
+
 core_ports="`grep -v '^\s*#' ts/rpms/core |sed ':a;N;$!ba;s/\n/ /g'`"
 grub_ports="`grep -v '^\s*#' ts/rpms/grub |sed ':a;N;$!ba;s/\n/ /g'`"
 kernel_ports="`grep -v '^\s*#' ts/rpms/kernel |sed ':a;N;$!ba;s/\n/ /g'`"
@@ -44,7 +46,7 @@ stage1()
         if ! mountpoint sys >/dev/null 2>&1 ; then mount -t sysfs none sys ; fi
 
 	ROOT=$PWD
-	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --releasever=44 $core_ports $kernel_ports $grub_ports $firmware_ports
+	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --setopt=max_parallel_downloads=10 --releasever="$DIST_VER" $core_ports $kernel_ports $grub_ports $firmware_ports
 	cd $ROOT
 	touch $ROOT/dostage2
 }
@@ -78,8 +80,8 @@ stage3()
 {
 	cp -a /ts/repos/* /etc/yum.repos.d/.
 	dnf makecache
-        dnf install --setopt=keepcache=1 -y --releasever=44 $system_ports
-	dnf install --setopt=keepcache=1 -y --allowerasing $ts_ports $other_ports
+        dnf install --setopt=keepcache=1 -y --setopt=max_parallel_downloads=10 --releasever="$DIST_VER" $system_ports
+	dnf install --setopt=keepcache=1 -y --allowerasing --setopt=max_parallel_downloads=10 --releasever="$DIST_VER" $ts_ports $other_ports
 	for Root in $TSWRKNG $XTRWRKNG; do
 		if [ $Root = $TSWRKNG ]
 			then export Cache=/ts

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ISO_DOCKER_DIR="${ISO_DOCKER_DIR:-/mnt/cdrom0/Docker}"
+STATE_DIR="${STATE_DIR:-/var/prstnt/docker-image-state}"
+COMPOSE_ROOT="${COMPOSE_ROOT:-/docker}"
+
+mkdir -p "$STATE_DIR"
+
+log() {
+  echo "[docker-iso-update] $*"
+}
+
+changed=0
+
+[[ -d "$ISO_DOCKER_DIR/images" ]] || {
+  log "No Docker image directory found at $ISO_DOCKER_DIR/images"
+  exit 0
+}
+
+for tar_file in "$ISO_DOCKER_DIR"/images/*.tar; do
+  [[ -f "$tar_file" ]] || continue
+
+  base="$(basename "$tar_file" .tar)"
+  manifest="$ISO_DOCKER_DIR/manifests/${base}.digest"
+  state_file="$STATE_DIR/${base}.digest"
+
+  if [[ ! -f "$manifest" ]]; then
+    log "Skipping $tar_file; missing manifest."
+    continue
+  fi
+
+  if [[ -f "$state_file" ]] && cmp -s "$manifest" "$state_file"; then
+    log "$base is already loaded."
+    continue
+  fi
+
+  image="$(grep '^IMAGE=' "$manifest" | cut -d= -f2-)"
+  log "Loading updated image: $image"
+
+  docker load -i "$tar_file"
+
+  cp "$manifest" "$state_file"
+  changed=1
+done
+
+if [[ "$changed" -eq 1 ]]; then
+  log "Images changed; recreating compose stacks."
+
+  for stack in "$COMPOSE_ROOT"/*; do
+    [[ -d "$stack" ]] || continue
+    [[ -f "$stack/docker-compose.yml" || -f "$stack/compose.yml" ]] || continue
+
+    log "Updating stack: $stack"
+    (
+      cd "$stack"
+      docker compose up -d --force-recreate
+    )
+  done
+else
+  log "No image changes detected."
+fi

@@ -1,3 +1,11 @@
+arptables
+arptables-save
+arptables-restore
+arptables-nft
+arptables-nft-save
+arptables-nft-restore
+xtables-nft-multi
+true
 init
 udhcpc
 sleep

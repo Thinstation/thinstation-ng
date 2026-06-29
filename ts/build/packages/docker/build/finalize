@@ -1,5 +1,5 @@
 #docker 90
-. /build/scripts/moby-engine_preinstall.sh 1
+#. /build/scripts/moby-engine_preinstall.sh 1
 . /build/scripts/moby-engine_postinstall.sh 1
 . /build/scripts/containerd_postinstall.sh 1
 . /build/scripts/criu_postinstall.sh 1
@@ -12,3 +12,4 @@ systemctl enable getty@tty1.service
 echo "%$TSUSER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$TSUSER
 docker --version > /etc/issue
 echo 'Kernel \r on an \m (\l)' >> /etc/issue
+#systemctl enable docker-iso-update

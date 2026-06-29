@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NM_DIR="/etc/NetworkManager/system-connections"
+
+nmcli con reload
+
+FILTER="$(
+  find "$NM_DIR" -maxdepth 1 -type f -name '*.nmconnection' -printf '%f\n' 2>/dev/null \
+    | sed 's/\.nmconnection$//' \
+    | sed 's/[][\.^$*+?{}()|/]/\\&/g' \
+    | paste -sd'|' -
+)"
+
+if [[ -n "$FILTER" ]]; then
+  mapfile -t UUIDS < <(
+    nmcli -t -f UUID,TYPE,NAME con show --active \
+      | awk -F: -v filter="$FILTER" '
+          $2 == "802-3-ethernet" && $3 !~ "^(" filter ")$" {
+            print $1
+          }
+        '
+  )
+  if [[ ${#UUIDS[@]} -eq 0 ]]; then
+    echo "No unmanaged active ethernet connections found."
+  else
+    echo "Taking down ${#UUIDS[@]} active ethernet connection(s)..."
+
+    for UUID in "${UUIDS[@]}"; do
+      echo "Bringing down $UUID"
+      nmcli con down uuid "$UUID" || true
+    done
+  fi
+  rm -rf /run/NetworkManager
+  systemctl restart NetworkManager
+fi

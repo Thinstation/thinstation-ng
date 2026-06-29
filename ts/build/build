@@ -2199,7 +2199,7 @@ wrap_efi()
 
 		HYBRID_EFI="--uefi"
 
-		lsize=`du -s $ESP |cut -f1`
+		lsize=`du -sc $ESP/EFI $ESP/boot |grep -e total |cut -f1`
 		let lsize+=1024
 		dd if=/dev/zero of=$INITDIR/boot.efi bs=1K count=$lsize
 		lodev=`losetup -f`
@@ -2207,7 +2207,8 @@ wrap_efi()
 		mkfs.vfat -I ${lodev} -n 'EFI'
 		mkdir -p temp-efi
 		mount ${lodev} temp-efi
-		cp -a $ESP/* temp-efi
+		cp -a $ESP/EFI temp-efi
+                cp -a $ESP/boot temp-efi
 		umount temp-efi
 		losetup -d $lodev
 		rmdir temp-efi

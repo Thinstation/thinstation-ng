@@ -6,8 +6,7 @@ ConditionPathExistsGlob=/etc/NetworkManager/system-connections/*
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/rm -rf /run/NetworkManager
-ExecStart=systemctl restart NetworkManager
+ExecStart=/etc/init.d/networkmanager-reload
 ExecStartPost=nm-online -s -q
 
 [Install]

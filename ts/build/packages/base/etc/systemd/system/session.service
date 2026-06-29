@@ -1,6 +1,6 @@
 [Unit]
 Description=ThinStation Session Initialize
-After=tsinit.target net.profile-setup.service
+After=tsinit.target net.profile-setup.service fastboot.service
 ConditionPathIsReadWrite=/etc
 
 [Service]

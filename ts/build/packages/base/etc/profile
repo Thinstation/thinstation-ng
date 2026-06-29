@@ -32,7 +32,7 @@ if [ "`tty`" == "$CONSOLE" ]; then
 		fi
 	fi
 	chvt 1
-	if ! is_disabled $FASTBOOT; then
+	if ! is_disabled $FASTBOOT && ! systemctl is-active fastboot >/dev/null 2>&1; then
 		echo "Fastboot was enabled, but something went wrong with the transfer or mount."
 		echo "Hopefully only Administrators ever see this message, and then only when they fail. :)"
 		echo "Review the log at /var/log/fastboot.log"

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export PACKAGE=qemu-guest-agent
+repackage -c
+

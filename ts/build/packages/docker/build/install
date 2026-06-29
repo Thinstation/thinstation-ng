@@ -1,7 +1,48 @@
 #!/bin/sh
 
 export PACKAGE="docker"
-export PORTS="docker-cli docker-buildx docker-compose docker-compose-switch containerd moby-filesystem runc tini-static moby-engine moby-engine-nano criu libnet"
+export PORTS="docker-cli docker-buildx docker-compose docker-compose-switch containerd moby-filesystem runc tini-static moby-engine moby-engine-nano moby-engine-rootless-extras rootlesskit criu libnet pigz slirp4netns libslirp"
+#export PORTS="
+#docker-compose
+#container-selinux
+#containerd
+#docker-cli
+#iptables-legacy
+#iptables-legacy-libs
+#iptables-libs
+#jansson
+#libbsd
+#libedit
+#libmd
+#libmnl
+#libnet
+#libnetfilter_conntrack
+#libnfnetlink
+#libnftnl
+#libselinux-utils
+#libsemanage
+#libslirp
+#moby-filesystem
+#nano
+#nftables
+#nftables-services
+#pigz
+#policycoreutils
+#rootlesskit
+#rpm-plugin-selinux
+#runc
+#selinux-policy
+#selinux-policy-targeted
+#slirp4netns
+#tar
+#tini-static
+#criu
+#docker-buildx
+#docker-compose-switch
+#moby-engine
+#moby-engine-nano
+#moby-engine-rootless-extras
+#"
 export DROP_FILES=""
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""
