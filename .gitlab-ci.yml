@@ -28,6 +28,7 @@ build-image:
     # or: ./build-image.sh
 #    - sudo mkdir ../out
     - sudo mv ts/build/boot-images/grub/thinstation-efi.iso ../npm.iso
+    - sudo chown gitlab-runner:gitlab-runner npm.iso
     #- sudo rm -rf *
     #- sudo mv ../out .
   artifacts:
