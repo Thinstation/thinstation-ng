@@ -1,0 +1,22 @@
+stages:
+  - build
+
+build-image:
+  stage: build
+  image: fedora:44
+  tags:
+    - docker
+  before_script:
+    - dnf -y update
+    - dnf -y install git make xz tar gzip sudo curl findutils util-linux
+  script:
+    - mkdir -p out
+    - make image
+    # or: ./build.sh
+    # or: ./build-image.sh
+    - find . -type f \( -name "*.iso" -o -name "*.img" -o -name "*.qcow2" -o -name "*.raw" -o -name "*.xz" \) -exec cp -v {} out/ \;
+  artifacts:
+    name: "image-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - out/
+    expire_in: 14 days
