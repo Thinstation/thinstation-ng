@@ -6,9 +6,9 @@ build-image:
   image: fedora:44
   tags:
     - fedora-shell
-  before_script:
-    - dnf -y update
-    - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
+  # before_script:
+  #   - dnf -y update
+  #   - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
   script:
     - ./setup-chroot -i
     #- ./setup-chroot -e cp /build/conf/tiny/* /build/.
