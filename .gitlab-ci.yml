@@ -11,7 +11,7 @@ build-image:
     - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
   script:
     - ./setup-chroot -i
-    - ./setup-chroot -e cp /build/conf/tiny /build/.
+    - ./setup-chroot -e cp /build/conf/tiny/* /build/.
     - ./setup-chroot -e stb
     #- make image
     # or: ./build.sh
