@@ -14,6 +14,7 @@ build-image:
     - sudo ./setup-chroot -e dnf install -y --setopt=keepcache=1 --setopt=max_parallel_downloads=10 docker
     #- ./setup-chroot -e cp /build/conf/tiny/* /build/.
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
+    - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo ./setup-chroot -e stb
     #- make image
     # or: ./build.sh
