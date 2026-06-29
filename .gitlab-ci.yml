@@ -19,11 +19,11 @@ build-image:
     # or: ./build.sh
     # or: ./build-image.sh
     - sudo mkdir ../out
-    - sudo cp -v ts/build/boot-images/grub/thinstation-efi.iso ../out/npm.iso
+    - sudo mv ts/build/boot-images/grub/thinstation-efi.iso ../out/npm.iso
+    - sudo rm -rf *
+    - sudo mv ../out .
   artifacts:
     name: "image-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
     paths:
-      - "$CI_PROJECT_DIR"/../out/
+      - out/
     expire_in: 14 days
-  after_script:
-    - sudo rm -rf "$CI_PROJECT_DIR"
