@@ -23,3 +23,5 @@ build-image:
     paths:
       - out/
     expire_in: 14 days
+  after_script:
+    - sudo rm -rf "$CI_PROJECT_DIR"
