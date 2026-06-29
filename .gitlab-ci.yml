@@ -8,10 +8,10 @@ build-image:
     - docker
   before_script:
     - dnf -y update
-    - dnf -y install git make xz tar gzip sudo curl findutils util-linux
+    - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
   script:
     - ./setup-chroot -i
-    - ./setup-chroot cp /build/conf/tiny /build/.
+    - ./setup-chroot -e cp /build/conf/tiny /build/.
     - ./setup-chroot -e stb
     #- make image
     # or: ./build.sh
