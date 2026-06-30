@@ -32,7 +32,7 @@ build-image:
     #- sudo rm -rf *
     #- sudo mv ../out .
   artifacts:
-    name: "image-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    name: "npm-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
     paths:
       - npm.iso
     expire_in: 14 days
