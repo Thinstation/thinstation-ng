@@ -34,7 +34,7 @@ build-image:
     paths:
       - npm-*.iso
       - npm-*.iso.sha256
-    expire_in: 14 dayss
+    expire_in: 14 days
 
   after_script:
     - sudo rm -rf build
