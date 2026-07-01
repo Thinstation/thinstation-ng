@@ -8,9 +8,6 @@ build-image:
   tags:
     - fedora-shell
 
-  before_script:
-    - sudo rm -rf out
-
   script:
     - sudo mkdir build
     - sudo mv ts build/.
