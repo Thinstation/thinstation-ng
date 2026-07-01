@@ -4,7 +4,7 @@ stages:
 
 build-image:
   stage: build
-  image: fedora:44
+#  image: fedora:44
   tags:
     - fedora-shell
 
@@ -36,5 +36,7 @@ build-image:
 
 deploy_repo:
   stage: deploy
+  tags:
+    - fedora-shell
   script:
     - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" out/ gitlab-deploy@192.168.22.22:/srv/repo-incoming/
