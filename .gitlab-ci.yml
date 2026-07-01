@@ -41,4 +41,4 @@ deploy_repo:
   tags:
     - fedora-shell
   script:
-    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" npm-*.iso gitlab-deploy@distro:/srv/repo-incoming/
+    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" npm-*.iso gitlab-deploy@distro:/srv/incoming/
