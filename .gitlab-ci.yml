@@ -1,16 +1,16 @@
 stages:
   - build
+  - deploy
 
 build-image:
   stage: build
   image: fedora:44
   tags:
     - fedora-shell
-  # before_script:
-  #   - dnf -y update
-  #   - dnf -y install git make xz tar gzip sudo curl findutils util-linux procps-ng which
+
   before_script:
     - sudo rm -rf out
+
   script:
     - sudo mkdir build
     - sudo mv ts build/.
@@ -23,22 +23,19 @@ build-image:
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo ./setup-chroot -e stb
-    #- make image
-    # or: ./build.sh
-    # or: ./build-image.sh
-#    - sudo mkdir ../out
     - sudo mv ts/build/boot-images/grub/thinstation-efi.iso ../npm.iso
     - sudo chown gitlab-runner:gitlab-runner ../npm.iso
-    #- sudo rm -rf *
-    #- sudo mv ../out .
-  deploy_repo:
-    stage: deploy
-    script:
-      - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" out/ gitlab-deploy@192.168.22.22:/srv/repo-incoming/
+
   artifacts:
     name: "npm-$CI_COMMIT_SHORT_SHA"
     paths:
       - npm.iso
     expire_in: 14 days
+
   after_script:
     - sudo rm -rf build
+
+deploy_repo:
+  stage: deploy
+  script:
+    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" out/ gitlab-deploy@192.168.22.22:/srv/repo-incoming/
