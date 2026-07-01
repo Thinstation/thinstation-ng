@@ -4,25 +4,34 @@ stages:
 
 build-image:
   stage: build
-#  image: fedora:44
   tags:
     - fedora-shell
 
   script:
+    - sudo rm -rf build
     - sudo mkdir build
-    - sudo mv ts build/.
-    - sudo mv setup-chroot build/.
-    - sudo mv README.md build/.
+    - sudo mount -t tmpfs -o size=32G tmpfs build
+    - sudo chown gitlab-runner:gitlab-runner build
+
+    # Recreate working tree inside tmpfs using the existing repo metadata
+    - ln -s "$CI_PROJECT_DIR/.git" build/.git
     - cd build
+    - git checkout -f "$CI_COMMIT_SHA"
+
+    # Build
     - sudo ./setup-chroot -i
     - sudo ./setup-chroot -e dnf install -y --setopt=keepcache=1 --setopt=max_parallel_downloads=10 docker
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo ./setup-chroot -e stb
-    - sudo mv ts/build/boot-images/grub/thinstation-efi.iso ../npm.iso
+
+    # Export ISO back to CI project dir
+    - sudo mv ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/npm.iso"
+    - cd "$CI_PROJECT_DIR"
+
+    # Timestamp + checksum
     - STAMP="$(date -d "$CI_PIPELINE_CREATED_AT" +%m%d%Y%H%M%S)"
-    - mv ../npm.iso "../npm-${STAMP}.iso"
-    - cd ..
+    - mv npm.iso "npm-${STAMP}.iso"
     - sha256sum "npm-${STAMP}.iso" > "npm-${STAMP}.iso.sha256"
     - sudo chown gitlab-runner:gitlab-runner "npm-${STAMP}.iso" "npm-${STAMP}.iso.sha256"
 
@@ -34,6 +43,7 @@ build-image:
     expire_in: 14 days
 
   after_script:
+    - sudo umount build || true
     - sudo rm -rf build
 
 deploy_repo:
