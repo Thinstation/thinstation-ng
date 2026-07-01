@@ -51,4 +51,9 @@ deploy_repo:
   tags:
     - fedora-shell
   script:
-    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new" npm-*.iso npm-*.iso.sha256 gitlab-deploy@distro:/srv/incoming/iso/npm/
+    - STAMPED_ISO="$(ls -1 npm-*.iso | head -1)"
+    - STAMPED_SHA="${STAMPED_ISO}.sha256"
+    - REMOTE_DIR="/srv/incoming/iso/npm/$CI_PIPELINE_ID"
+    - ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new gitlab-deploy@distro "mkdir -p '$REMOTE_DIR'"
+    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new" "$STAMPED_ISO" "$STAMPED_SHA" gitlab-deploy@distro:"$REMOTE_DIR/"
+    - ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new gitlab-deploy@distro "touch '$REMOTE_DIR/.ready'"
