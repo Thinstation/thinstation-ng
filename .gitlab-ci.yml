@@ -31,6 +31,10 @@ build-image:
     - sudo chown gitlab-runner:gitlab-runner ../npm.iso
     #- sudo rm -rf *
     #- sudo mv ../out .
+  deploy_repo:
+    stage: deploy
+    script:
+      - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy" out/ gitlab-deploy@192.168.22.22:/srv/repo-incoming/
   artifacts:
     name: "npm-$CI_COMMIT_SHORT_SHA"
     paths:
