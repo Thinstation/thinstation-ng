@@ -23,15 +23,18 @@ build-image:
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo ./setup-chroot -e stb
     - sudo mv ts/build/boot-images/grub/thinstation-efi.iso ../npm.iso
-    - STAMP="$(date +%m%d%Y%H%M%S)"
+    - STAMP="$(date -d "$CI_PIPELINE_CREATED_AT" +%m%d%Y%H%M%S)"
     - mv ../npm.iso "../npm-${STAMP}.iso"
-    - sudo chown gitlab-runner:gitlab-runner "../npm-${STAMP}.iso"
+    - cd ..
+    - sha256sum "npm-${STAMP}.iso" > "npm-${STAMP}.iso.sha256"
+    - sudo chown gitlab-runner:gitlab-runner "npm-${STAMP}.iso" "npm-${STAMP}.iso.sha256"
 
   artifacts:
     name: "npm-$CI_COMMIT_SHORT_SHA"
     paths:
       - npm-*.iso
-    expire_in: 14 days
+      - npm-*.iso.sha256
+    expire_in: 14 dayss
 
   after_script:
     - sudo rm -rf build
@@ -41,4 +44,4 @@ deploy_repo:
   tags:
     - fedora-shell
   script:
-    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new" npm-*.iso gitlab-deploy@distro:/srv/incoming/iso/npm
+    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new" npm-*.iso npm-*.iso.sha256 gitlab-deploy@distro:/srv/incoming/iso/npm/
