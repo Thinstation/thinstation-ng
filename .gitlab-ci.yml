@@ -5,7 +5,8 @@ stages:
 build-image:
   stage: build
   tags:
-    - fedora-shell
+    - Fedora
+    - Shell
 
   script:
     - sudo rm -rf build
