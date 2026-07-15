@@ -50,7 +50,8 @@ build-image:
 deploy_repo:
   stage: deploy
   tags:
-    - fedora-shell
+    - Fedora
+    - Shell
   script:
     - STAMPED_ISO="$(ls -1 npm-*.iso | head -1)"
     - STAMPED_SHA="${STAMPED_ISO}.sha256"
