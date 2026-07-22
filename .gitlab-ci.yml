@@ -5,7 +5,7 @@ stages:
 variables:
   PUBLISH_PROJECT: "npm"
   DISTRO_HOST: "distro"
-  DISTRO_USER: "gitlab-deploy"
+  DISTRO_USER: "gitlab-runner"
   DISTRO_INCOMING_ROOT: "/srv/incoming"
   DISTRO_SSH_KEY: "/home/gitlab-runner/.ssh/repo_deploy"
 
