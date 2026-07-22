@@ -2,6 +2,13 @@ stages:
   - build
   - deploy
 
+variables:
+  PUBLISH_PROJECT: "npm"
+  DISTRO_HOST: "distro"
+  DISTRO_USER: "gitlab-deploy"
+  DISTRO_INCOMING_ROOT: "/srv/incoming"
+  DISTRO_SSH_KEY: "/home/gitlab-runner/.ssh/repo_deploy"
+
 build-image:
   stage: build
   tags:
@@ -14,24 +21,22 @@ build-image:
     - sudo mount -t tmpfs -o size=32G tmpfs build
     - sudo chown gitlab-runner:gitlab-runner build
 
-    # Recreate working tree inside tmpfs using the existing repo metadata
+    # Recreate the working tree inside tmpfs using the existing repository metadata.
     - ln -s "$CI_PROJECT_DIR/.git" build/.git
     - cd build
     - git checkout -f "$CI_COMMIT_SHA"
 
-    # Build
+    # Build Nginx Proxy Manager ThinStation image.
     - sudo ./setup-chroot -i
     - sudo ./setup-chroot -e dnf install -y --setopt=keepcache=1 --setopt=max_parallel_downloads=10 docker
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo ./setup-chroot -e stb
 
-    # Export ISO back to CI project dir
+    # Export and name the ISO.
     - sudo mv ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/npm.iso"
     - cd "$CI_PROJECT_DIR"
-
-    # Timestamp + checksum
-    - STAMP="$(date -d "$CI_PIPELINE_CREATED_AT" +%m%d%Y%H%M%S)"
+    - STAMP="$(date -u -d "$CI_PIPELINE_CREATED_AT" +%Y%m%dT%H%M%SZ)"
     - mv npm.iso "npm-${STAMP}.iso"
     - sha256sum "npm-${STAMP}.iso" > "npm-${STAMP}.iso.sha256"
     - sudo chown gitlab-runner:gitlab-runner "npm-${STAMP}.iso" "npm-${STAMP}.iso.sha256"
@@ -52,10 +57,68 @@ deploy_repo:
   tags:
     - Fedora
     - Shell
+  resource_group: distro-publisher
+  needs:
+    - job: build-image
+      artifacts: true
+
   script:
-    - STAMPED_ISO="$(ls -1 npm-*.iso | head -1)"
-    - STAMPED_SHA="${STAMPED_ISO}.sha256"
-    - REMOTE_DIR="/srv/incoming/iso/npm"
-    - ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new gitlab-deploy@distro "mkdir -p '$REMOTE_DIR'"
-    - rsync -av -e "ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new" "$STAMPED_ISO" "$STAMPED_SHA" gitlab-deploy@distro:"$REMOTE_DIR/"
-    - ssh -i /home/gitlab-runner/.ssh/repo_deploy -o StrictHostKeyChecking=accept-new gitlab-deploy@distro "touch '$REMOTE_DIR/.ready'"
+    - |
+      set -Eeuo pipefail
+
+      STAMPED_ISO="$(find . -maxdepth 1 -type f -name 'npm-*.iso' -printf '%f\n' | sort | head -1)"
+      [[ -n "$STAMPED_ISO" ]] || {
+          echo "No npm ISO artifact was found" >&2
+          exit 1
+      }
+
+      STAMPED_SHA="${STAMPED_ISO}.sha256"
+      [[ -f "$STAMPED_SHA" ]] || {
+          echo "Missing checksum artifact: $STAMPED_SHA" >&2
+          exit 1
+      }
+
+      PAYLOAD_DIR="$(mktemp -d)"
+      trap 'rm -rf "$PAYLOAD_DIR"' EXIT
+
+      mkdir -p "$PAYLOAD_DIR/iso"
+      install -m 0644 "$STAMPED_ISO" "$PAYLOAD_DIR/iso/$STAMPED_ISO"
+      install -m 0644 "$STAMPED_SHA" "$PAYLOAD_DIR/iso/$STAMPED_SHA"
+
+      (
+          cd "$PAYLOAD_DIR"
+          find iso -type f -print0 |
+              sort -z |
+              xargs -0 sha256sum > SHA256SUMS
+      )
+
+      SSH=(
+          ssh
+          -i "$DISTRO_SSH_KEY"
+          -o StrictHostKeyChecking=accept-new
+      )
+
+      RSYNC_SSH="ssh -i $DISTRO_SSH_KEY -o StrictHostKeyChecking=accept-new"
+      REMOTE_STAGE="${DISTRO_INCOMING_ROOT}/.${PUBLISH_PROJECT}-${CI_PIPELINE_ID}"
+      REMOTE_PAYLOAD="${DISTRO_INCOMING_ROOT}/${PUBLISH_PROJECT}"
+
+      # Upload to a hidden staging directory so the publisher cannot see a
+      # partially transferred payload.
+      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}" \
+          "rm -rf '$REMOTE_STAGE' && mkdir -p '$REMOTE_STAGE'"
+
+      rsync \
+          --archive \
+          --delete \
+          -e "$RSYNC_SSH" \
+          "$PAYLOAD_DIR/" \
+          "${DISTRO_USER}@${DISTRO_HOST}:${REMOTE_STAGE}/"
+
+      # Publish the completed directory atomically, then create .ready last.
+      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}" \
+          "set -eu; test ! -e '$REMOTE_PAYLOAD'; mv '$REMOTE_STAGE' '$REMOTE_PAYLOAD'; touch '$REMOTE_PAYLOAD/.ready'"
+
+      trap - EXIT
+      rm -rf "$PAYLOAD_DIR"
+
+      echo "Submitted ${REMOTE_PAYLOAD} for repository publishing"
