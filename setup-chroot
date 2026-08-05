@@ -7,6 +7,11 @@ state_checks()
 	test $(id -u) -ne 0 && echo "please run as root" && exit 1
 	test ! -e setup-chroot  && echo "This utility must be run in the directory in which it exists." && exit 1
 	test "$PWD" == "/" && echo "You have already started the session." && exit 1
+	# Default architecture = host
+	if [ -z "$TARGET_ARCH" ]; then
+		TARGET_ARCH=$(uname -m)
+	fi
+	validate_cross_arch
 	test ! -d var/cache/dnf && ts/bin/install_chroot
 }
 
@@ -20,6 +25,8 @@ help()
 	this env when you are done working in it. It takes the following options.
 
 	-a : Automatically download and build during unwind.
+	--arch ARCH : Specify target architecture (x86_64, aarch64, armv7l)
+	-d : Enable interactive mode for debug.
 	-h : Show this help message.
 	-i : Install the env only. Don't enter it after-wards.
 	-b : Run build after entering chroot and exit after-wards.
@@ -39,6 +46,7 @@ get_opts()
 	until [ -z "$1" ] ; do
 		case $1 in
 		-a|--autodl)	export AUTODL=true;;
+		--arch)		shift ; export TARGET_ARCH=$1;;
 		-i|--install)	install_only=true; export AUTODL=true;;
 		-b|--build)	export build=true ;;
 		-h|--help)	help ; exit 255 ;;
@@ -46,13 +54,60 @@ get_opts()
 		-c|--clean)	unset build exec_cmd; shift $# ; export clean=true ;;
 		-e|--exec)	shift ; export exec_cmd=$@ ; shift $# ;;
 		-u|--user)	shift ; export chuser=$1 ;;
-		-k|--keys)	shift ; export keys=true;;
+		-k|--keys)  export keys=true;;
+		-d|--debug) export DEBUG=true ;;
 		*)		echo "Invalid Argument: $1" ; help ; exit 255 ;;
 		esac
 		shift
 	done
 	get_gnome_proxy
 	set_proxy
+}
+
+validate_cross_arch()
+{
+	# Normalize architecture names
+	case $TARGET_ARCH in
+		arm64) TARGET_ARCH=aarch64 ;;
+		armv7|armhf) TARGET_ARCH=armv7l ;;
+		amd64) TARGET_ARCH=x86_64 ;;
+	esac
+	
+	HOST_ARCH=$(uname -m)
+	
+	# If cross-compilation, check QEMU tools
+	if [ "$TARGET_ARCH" != "$HOST_ARCH" ]; then
+		export CROSS_COMPILE=true
+		
+		# Determine QEMU binary
+		case $TARGET_ARCH in
+			aarch64) QEMU_STATIC=qemu-aarch64-static ;;
+			armv7l) QEMU_STATIC=qemu-arm-static ;;
+			x86_64) QEMU_STATIC=qemu-x86_64-static ;;
+			*) echo "Unsupported architecture: $TARGET_ARCH" ; exit 1 ;;
+		esac
+		
+		# Check if QEMU is installed
+		if ! which $QEMU_STATIC >/dev/null 2>&1; then
+			echo "Error: $QEMU_STATIC not found"
+			echo "Please install: dnf install qemu-user-static"
+			exit 1
+		fi
+		
+		# Check binfmt_misc
+		if [ ! -e /proc/sys/fs/binfmt_misc/status ]; then
+			echo "Error: binfmt_misc not enabled"
+			echo "Please enable: systemctl start systemd-binfmt"
+			exit 1
+		fi
+		
+		export QEMU_STATIC
+		echo "Cross-compilation mode: $HOST_ARCH -> $TARGET_ARCH"
+		echo "Using QEMU: $QEMU_STATIC"
+	else
+		export CROSS_COMPILE=false
+		echo "Native compilation mode: $TARGET_ARCH"
+	fi
 }
 
 first_or_last()
@@ -182,6 +237,15 @@ copy_host_essential()
 		if [ -e ~/.ssh ]; then
 			mkdir -p root
 			cp -Prfd ~/.ssh	root/.
+		fi
+	fi
+	# Copy QEMU static if cross-compilation
+	if [ "$CROSS_COMPILE" = "true" ]; then
+		QEMU_PATH=$(which $QEMU_STATIC)
+		if [ -n "$QEMU_PATH" ]; then
+			mkdir -p usr/bin
+			cp $QEMU_PATH usr/bin/
+			echo "Copied $QEMU_STATIC to chroot"
 		fi
 	fi
 }

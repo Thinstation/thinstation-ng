@@ -2089,10 +2089,22 @@ image_fastboot()
 	fi
 }
 
-if [ "$ts_bootimages" != "grub" ] && [ -n "$ts_bootimages" ] ; then
-	echo "Use of bootimages is deprecated. Only grub is supported."
+# Validate bootimages value
+if [ "$ts_bootimages" != "grub" ] && [ "$ts_bootimages" != "uboot" ]; then
+	if [ -n "$ts_bootimages" ]; then
+		echo "Warning: bootimages value '$ts_bootimages' is not supported. Only 'grub' and 'uboot' are valid."
+		echo "Defaulting to 'grub' for x86_64 or 'uboot' for ARM architectures."
+	fi
+	case "$TARGET_ARCH" in
+		aarch64|armv7l)
+			ts_bootimages="uboot"
+			;;
+		*)
+			ts_bootimages="grub"
+			;;
+	esac
 fi
-ts_bootimages="grub"
+
 if [ -z "$ts_grubtheme" ]; then
 	ts_grubtheme="default"
 fi
@@ -2282,9 +2294,45 @@ if [ -z "$NOIMAGES" ]; then
                                         $ESP
 
                                 echo $ESP/../thinstation-efi.iso >> boot-images/initrd/added.files
-			;;
+   ;;
 
-		esac
+   uboot)
+    ESP=boot-images/uboot/efi-source
+
+    add_image
+    add_overlay
+
+    addpkgs $ESP
+
+    # Create extlinux configuration file
+    mkdir -p $ESP/extlinux
+    cat > $ESP/extlinux/extlinux.conf << EOF
+LABEL Thinstation
+    KERNEL /boot/vmlinuz
+    INITRD /boot/initrd
+    APPEND $KERNEL_PARAMETERS $ts_kernelcmdline
+EOF
+    echo $ESP/extlinux/extlinux.conf >> boot-images/initrd/added.files
+
+    # Copy Device Tree Blobs if available
+    if [ -d /boot/dtb-$KERNVER ]; then
+     sys_copy /boot/dtb-$KERNVER $ESP/dtb
+     echo "Copied Device Tree Blobs"
+    elif [ -d /boot/dtbs/$KERNVER ]; then
+     sys_copy /boot/dtbs/$KERNVER $ESP/dtb
+     echo "Copied Device Tree Blobs"
+    fi
+
+    # Create tar image for deployment
+    cd $ESP
+    tar czf ../../thinstation-arm64-$TSVER.tar.gz *
+    cd ../../..
+
+    echo "ARM64 boot image created: boot-images/thinstation-arm64-$TSVER.tar.gz"
+    echo boot-images/thinstation-arm64-$TSVER.tar.gz >> boot-images/initrd/added.files
+   ;;
+
+  esac
 	done
 fi
 

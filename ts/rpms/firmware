@@ -13,7 +13,6 @@ iwlwifi-mvm-firmware
 libertas-firmware
 linux-firmware
 linux-firmware-whence
-microcode_ctl
 mt7xxx-firmware
 nvidia-gpu-firmware
 nxpwireless-firmware
