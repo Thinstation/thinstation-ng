@@ -1,13 +1,7 @@
 stages:
   - build
   - deploy
-
-variables:
-  PUBLISH_PROJECT: "npm"
-  DISTRO_HOST: "distro"
-  DISTRO_USER: "gitlab-runner"
-  DISTRO_INCOMING_ROOT: "/srv/incoming"
-  DISTRO_SSH_KEY: "/home/gitlab-runner/.ssh/repo_deploy"
+  - publish
 
 build-image:
   stage: build
@@ -122,3 +116,15 @@ deploy_repo:
       rm -rf "$PAYLOAD_DIR"
 
       echo "Submitted ${REMOTE_PAYLOAD} for repository publishing"
+
+trigger-publisher:
+  stage: publish
+  needs:
+    - job: deploy_repo
+  trigger:
+    project: $PUBLISH_ARTIFACTS_PROJECT
+    branch: $PUBLISH_ARTIFACTS_BRANCH
+    strategy: depend
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
