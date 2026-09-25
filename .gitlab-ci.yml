@@ -6,8 +6,8 @@ stages:
 build-image:
   stage: build
   tags:
-    - Fedora
-    - Shell
+    - fedora
+    - shell
 
   script:
     - sudo rm -rf build
@@ -49,8 +49,8 @@ build-image:
 deploy_repo:
   stage: deploy
   tags:
-    - Fedora
-    - Shell
+    - fedora
+    - shell
   resource_group: distro-publisher
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
