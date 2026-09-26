@@ -1,3 +1,11 @@
+variables:
+  GITLAB_EE_VERSION:
+    value: "19.4.0"
+    description: "GitLab EE semantic version to bake into the appliance ISO (for example 19.4.0)."
+  BUILD_GITLAB_EE:
+    value: "0"
+    description: "Set to 1 to build the versioned GitLab EE appliance ISO."
+
 stages:
   - build
   - deploy
@@ -131,3 +139,52 @@ trigger-publisher:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_TAG'
+
+
+build-gitlab-ee:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$BUILD_GITLAB_EE == "1"'
+
+  script:
+    - |
+      set -Eeuo pipefail
+      [[ "$GITLAB_EE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+        echo "GITLAB_EE_VERSION must be major.minor.patch, got: $GITLAB_EE_VERSION" >&2
+        exit 1
+      }
+
+    - sudo rm -rf build-gitlab-ee
+    - sudo mkdir build-gitlab-ee
+    - sudo mount -t tmpfs -o size=40G tmpfs build-gitlab-ee
+    - sudo chown gitlab-runner:gitlab-runner build-gitlab-ee
+    - ln -s "$CI_PROJECT_DIR/.git" build-gitlab-ee/.git
+    - cd build-gitlab-ee
+    - git checkout -f "$CI_COMMIT_SHA"
+    - sudo ./setup-chroot -i
+    - sudo ./setup-chroot -e dnf install -y --setopt=keepcache=1 --setopt=max_parallel_downloads=10 docker
+    - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
+    - sudo sed -i 's/^package nginx-proxy-manager.*/package gitlab-ee  # GitLab EE immutable appliance/' ts/build/build.conf
+    - sudo sed -i -E "s#gitlab/gitlab-ee:[0-9]+\\.[0-9]+\\.[0-9]+-ee\\.0#gitlab/gitlab-ee:${GITLAB_EE_VERSION}-ee.0#" ts/build/packages/gitlab-ee/build/images.conf
+    - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/gitlab-ee/build/images.conf build/boot-images/grub/efi-source/Docker
+    - sudo ./setup-chroot -e stb
+    - sudo mv ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/gitlab-ee.iso"
+    - cd "$CI_PROJECT_DIR"
+    - STAMP="$(date -u -d "$CI_PIPELINE_CREATED_AT" +%Y%m%dT%H%M%SZ)"
+    - mv gitlab-ee.iso "gitlab-ee-${GITLAB_EE_VERSION}-${STAMP}.iso"
+    - sha256sum "gitlab-ee-${GITLAB_EE_VERSION}-${STAMP}.iso" > "gitlab-ee-${GITLAB_EE_VERSION}-${STAMP}.iso.sha256"
+    - sudo chown gitlab-runner:gitlab-runner "gitlab-ee-${GITLAB_EE_VERSION}-${STAMP}.iso" "gitlab-ee-${GITLAB_EE_VERSION}-${STAMP}.iso.sha256"
+
+  artifacts:
+    name: "gitlab-ee-${GITLAB_EE_VERSION}-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - gitlab-ee-*.iso
+      - gitlab-ee-*.iso.sha256
+    expire_in: 30 days
+
+  after_script:
+    - sudo umount build-gitlab-ee || true
+    - sudo rm -rf build-gitlab-ee
