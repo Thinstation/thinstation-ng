@@ -16,6 +16,10 @@ build-image:
   tags:
     - fedora
     - shell
+  rules:
+    - if: '$BUILD_GITLAB_EE == "1"'
+      when: never
+    - when: on_success
 
   script:
     - sudo rm -rf build
@@ -61,6 +65,8 @@ deploy_repo:
     - shell
   resource_group: distro-publisher
   rules:
+    - if: '$BUILD_GITLAB_EE == "1"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_TAG'
   needs:
