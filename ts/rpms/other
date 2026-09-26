@@ -1,1 +1,30 @@
+# Packages preloaded into the ThinStation build chroot because package unwind /
+# ISO assembly otherwise installs them piecemeal in many small DNF transactions.
+# Keep this list at the top-level requirement layer; DNF resolves the dependency
+# closure in one bulk install before unwind.
 python3-pyside6
+bridge-utils
+dbus-glib
+dhcp-client
+docker-compose
+ebtables-legacy
+firewalld
+dejavu-sans-fonts
+gdisk
+gdk-pixbuf2-xlib
+gtk2-immodules
+gtk2-engines
+lvm2
+NetworkManager
+iptables-services
+open-vm-tools
+python3-tkinter
+qemu-guest-agent
+spice-vdagent
+sudo
+virtualbox-guest-additions
+vulkan-tools
+numlockx
+xe-guest-utilities-latest
+xmlsec1-gcrypt
+yad
