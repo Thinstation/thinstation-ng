@@ -1,1 +1,61 @@
+# Build-time preload for ThinStation ISO generation.
+#
+# These packages were observed as explicit top-level installs during the stb
+# phase of a clean GitLab EE appliance build. Preloading them here lets DNF
+# resolve/install the full dependency closure in one bulk transaction before
+# package unwind/finalization, rather than spawning many small transactions
+# while the ISO is being rendered.
 python3-pyside6
+bridge-utils
+dbus-glib
+dhcp-client
+docker-compose
+docker-compose-switch
+slirp4netns
+ebtables-legacy
+firewall-config
+firewalld
+ipset
+libcap-ng-python3
+python3-nftables
+dejavu-sans-fonts
+gdisk
+gdk-pixbuf2-modules-extra
+gdk-pixbuf2-xlib
+gtk2-immodule-xim
+gtk2-immodules
+gtk2-engines
+device-mapper-event
+device-mapper-multipath
+lvm2
+lvm2-libs
+NetworkManager
+NetworkManager-bluetooth
+NetworkManager-wifi
+NetworkManager-wwan
+mobile-broadband-provider-info
+network-manager-applet
+nm-connection-editor
+openresolv
+iptables-nft
+iptables-services
+iptables-utils
+open-vm-tools
+open-vm-tools-desktop
+python3-abrt-addon
+python3-tkinter
+qemu-guest-agent
+spice-vdagent
+sudo
+virtualbox-guest-additions
+vulkan-tools
+vulkan-validation-layers
+numlockx
+rgb
+xorg-x11-fonts-misc
+xset
+xe-guest-utilities-latest
+xmlsec1-gcrypt
+xmlsec1-gnutls
+xmlsec1-nss
+yad

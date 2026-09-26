@@ -1,10 +1,20 @@
 variables:
+  BUILD_NPM:
+    value: "0"
+    description: "Set to 1 to build the NPM appliance ISO."
   GITLAB_EE_VERSION:
     value: "19.4.0"
     description: "GitLab EE semantic version to bake into the appliance ISO (for example 19.4.0)."
   BUILD_GITLAB_EE:
     value: "0"
     description: "Set to 1 to build the versioned GitLab EE appliance ISO."
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
 
 stages:
   - build
@@ -17,9 +27,11 @@ build-image:
     - fedora
     - shell
   rules:
-    - if: '$BUILD_GITLAB_EE == "1"'
-      when: never
-    - when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
 
   script:
     - sudo rm -rf build
@@ -65,10 +77,11 @@ deploy_repo:
     - shell
   resource_group: distro-publisher
   rules:
-    - if: '$BUILD_GITLAB_EE == "1"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
+      when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $BUILD_NPM == "1"'
+      when: on_success
+    - when: never
   needs:
     - job: build-image
       artifacts: true
@@ -143,8 +156,11 @@ trigger-publisher:
     branch: $PUBLISH_ARTIFACTS_BRANCH
     strategy: depend
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
+      when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $BUILD_NPM == "1"'
+      when: on_success
+    - when: never
 
 
 build-gitlab-ee:
@@ -153,7 +169,11 @@ build-gitlab-ee:
     - fedora
     - shell
   rules:
-    - if: '$BUILD_GITLAB_EE == "1"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_GITLAB_EE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
 
   script:
     - |
