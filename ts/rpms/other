@@ -38,6 +38,7 @@ network-manager-applet
 nm-connection-editor
 openresolv
 iptables-nft
+iptables-legacy
 iptables-services
 iptables-utils
 open-vm-tools
