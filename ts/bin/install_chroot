@@ -15,6 +15,31 @@ if [ -e ts/rpms/other ]; then
 	other_ports="`grep -v '^\s*#' ts/rpms/other |sed ':a;N;$!ba;s/\n/ /g'`"
 fi
 
+preserve_host_repo_overrides()
+{
+	local src marker replacements id
+	mkdir -p "$ROOT/etc/yum.repos.d"
+
+	for src in /etc/yum.repos.d/*.repo; do
+		[ -f "$src" ] || continue
+		marker="$(grep -E '^# *thinstation-replaces=' "$src" | tail -n1 | cut -d= -f2- | tr -d '[:space:]')"
+		[ -n "$marker" ] || continue
+
+		echo "Preserving ThinStation host repository override: $src"
+		cp -f "$src" "$ROOT/etc/yum.repos.d/"
+
+		IFS=',' read -ra replacements <<< "$marker"
+		for id in "${replacements[@]}"; do
+			[ -n "$id" ] || continue
+			for repo in "$ROOT"/etc/yum.repos.d/*.repo; do
+				[ -f "$repo" ] || continue
+				[ "$repo" = "$ROOT/etc/yum.repos.d/$(basename "$src")" ] && continue
+				sed -i "/^\\[$id\\]$/,/^\\[/ s/^enabled=.*/enabled=0/" "$repo"
+			done
+		done
+	done
+}
+
 stage1()
 {
 	if dnf --version| head -n1 |grep -qe dnf5; then
@@ -47,6 +72,7 @@ stage1()
 
 	ROOT=$PWD
 	dnf install --setopt=keepcache=1 -y --installroot=$ROOT $host_config --setopt=max_parallel_downloads=10 --releasever="$DIST_VER" $core_ports $kernel_ports $grub_ports $firmware_ports
+	preserve_host_repo_overrides
 	cd $ROOT
 	touch $ROOT/dostage2
 }
