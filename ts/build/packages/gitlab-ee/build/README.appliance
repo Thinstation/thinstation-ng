@@ -1,0 +1,21 @@
+ThinStation GitLab EE Appliance
+
+The ISO contains one pinned upstream GitLab EE container image, retagged as:
+  thinstation/gitlab-ee:appliance
+
+Persistent state is kept on the ThinStation Docker data disk under:
+  /docker/gitlab-ee/config -> /etc/gitlab
+  /docker/gitlab-ee/logs   -> /var/log/gitlab
+  /docker/gitlab-ee/data   -> /var/opt/gitlab
+
+Optional persistent Compose variables may be set in:
+  /docker/gitlab-ee/.env
+
+Example:
+  GITLAB_HOSTNAME=gitlab.example.org
+  GITLAB_EXTERNAL_URL=https://gitlab.example.org
+  GITLAB_SSH_PORT=22
+
+Rotating to a newer GitLab appliance ISO loads the baked image and recreates
+the Compose stack against the same persistent volumes. GitLab then performs
+its normal version-specific upgrade/migration process.
