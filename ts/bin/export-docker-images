@@ -10,23 +10,37 @@ safe_name() {
   echo "$1" | sed 's#[/:@]#_#g'
 }
 
-while IFS= read -r image || [[ -n "$image" ]]; do
-  image="$(echo "$image" | xargs)"
-  [[ -z "$image" || "$image" =~ ^# ]] && continue
+while IFS= read -r spec || [[ -n "$spec" ]]; do
+  spec="$(echo "$spec" | xargs)"
+  [[ -z "$spec" || "$spec" =~ ^# ]] && continue
 
-  name="$(safe_name "$image")"
+  source_image="${spec%%|*}"
+  target_image="$source_image"
+  if [[ "$spec" == *"|"* ]]; then
+    target_image="${spec#*|}"
+  fi
 
-  echo "Pulling $image"
-  docker pull "$image"
+  source_image="$(echo "$source_image" | xargs)"
+  target_image="$(echo "$target_image" | xargs)"
+  name="$(safe_name "$target_image")"
 
-  digest="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
-  image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+  echo "Pulling $source_image"
+  docker pull "$source_image"
 
-  echo "Saving $image"
-  docker save "$image" -o "$OUT_DIR/images/${name}.tar"
+  digest="$(docker image inspect "$source_image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+  image_id="$(docker image inspect "$source_image" --format '{{.Id}}')"
+
+  if [[ "$target_image" != "$source_image" ]]; then
+    echo "Tagging $source_image as $target_image"
+    docker tag "$source_image" "$target_image"
+  fi
+
+  echo "Saving $target_image"
+  docker save "$target_image" -o "$OUT_DIR/images/${name}.tar"
 
   cat > "$OUT_DIR/manifests/${name}.digest" <<EOF
-IMAGE=$image
+IMAGE=$target_image
+SOURCE_IMAGE=$source_image
 DIGEST=$digest
 IMAGE_ID=$image_id
 EOF
