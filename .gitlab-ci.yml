@@ -9,6 +9,13 @@ variables:
     value: "0"
     description: "Set to 1 to build the versioned GitLab EE appliance ISO."
 
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+
 stages:
   - build
   - deploy
