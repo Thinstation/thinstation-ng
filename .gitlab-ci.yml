@@ -71,29 +71,20 @@ build-npm:
     - sudo umount build || true
     - sudo rm -rf build
 
-deploy_repo:
+
+.deploy-repo:
   stage: deploy
   tags:
     - fedora
     - shell
   resource_group: distro-publisher
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
-      when: on_success
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $BUILD_NPM == "1"'
-      when: on_success
-    - when: never
-  needs:
-    - job: build-npm
-      artifacts: true
-
   script:
     - |
       set -Eeuo pipefail
 
-      STAMPED_ISO="$(find . -maxdepth 1 -type f -name 'npm-*.iso' -printf '%f\n' | sort | head -1)"
+      STAMPED_ISO="$(find . -maxdepth 1 -type f -name "$APPLIANCE_ARTIFACT_GLOB" -printf '%f\n' | sort | head -1)"
       [[ -n "$STAMPED_ISO" ]] || {
-          echo "No npm ISO artifact was found" >&2
+          echo "No $APPLIANCE_NAME ISO artifact was found using: $APPLIANCE_ARTIFACT_GLOB" >&2
           exit 1
       }
 
@@ -124,42 +115,78 @@ deploy_repo:
       )
 
       RSYNC_SSH="ssh -i $DISTRO_SSH_KEY -o StrictHostKeyChecking=accept-new"
-      REMOTE_STAGE="${DISTRO_INCOMING_ROOT}/.${PUBLISH_PROJECT}-${CI_PIPELINE_ID}"
-      REMOTE_PAYLOAD="${DISTRO_INCOMING_ROOT}/${PUBLISH_PROJECT}"
+      REMOTE_STAGE="${DISTRO_INCOMING_ROOT}/.${APPLIANCE_PUBLISH_PROJECT}-${CI_PIPELINE_ID}"
+      REMOTE_PAYLOAD="${DISTRO_INCOMING_ROOT}/${APPLIANCE_PUBLISH_PROJECT}"
 
-      # Upload to a hidden staging directory so the publisher cannot see a
-      # partially transferred payload.
-      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}" \
-          "rm -rf '$REMOTE_STAGE' && mkdir -p '$REMOTE_STAGE'"
+      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}"           "rm -rf '$REMOTE_STAGE' && mkdir -p '$REMOTE_STAGE'"
 
-      rsync \
-          --archive \
-          --delete \
-          -e "$RSYNC_SSH" \
-          "$PAYLOAD_DIR/" \
-          "${DISTRO_USER}@${DISTRO_HOST}:${REMOTE_STAGE}/"
+      rsync           --archive           --delete           -e "$RSYNC_SSH"           "$PAYLOAD_DIR/"           "${DISTRO_USER}@${DISTRO_HOST}:${REMOTE_STAGE}/"
 
-      # Publish the completed directory atomically, then create .ready last.
-      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}" \
-          "set -eu; test ! -e '$REMOTE_PAYLOAD'; mv '$REMOTE_STAGE' '$REMOTE_PAYLOAD'; touch '$REMOTE_PAYLOAD/.ready'"
+      "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}"           "set -eu; test ! -e '$REMOTE_PAYLOAD'; mv '$REMOTE_STAGE' '$REMOTE_PAYLOAD'; touch '$REMOTE_PAYLOAD/.ready'"
 
       trap - EXIT
       rm -rf "$PAYLOAD_DIR"
 
-      echo "Submitted ${REMOTE_PAYLOAD} for repository publishing"
+      echo "Submitted $APPLIANCE_NAME as ${REMOTE_PAYLOAD} for repository publishing"
 
-trigger-publisher:
-  stage: publish
+deploy-npm:
+  extends: .deploy-repo
+  variables:
+    APPLIANCE_NAME: "npm"
+    APPLIANCE_PUBLISH_PROJECT: "npm"
+    APPLIANCE_ARTIFACT_GLOB: "npm-*.iso"
   needs:
-    - job: deploy_repo
+    - job: build-npm
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
+deploy-gitlab-ee:
+  extends: .deploy-repo
+  variables:
+    APPLIANCE_NAME: "gitlab-ee"
+    APPLIANCE_PUBLISH_PROJECT: "gitlab-ee"
+    APPLIANCE_ARTIFACT_GLOB: "gitlab-ee-*.iso"
+  needs:
+    - job: build-gitlab-ee
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_GITLAB_EE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
+.trigger-publisher:
+  stage: publish
   trigger:
     project: $PUBLISH_ARTIFACTS_PROJECT
     branch: $PUBLISH_ARTIFACTS_BRANCH
     strategy: depend
+
+trigger-publisher-npm:
+  extends: .trigger-publisher
+  needs:
+    - job: deploy-npm
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
       when: on_success
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $BUILD_NPM == "1"'
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
+trigger-publisher-gitlab-ee:
+  extends: .trigger-publisher
+  needs:
+    - job: deploy-gitlab-ee
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_GITLAB_EE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
       when: on_success
     - when: never
 
