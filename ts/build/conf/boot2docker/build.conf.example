@@ -258,7 +258,14 @@ package locale-en_US         # English (US)
 #package dnsmasq              # DNS and DHCP server
 #package sshd                 # Secure shell server for remote login using dropbear
 #package openssh              # Secure shell server for remote login using openssh
-package nginx-proxy-manager  # A reverse proxy with ACME support
+
+######################
+### --- Dockers --- ###
+######################
+# Docker-backed appliances. CI selectively enables one package per build.
+
+#package nginx-proxy-manager  # Nginx Proxy Manager appliance
+#package gitlab-ee            # GitLab EE appliance
 
 ####################
 ### --- Xorg --- ###
