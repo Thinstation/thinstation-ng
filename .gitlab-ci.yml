@@ -115,8 +115,8 @@ build-npm:
       )
 
       RSYNC_SSH="ssh -i $DISTRO_SSH_KEY -o StrictHostKeyChecking=accept-new"
-      REMOTE_STAGE="${DISTRO_INCOMING_ROOT}/.${PUBLISH_PROJECT}-${CI_PIPELINE_ID}"
-      REMOTE_PAYLOAD="${DISTRO_INCOMING_ROOT}/${PUBLISH_PROJECT}"
+      REMOTE_STAGE="${DISTRO_INCOMING_ROOT}/.${APPLIANCE_PUBLISH_PROJECT}-${CI_PIPELINE_ID}"
+      REMOTE_PAYLOAD="${DISTRO_INCOMING_ROOT}/${APPLIANCE_PUBLISH_PROJECT}"
 
       "${SSH[@]}" "${DISTRO_USER}@${DISTRO_HOST}"           "rm -rf '$REMOTE_STAGE' && mkdir -p '$REMOTE_STAGE'"
 
@@ -133,6 +133,7 @@ deploy-npm:
   extends: .deploy-repo
   variables:
     APPLIANCE_NAME: "npm"
+    APPLIANCE_PUBLISH_PROJECT: "npm"
     APPLIANCE_ARTIFACT_GLOB: "npm-*.iso"
   needs:
     - job: build-npm
@@ -148,6 +149,7 @@ deploy-gitlab-ee:
   extends: .deploy-repo
   variables:
     APPLIANCE_NAME: "gitlab-ee"
+    APPLIANCE_PUBLISH_PROJECT: "gitlab-ee"
     APPLIANCE_ARTIFACT_GLOB: "gitlab-ee-*.iso"
   needs:
     - job: build-gitlab-ee
