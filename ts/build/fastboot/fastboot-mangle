@@ -90,7 +90,7 @@ find_library_source()
 		fi
 	done
 
-	return 1
+	find /usr/lib64 /usr/lib /lib64 /lib -name "$lib" -print -quit 2>/dev/null
 }
 
 seed_retained_libraries()
