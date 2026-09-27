@@ -45,18 +45,17 @@ setup_qemu()
         QEMU=qemu-system-x86_64
 
 	if $REMOTE_ACCESS; then
-		SERIAL_SOCKET="${BT_SERIAL_SOCKET:-/tmp/thinstation-qemu-serial.sock}"
-		MONITOR_SOCKET="${BT_MONITOR_SOCKET:-/tmp/thinstation-qemu-monitor.sock}"
+		SERIAL_PORT="${BT_SERIAL_PORT:-4444}"
+		MONITOR_PORT="${BT_MONITOR_PORT:-4445}"
 		SSH_PORT="${BT_SSH_PORT:-2222}"
-		rm -f "$SERIAL_SOCKET" "$MONITOR_SOCKET"
-		CONSOLE="-serial unix:$SERIAL_SOCKET,server=on,wait=off -monitor unix:$MONITOR_SOCKET,server=on,wait=off"
+		CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=off -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
 		case "$1" in
 			net|net-efi) NETWORK="" ;;
 			*) NETWORK="-netdev user,id=bt-net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 -device virtio-net-pci,netdev=bt-net0" ;;
 		esac
 		echo "Remote access enabled:"
-		echo "  serial:  $SERIAL_SOCKET"
-		echo "  monitor: $MONITOR_SOCKET"
+		echo "  serial:  127.0.0.1:$SERIAL_PORT"
+		echo "  monitor: 127.0.0.1:$MONITOR_PORT"
 		[ -n "$NETWORK" ] && echo "  ssh:     127.0.0.1:$SSH_PORT -> guest:22"
 	else
 		CONSOLE="-serial stdio"
