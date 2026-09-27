@@ -159,7 +159,6 @@ stage2()
 	fi
 
 	rm /dostage2
-	touch /dostage3
 }
 
 unwind_package()
@@ -180,18 +179,11 @@ unwind_package()
 	fi
 }
 
-stage3()
-{
-	rm /dostage3
-}
-
 export -f unwind_package
 
 ROOT=$PWD
 
-if [ -e "$ROOT/dostage3" ]; then
-	stage3
-elif [ -e "$ROOT/dostage2" ]; then
+if [ -e "$ROOT/dostage2" ]; then
 	stage2
 else
 	stage1
