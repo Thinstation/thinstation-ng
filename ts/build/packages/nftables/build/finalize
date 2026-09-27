@@ -4,6 +4,10 @@
 . /build/scripts/iptables-services_postinstall.sh 1
 . /build/scripts/iptables-nft_postinstall.sh 1
 
+update-alternatives --set iptables /usr/bin/iptables-nft
+update-alternatives --set ebtables /usr/bin/ebtables-nft
+update-alternatives --set arptables /usr/bin/arptables-nft
+
 for name in ip{,6}tables{,-save,-restore} ebtables{,-save,-restore} arptables{,-save,-restore}; do
     test -h /sbin || ln -s /bin/$name /sbin/$name 2>/dev/null || :
 done
