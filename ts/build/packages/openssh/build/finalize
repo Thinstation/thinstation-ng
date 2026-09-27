@@ -1,3 +1,10 @@
 #openssh 35
 
 /usr/lib/systemd/systemd-update-helper install-system-units sshd.service sshd.socket
+
+cat <<EOF>> /etc/ssh/sshd.conf
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
