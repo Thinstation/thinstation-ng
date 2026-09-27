@@ -10,6 +10,8 @@ command -v wipefs >/dev/null || die "wipefs required."
 command -v parted >/dev/null || die "parted required."
 command -v pvcreate >/dev/null || die "lvm2 tools required."
 command -v mkfs.ext4 >/dev/null || die "mkfs.ext4 required."
+command -v useradd >/dev/null || die "useradd required."
+command -v userdel >/dev/null || die "userdel required."
 
 cidr_to_netmask() {
   local cidr="$1"
@@ -120,8 +122,10 @@ if [[ -z "$NET_DNS_SEARCH" ]]; then
 fi
 
 ask_required A_USER "Enter a username for an administrative user" valid_user
-deluser tsuser
-adduser $A_USER
+if id tsuser >/dev/null 2>&1; then
+  userdel -r tsuser 2>/dev/null || userdel tsuser
+fi
+useradd -m -s /bin/sh "$A_USER"
 echo "Let's update the password for root"
 passwd root
 echo "%$A_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$A_USER
