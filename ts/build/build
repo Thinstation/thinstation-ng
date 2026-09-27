@@ -1476,8 +1476,10 @@ else
 	echo "HALTONERROR=true" >> ./tmp-tree/etc/thinstation.defaults
 fi
 
-if [ -z "$DEBUG_KERNEL" ] ; then
-  	DEBUGCONSOLE="console=tty1"
+if [ -n "$ts_debugconsole" ]; then
+	DEBUGCONSOLE="console=$ts_debugconsole"
+elif [ -z "$DEBUG_KERNEL" ]; then
+	DEBUGCONSOLE="console=tty1"
 fi
 
 # Should we delete the dri folder?
