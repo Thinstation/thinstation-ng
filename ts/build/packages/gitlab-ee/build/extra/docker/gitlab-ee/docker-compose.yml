@@ -1,0 +1,19 @@
+services:
+  gitlab:
+    image: thinstation/gitlab-ee:appliance
+    container_name: gitlab
+    restart: always
+    hostname: ${GITLAB_HOSTNAME:-gitlab.thinstation.org}
+    shm_size: "256m"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '${GITLAB_EXTERNAL_URL:-https://gitlab.thinstation.org}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-22}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${GITLAB_SSH_PORT:-22}:22"
+    volumes:
+      - ./config:/etc/gitlab
+      - ./logs:/var/log/gitlab
+      - ./data:/var/opt/gitlab
