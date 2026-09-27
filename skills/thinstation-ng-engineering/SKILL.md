@@ -1,0 +1,37 @@
+---
+name: thinstation-ng-engineering
+description: Engineering guide for the ThinStation Next Generation repository and lab workflow. Use when working on the thinstation-ng repo, ThinStation build system, install_chroot/setup-chroot, fastboot, Docker-backed appliance ISOs, GitLab CI appliance builds, package manifests/finalizers, persistent-files, setup-docker, PVE/QEMU validation, or debugging a built ThinStation appliance. Encodes repo conventions, source-vs-generated file distinctions, branch/MR workflow, and known lab validation patterns.
+---
+
+# ThinStation NG Engineering
+
+Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-Stable` unless the user explicitly says otherwise.
+
+## Operating rules
+
+- Treat GitLab as source of truth. Use a feature branch, commit logically related changes, open an MR, review the diff, then merge.
+- Prefer the GitLab Self-Managed connector for canonical source changes. The Fedora workspace at `/thinstation-ng` may be stale, generated, or intentionally dirty.
+- Never broadly reset or clean the Fedora workspace. `./setup-chroot -c` is the approved way to remove most build artifacts when inspecting real diffs.
+- Distinguish templates from the active build tree. CI copies `ts/build/conf/boot2docker/*` into `ts/build/`; `setup-chroot -e stb` parses the active files under `ts/build/`.
+- Keep organization/site specifics out of reusable source. Supply them through CI variables, environment variables, surveys, or extra vars.
+- For appliance-specific behavior, prefer CI/package selection over globally changing the shared boot2docker profile.
+- Validate source changes in the real pipeline and, when relevant, boot the produced ISO in PVE and inspect the live guest.
+
+## Read the relevant reference
+
+- For repo structure, build phases, active/template config rules, `install_chroot`, and fastboot: read `references/build-architecture.md`.
+- For GitLab CI, appliance package selection, Docker image export, compose payloads, and CI variables: read `references/appliance-ci.md`.
+- For `persistent-files`, immutable appliance state, `setup-docker`, first-run configuration, and idempotency: read `references/persistence-and-setup.md`.
+- For PVE, QGA/SSH validation, lab aliases, and efficient debugging: read `references/lab-validation.md`.
+
+## Change workflow
+
+1. Inspect canonical `7.4-Stable` before editing.
+2. If the issue was found on Fedora, clean generated artifacts with `sudo ./setup-chroot -c` before deciding what is a source diff.
+3. Create a focused branch from current `7.4-Stable`.
+4. Make the smallest reusable fix. Avoid one-off lab values in source.
+5. Review the branch diff against `7.4-Stable`.
+6. Merge through an MR.
+7. Run the appropriate lab pipeline or local build.
+8. If the output is an appliance ISO, publish it, boot it in PVE, and verify the behavior from the live guest.
+9. If new non-obvious behavior or a recurring trap is discovered, update this skill in the same repo.
