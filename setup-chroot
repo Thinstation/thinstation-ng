@@ -259,10 +259,6 @@ main()
 	get_opts $@
 	state_checks
 	launch_chroot
-	if [ -e dostage4 ] ; then
-		copy_host_essential
-		launch_chroot
-	fi
 	if [ -e installed ] ; then
 		rm installed
 		if [ "$install_only" == "true" ] ; then
