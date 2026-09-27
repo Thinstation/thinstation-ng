@@ -1,298 +1,411 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+PROG="${0##*/}"
+NON_INTERACTIVE=0
+ASSUME_YES=0
+REBOOT=1
+FORCE_REPARTITION=0
+REUSE_STORAGE=1
+
+NET_HOSTNAME="${NET_HOSTNAME:-}"
+NET_IP_ADDRESS="${NET_IP_ADDRESS:-}"
+NET_CIDR="${NET_CIDR:-}"
+NET_GATEWAY="${NET_GATEWAY:-}"
+NET_DNS1="${NET_DNS1:-}"
+NET_DNS2="${NET_DNS2:-}"
+NET_DNS_SEARCH="${NET_DNS_SEARCH:-}"
+A_USER="${A_USER:-}"
+DISK="${DISK:-}"
+ROOT_PASSWORD_HASH="${ROOT_PASSWORD_HASH:-}"
+ADMIN_PASSWORD_HASH="${ADMIN_PASSWORD_HASH:-}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
+log() { echo "[$PROG] $*"; }
+
+usage() {
+  cat <<'EOF'
+Usage: setup-docker.sh [options]
+
+Interactive mode derives defaults from the running system, shows a summary,
+and requires approval before making changes.
+
+Options:
+  --non-interactive       Never prompt. Requires --yes to apply.
+  --yes                   Approve the proposed configuration.
+  --no-reboot             Do not reboot when setup completes.
+  --repartition           Destroy/recreate persistent storage even if it exists.
+  --hostname FQDN         Static hostname.
+  --ip ADDRESS            Static IPv4 address.
+  --cidr PREFIX           IPv4 CIDR prefix.
+  --gateway ADDRESS       IPv4 gateway.
+  --dns1 ADDRESS          Primary DNS server.
+  --dns2 ADDRESS          Secondary DNS server (optional).
+  --search-domain DOMAIN  DNS search domain.
+  --admin-user USER       Administrative user name.
+  --disk DEVICE           Persistent storage disk, e.g. /dev/sda.
+  --root-password-hash H  crypt(3) password hash for root.
+  --admin-password-hash H crypt(3) password hash for the admin user.
+  -h, --help              Show this help.
+
+The same values may be supplied by environment variables:
+NET_HOSTNAME, NET_IP_ADDRESS, NET_CIDR, NET_GATEWAY, NET_DNS1, NET_DNS2,
+NET_DNS_SEARCH, A_USER, DISK, ROOT_PASSWORD_HASH, ADMIN_PASSWORD_HASH.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --non-interactive) NON_INTERACTIVE=1 ;;
+    --yes) ASSUME_YES=1 ;;
+    --no-reboot) REBOOT=0 ;;
+    --repartition) FORCE_REPARTITION=1; REUSE_STORAGE=0 ;;
+    --hostname) NET_HOSTNAME="$2"; shift ;;
+    --ip) NET_IP_ADDRESS="$2"; shift ;;
+    --cidr) NET_CIDR="$2"; shift ;;
+    --gateway) NET_GATEWAY="$2"; shift ;;
+    --dns1) NET_DNS1="$2"; shift ;;
+    --dns2) NET_DNS2="$2"; shift ;;
+    --search-domain) NET_DNS_SEARCH="$2"; shift ;;
+    --admin-user) A_USER="$2"; shift ;;
+    --disk) DISK="$2"; shift ;;
+    --root-password-hash) ROOT_PASSWORD_HASH="$2"; shift ;;
+    --admin-password-hash) ADMIN_PASSWORD_HASH="$2"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "Unknown option: $1" ;;
+  esac
+  shift
+done
 
 [[ $EUID -eq 0 ]] || die "Run as root."
 
-command -v lsblk >/dev/null || die "lsblk required."
-command -v wipefs >/dev/null || die "wipefs required."
-command -v parted >/dev/null || die "parted required."
-command -v pvcreate >/dev/null || die "lvm2 tools required."
-command -v mkfs.ext4 >/dev/null || die "mkfs.ext4 required."
-command -v useradd >/dev/null || die "useradd required."
-command -v userdel >/dev/null || die "userdel required."
-
-cidr_to_netmask() {
-  local cidr="$1"
-  local mask=""
-  local full_octets=$((cidr / 8))
-  local partial_bits=$((cidr % 8))
-
-  for i in 0 1 2 3; do
-    if (( i < full_octets )); then
-      mask+="255"
-    elif (( i == full_octets )); then
-      mask+=$(( 256 - 2 ** (8 - partial_bits) ))
-    else
-      mask+="0"
-    fi
-
-    [[ $i -lt 3 ]] && mask+="."
-  done
-
-  echo "$mask"
-}
+for cmd in lsblk wipefs parted pvcreate vgcreate lvcreate mkfs.ext4 nmcli findmnt usermod groupmod; do
+  command -v "$cmd" >/dev/null || die "$cmd required."
+done
 
 valid_user() {
-  local user="$1"
-  if echo "$user" |grep -e " " -q ; then return 1; fi
+  [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]
 }
-
 valid_ipv4() {
-  local ip="$1"
+  local ip="$1" a b c d octet
   [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
-
-  IFS=. read -r a b c d <<< "$ip"
+  IFS=. read -r a b c d <<<"$ip"
   for octet in "$a" "$b" "$c" "$d"; do
     (( octet >= 0 && octet <= 255 )) || return 1
   done
 }
-
 valid_cidr() {
-  local cidr="$1"
-  [[ "$cidr" =~ ^[0-9]{1,2}$ ]] || return 1
-  (( cidr >= 1 && cidr <= 32 ))
+  [[ "$1" =~ ^[0-9]{1,2}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 32 ))
 }
-
 valid_fqdn() {
-  local fqdn="$1"
-
-  [[ ${#fqdn} -le 253 ]] || return 1
-  [[ "$fqdn" == *.* ]] || return 1
-  [[ "$fqdn" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]
+  [[ ${#1} -le 253 && "$1" == *.* &&
+     "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]
 }
 
-ask_required() {
-  local var_name="$1"
-  local prompt="$2"
-  local validator="$3"
-  local value=""
+default_iface() {
+  ip -4 route show default 2>/dev/null | awk 'NR==1{print $5}'
+}
+default_ip_cidr() {
+  local iface="$1"
+  ip -4 -o addr show dev "$iface" scope global 2>/dev/null | awk 'NR==1{print $4}'
+}
+default_gateway() {
+  ip -4 route show default 2>/dev/null | awk 'NR==1{print $3}'
+}
+default_dns() {
+  local iface="$1"
+  resolvectl dns "$iface" 2>/dev/null | awk -F: 'NR==1{gsub(/^ +| +$/,"",$2); print $2}'
+}
+default_search() {
+  local iface="$1"
+  local s
+  s="$(resolvectl domain "$iface" 2>/dev/null | awk -F: 'NR==1{gsub(/^ +| +$/,"",$2); print $2}' | awk '{print $1}')"
+  [[ "$s" == "~." ]] && s=""
+  [[ -n "$s" ]] || s="$(awk '/^search /{print $2; exit}' /etc/resolv.conf 2>/dev/null || true)"
+  printf '%s\n' "$s"
+}
 
+prompt_value() {
+  local var="$1" label="$2" validator="$3" def="$4" value=""
   while true; do
-    read -rp "$prompt: " value
-    [[ -n "$value" ]] || {
-      echo "Value is required."
-      continue
-    }
-
+    read -rp "$label [${def}]: " value
+    value="${value:-$def}"
     if "$validator" "$value"; then
-      printf -v "$var_name" '%s' "$value"
-      return 0
+      printf -v "$var" '%s' "$value"
+      return
     fi
-
     echo "Invalid value: $value"
   done
 }
 
-ask_optional_ip() {
-  local var_name="$1"
-  local prompt="$2"
-  local value=""
-
+prompt_optional_ip() {
+  local var="$1" label="$2" def="$3" value=""
   while true; do
-    read -rp "$prompt [optional]: " value
-
-    if [[ -z "$value" ]]; then
-      printf -v "$var_name" '%s' ""
-      return 0
+    read -rp "$label [${def:-none}]: " value
+    value="${value:-$def}"
+    if [[ -z "$value" ]] || valid_ipv4 "$value"; then
+      printf -v "$var" '%s' "$value"
+      return
     fi
-
-    if valid_ipv4 "$value"; then
-      printf -v "$var_name" '%s' "$value"
-      return 0
-    fi
-
     echo "Invalid IPv4 address: $value"
   done
 }
 
-echo "Creating ThinStation network config"
+IFACE="$(default_iface)"
+[[ -n "$IFACE" ]] || die "Unable to determine primary network interface."
 
-ask_required NET_HOSTNAME "Enter hostname as FQDN, example docker01.example.com" valid_fqdn
-ask_required NET_IP_ADDRESS "Enter static IPv4 address" valid_ipv4
-ask_required NET_CIDR "Enter CIDR prefix, example 24" valid_cidr
-ask_required NET_GATEWAY "Enter IPv4 gateway" valid_ipv4
-ask_required NET_DNS1 "Enter primary DNS server" valid_ipv4
-ask_optional_ip NET_DNS2 "Enter secondary DNS server"
-read -rp "Enter DNS search domain [derived from hostname]: " NET_DNS_SEARCH
-
-if [[ -z "$NET_DNS_SEARCH" ]]; then
-  NET_DNS_SEARCH="${NET_HOSTNAME#*.}"
+CURRENT_CIDR="$(default_ip_cidr "$IFACE")"
+CURRENT_IP="${CURRENT_CIDR%/*}"
+CURRENT_PREFIX="${CURRENT_CIDR#*/}"
+CURRENT_GATEWAY="$(default_gateway)"
+read -r CURRENT_DNS1 CURRENT_DNS2 _ <<<"$(default_dns "$IFACE")"
+CURRENT_SEARCH="$(default_search "$IFACE")"
+CURRENT_HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
+if [[ "$CURRENT_HOSTNAME" != *.* && -n "$CURRENT_SEARCH" ]]; then
+  CURRENT_HOSTNAME="${CURRENT_HOSTNAME}.${CURRENT_SEARCH}"
 fi
 
-ask_required A_USER "Enter a username for an administrative user" valid_user
-if id tsuser >/dev/null 2>&1; then
-  userdel -r tsuser 2>/dev/null || userdel tsuser
-fi
-useradd -m -s /bin/sh "$A_USER"
-echo "Let's update the password for root"
-passwd root
-echo "%$A_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$A_USER
+NET_IP_ADDRESS="${NET_IP_ADDRESS:-$CURRENT_IP}"
+NET_CIDR="${NET_CIDR:-$CURRENT_PREFIX}"
+NET_GATEWAY="${NET_GATEWAY:-$CURRENT_GATEWAY}"
+NET_DNS1="${NET_DNS1:-${CURRENT_DNS1:-$CURRENT_GATEWAY}}"
+NET_DNS2="${NET_DNS2:-${CURRENT_DNS2:-}}"
+NET_DNS_SEARCH="${NET_DNS_SEARCH:-$CURRENT_SEARCH}"
+NET_HOSTNAME="${NET_HOSTNAME:-$CURRENT_HOSTNAME}"
+A_USER="${A_USER:-admin}"
 
-ORIG_CON_NAME="Wired connection 1"
+if (( ! NON_INTERACTIVE )); then
+  echo
+  echo "ThinStation Docker appliance setup"
+  echo "Press Enter to accept each derived default."
+  prompt_value NET_HOSTNAME "Hostname (FQDN)" valid_fqdn "$NET_HOSTNAME"
+  prompt_value NET_IP_ADDRESS "Static IPv4 address" valid_ipv4 "$NET_IP_ADDRESS"
+  prompt_value NET_CIDR "CIDR prefix" valid_cidr "$NET_CIDR"
+  prompt_value NET_GATEWAY "IPv4 gateway" valid_ipv4 "$NET_GATEWAY"
+  prompt_value NET_DNS1 "Primary DNS server" valid_ipv4 "$NET_DNS1"
+  prompt_optional_ip NET_DNS2 "Secondary DNS server" "$NET_DNS2"
+  NET_DNS_SEARCH="${NET_DNS_SEARCH:-${NET_HOSTNAME#*.}}"
+  read -rp "DNS search domain [${NET_DNS_SEARCH}]: " answer
+  NET_DNS_SEARCH="${answer:-$NET_DNS_SEARCH}"
+  prompt_value A_USER "Administrative user" valid_user "$A_USER"
+fi
+
+valid_fqdn "$NET_HOSTNAME" || die "Invalid hostname: $NET_HOSTNAME"
+valid_ipv4 "$NET_IP_ADDRESS" || die "Invalid IPv4 address: $NET_IP_ADDRESS"
+valid_cidr "$NET_CIDR" || die "Invalid CIDR: $NET_CIDR"
+valid_ipv4 "$NET_GATEWAY" || die "Invalid gateway: $NET_GATEWAY"
+valid_ipv4 "$NET_DNS1" || die "Invalid primary DNS: $NET_DNS1"
+[[ -z "$NET_DNS2" ]] || valid_ipv4 "$NET_DNS2" || die "Invalid secondary DNS: $NET_DNS2"
+valid_user "$A_USER" || die "Invalid admin user: $A_USER"
+
+VG_NAME="ts_persistent"
+EXPECTED_LVS=(prstnt docker log docker-data container-data)
+storage_ready=1
+for lv in "${EXPECTED_LVS[@]}"; do
+  [[ -b "/dev/$VG_NAME/$lv" ]] || storage_ready=0
+done
+
+if (( storage_ready && ! FORCE_REPARTITION )); then
+  REUSE_STORAGE=1
+  DISK="${DISK:-$(pvs --noheadings -o pv_name,vg_name 2>/dev/null | awk -v vg="$VG_NAME" '$2==vg{print $1; exit}' | sed -E 's/p?[0-9]+$//')}"
+else
+  REUSE_STORAGE=0
+  if [[ -z "$DISK" ]]; then
+    mapfile -t CANDIDATES < <(lsblk -dn -o NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}')
+    if [[ ${#CANDIDATES[@]} -eq 1 ]]; then
+      DISK="${CANDIDATES[0]}"
+    elif (( NON_INTERACTIVE )); then
+      die "Multiple disks found; specify --disk."
+    else
+      echo "Candidate persistent storage disks:"
+      select choice in "${CANDIDATES[@]}"; do
+        [[ -n "${choice:-}" ]] || continue
+        DISK="$choice"
+        break
+      done
+    fi
+  fi
+fi
+
+echo
+echo "Proposed configuration"
+printf '  Hostname:       %s\n' "$NET_HOSTNAME"
+printf '  Interface:      %s\n' "$IFACE"
+printf '  Address:        %s/%s\n' "$NET_IP_ADDRESS" "$NET_CIDR"
+printf '  Gateway:        %s\n' "$NET_GATEWAY"
+printf '  DNS:            %s%s\n' "$NET_DNS1" "${NET_DNS2:+, $NET_DNS2}"
+printf '  Search domain:  %s\n' "$NET_DNS_SEARCH"
+printf '  Admin user:     %s\n' "$A_USER"
+if (( REUSE_STORAGE )); then
+  printf '  Storage:        reuse existing %s volumes\n' "$VG_NAME"
+else
+  printf '  Storage:        DESTROY and initialize %s\n' "$DISK"
+fi
+printf '  Reboot:         %s\n' "$([[ $REBOOT -eq 1 ]] && echo yes || echo no)"
+echo
+
+if (( NON_INTERACTIVE )); then
+  (( ASSUME_YES )) || die "--non-interactive requires --yes."
+elif (( ! ASSUME_YES )); then
+  read -rp "Apply this configuration? Type YES to continue: " CONFIRM
+  [[ "$CONFIRM" == "YES" ]] || die "Aborted."
+fi
+
+systemctl stop docker 2>/dev/null || true
+systemctl stop containerd 2>/dev/null || true
+systemctl stop persistent-files 2>/dev/null || true
+systemctl stop persistent-dirs 2>/dev/null || true
+
+if (( ! REUSE_STORAGE )); then
+  [[ -b "$DISK" ]] || die "Storage disk not found: $DISK"
+
+  log "Unmounting filesystems on $DISK"
+  while read -r mp; do
+    [[ -n "$mp" ]] && umount -lf "$mp" || true
+  done < <(lsblk -nr -o MOUNTPOINT "$DISK" | awk 'NF')
+
+  mapfile -t OLD_PVS < <(pvs --noheadings -o pv_name 2>/dev/null | awk -v d="$DISK" '$1 ~ "^"d {print $1}')
+  for pv in "${OLD_PVS[@]}"; do
+    vg="$(pvs --noheadings -o vg_name "$pv" 2>/dev/null | awk 'NF{print $1}')"
+    [[ -z "$vg" ]] || { vgchange -an "$vg" || true; vgremove -ff "$vg" || true; }
+  done
+
+  log "Creating persistent storage on $DISK"
+  wipefs -a "$DISK"
+  sgdisk --zap-all "$DISK" 2>/dev/null || true
+  parted -s "$DISK" mklabel gpt
+  parted -s "$DISK" mkpart primary 1MiB 100%
+  parted -s "$DISK" set 1 lvm on
+  partprobe "$DISK"
+  udevadm settle || true
+
+  PART="${DISK}1"
+  [[ -b "$PART" ]] || PART="${DISK}p1"
+  [[ -b "$PART" ]] || die "Could not find new partition."
+
+  pvcreate -ff -y "$PART"
+  vgcreate "$VG_NAME" "$PART"
+  lvcreate -y -L 1G -n prstnt "$VG_NAME"
+  lvcreate -y -L 1G -n docker "$VG_NAME"
+  lvcreate -y -L 4G -n log "$VG_NAME"
+  lvcreate -y -L 2G -n docker-data "$VG_NAME"
+  lvcreate -y -l 100%FREE -n container-data "$VG_NAME"
+
+  mkfs.ext4 -F -L prstnt "/dev/$VG_NAME/prstnt"
+  mkfs.ext4 -F -L docker "/dev/$VG_NAME/docker"
+  mkfs.ext4 -F -L log "/dev/$VG_NAME/log"
+  mkfs.ext4 -F -L docker-data "/dev/$VG_NAME/docker-data"
+  mkfs.ext4 -F -L container-data "/dev/$VG_NAME/container-data"
+fi
+
+mkdir -p /var/prstnt /docker /var/log /var/lib/docker /var/lib/containerd
+
+# Preserve immutable-image compose payload before mounting the persistent /docker LV.
+if ! mountpoint -q /docker && [[ -d /docker ]]; then
+  rm -rf /run/docker-inst
+  mkdir -p /run/docker-inst
+  cp -a /docker/. /run/docker-inst/ 2>/dev/null || true
+fi
+
+for mp in /var/prstnt /var/log /docker /var/lib/docker /var/lib/containerd; do
+  mountpoint -q "$mp" || mount "$mp"
+done
+
+log "Applying identity and network configuration"
+if id "$A_USER" >/dev/null 2>&1; then
+  :
+elif id tsuser >/dev/null 2>&1; then
+  groupmod -n "$A_USER" tsuser
+  usermod -l "$A_USER" -m -d "/home/$A_USER" tsuser
+else
+  useradd -m -s /bin/sh "$A_USER"
+fi
+
+if [[ -n "$ADMIN_PASSWORD_HASH" ]]; then
+  usermod -p "$ADMIN_PASSWORD_HASH" "$A_USER"
+elif (( ! NON_INTERACTIVE )); then
+  echo "Set password for $A_USER"
+  passwd "$A_USER"
+fi
+
+if [[ -n "$ROOT_PASSWORD_HASH" ]]; then
+  usermod -p "$ROOT_PASSWORD_HASH" root
+elif (( ! NON_INTERACTIVE )); then
+  echo "Set password for root"
+  passwd root
+fi
+
+install -d -m 0750 /etc/sudoers.d
+printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$A_USER" >"/etc/sudoers.d/$A_USER"
+chmod 0440 "/etc/sudoers.d/$A_USER"
+
 CON_NAME="D1"
 IP_CIDR="${NET_IP_ADDRESS}/${NET_CIDR}"
-CON_TYPE=$(nmcli con show "$ORIG_CON_NAME" |grep -e connection.type |awk '{print $2}')
-IFACE=$(nmcli con show "$ORIG_CON_NAME" |grep -e connection.interface-name |awk '{print $2}')
+if nmcli -t -f NAME con show | grep -Fxq "$CON_NAME"; then
+  nmcli con modify "$CON_NAME"     connection.interface-name "$IFACE"     ipv4.method manual     ipv4.addresses "$IP_CIDR"     ipv4.gateway "$NET_GATEWAY"     ipv4.dns "$NET_DNS1${NET_DNS2:+,$NET_DNS2}"     ipv4.dns-search "$NET_DNS_SEARCH"     connection.autoconnect yes
+else
+  nmcli con add con-name "$CON_NAME" type ethernet ifname "$IFACE"     ipv4.method manual     ipv4.addresses "$IP_CIDR"     ipv4.gateway "$NET_GATEWAY"     ipv4.dns "$NET_DNS1${NET_DNS2:+,$NET_DNS2}"     ipv4.dns-search "$NET_DNS_SEARCH"     autoconnect yes
+fi
 
-nmcli connection down "$ORIG_CON_NAME" 2>/dev/null || true
-nmcli connection delete "$ORIG_CON_NAME" 2>/dev/null || true
-nmcli connection delete "$IFACE" 2>/dev/null || true
-
-nmcli connection add \
-  con-name "$CON_NAME" \
-  type "$CON_TYPE" \
-  ifname "$IFACE" \
-  ipv4.method manual \
-  ipv4.addresses "$IP_CIDR" \
-  ipv4.gateway "$NET_GATEWAY" \
-  ipv4.dns "$NET_DNS1${NET_DNS2:+,$NET_DNS2}" \
-  ipv4.dns-search "$NET_DNS_SEARCH" \
-  autoconnect yes
-
-nmcli connection up "$CON_NAME"
+for old in $(nmcli -t -f NAME,DEVICE con show | awk -F: -v ifc="$IFACE" '$2==ifc && $1!="D1"{print $1}'); do
+  nmcli con delete "$old" >/dev/null 2>&1 || true
+done
+nmcli con up "$CON_NAME"
 hostnamectl set-hostname "$NET_HOSTNAME"
 
-#NET_MASK="$(cidr_to_netmask "$NET_CIDR")"
-
-cat > /etc/thinstation.custom <<EOF
-NET_HOSTNAME=${NET_HOSTNAME}
+cat >/etc/thinstation.custom <<EOF
+NET_HOSTNAME=$NET_HOSTNAME
 NET_USE_DHCP=Off
 EOF
 
-echo ""
-echo "Detecting candidate persistent storage disks..."
-
-VG_NAME="ts_persistent"
-ROOT_SRC="$(findmnt -n -o SOURCE / || true)"
-ROOT_DISK=""
-if [[ -n "$ROOT_SRC" ]]; then
-  ROOT_DISK="/dev/$(lsblk -no PKNAME "$ROOT_SRC" 2>/dev/null | head -n1 || true)"
+log "Restoring appliance compose payload"
+if [[ -d /run/docker-inst ]]; then
+  cp -a /run/docker-inst/. /docker/
 fi
 
-mapfile -t CANDIDATES < <(
-  lsblk -dn -o NAME,TYPE,SIZE,MODEL |
-  awk '$2=="disk"{print "/dev/"$1" "$3" "$4}'
-)
-
-FILTERED=()
-for line in "${CANDIDATES[@]}"; do
-  dev="$(awk '{print $1}' <<< "$line")"
-  [[ "$dev" == "$ROOT_DISK" ]] && continue
-  FILTERED+=("$line")
-done
-
-[[ ${#FILTERED[@]} -gt 0 ]] || die "No candidate persistent storage disks found."
-
-if [[ ${#FILTERED[@]} -eq 1 ]]; then
-  DISK="$(awk '{print $1}' <<< "${FILTERED[0]}")"
-  echo "Using only detected candidate: $DISK"
-else
-  echo "Multiple candidate disks found:"
-  select choice in "${FILTERED[@]}"; do
-    [[ -n "${choice:-}" ]] || continue
-    DISK="$(awk '{print $1}' <<< "$choice")"
-    break
-  done
-fi
-
-echo
-echo "Selected disk: $DISK"
-echo "THIS WILL DESTROY ALL DATA ON $DISK"
-read -rp "Type YES to continue: " CONFIRM
-[[ "$CONFIRM" == "YES" ]] || die "Aborted."
-
-echo "Stopping Docker if present..."
-systemctl stop docker 2>/dev/null || true
-systemctl stop containerd 2>/dev/null || true
-
-echo "Unmounting anything currently mounted from $DISK..."
-while read -r mp; do
-  [[ -n "$mp" ]] && umount -lf "$mp" || true
-done < <(lsblk -nr -o MOUNTPOINT "$DISK" | awk 'NF')
-
-echo "Removing old LVM objects on $DISK..."
-mapfile -t OLD_PVS < <(pvs --noheadings -o pv_name 2>/dev/null | awk -v d="$DISK" '$1 ~ "^"d {print $1}')
-for pv in "${OLD_PVS[@]}"; do
-  vg="$(pvs --noheadings -o vg_name "$pv" 2>/dev/null | awk 'NF{print $1}')"
-  if [[ -n "$vg" ]]; then
-    echo "Removing VG $vg"
-    vgchange -an "$vg" || true
-    vgremove -ff "$vg" || true
-  fi
-done
-
-echo "Wiping disk signatures and partition table..."
-wipefs -a "$DISK"
-sgdisk --zap-all "$DISK" 2>/dev/null || true
-parted -s "$DISK" mklabel gpt
-parted -s "$DISK" mkpart primary 1MiB 100%
-parted -s "$DISK" set 1 lvm on
-partprobe "$DISK"
-sleep 2
-
-PART="${DISK}1"
-[[ -b "$PART" ]] || PART="${DISK}p1"
-[[ -b "$PART" ]] || die "Could not find new partition."
-
-echo "Creating LVM..."
-pvcreate -ff -y "$PART"
-vgcreate "$VG_NAME" "$PART"
-
-lvcreate -y -L 1G -n prstnt "$VG_NAME"
-lvcreate -y -L 1G -n docker "$VG_NAME"
-lvcreate -y -L 4G -n log "$VG_NAME"
-lvcreate -y -L 2G -n docker-data "$VG_NAME"
-lvcreate -y -l 100%FREE -n container-data "$VG_NAME"
-
-echo "Formatting filesystems..."
-mkfs.ext4 -F -L prstnt "/dev/$VG_NAME/prstnt"
-mkfs.ext4 -F -L docker "/dev/$VG_NAME/docker"
-mkfs.ext4 -F -L log "/dev/$VG_NAME/log"
-mkfs.ext4 -F -L docker-data "/dev/$VG_NAME/docker-data"
-mkfs.ext4 -F -L container-data "/dev/$VG_NAME/container-data"
-
-echo "Preparing mount points..."
-mkdir -p /var/prstnt /docker /var/lib/docker /var/lib/containerd
-
-if [[ -d /docker && ! -L /docker ]]; then
-  if [[ ! -d /docker-inst ]]; then
-    mv /docker /docker-inst
-  else
-    echo "/docker-inst already exists; leaving it in place."
-  fi
-fi
-
-mkdir -p /docker
-
-echo "Mounting filesystems..."
-mount /var/prstnt
-mount /docker
-mount /var/lib/docker
-mount /var/lib/containerd
-
-echo "Loading Docker Images..."
+log "Starting Docker and loading ISO images"
+systemctl start containerd
+systemctl start docker
 /sbin/docker-iso-update
 
-echo "Copying original /docker contents..."
-if [[ -d /docker-inst ]]; then
-  cp -a /docker-inst/. /docker/
-fi
-
-echo "Building Docker Containers..."
-for docker in $(ls /docker -1 |grep -Ev "^lost"); do
-	cd /docker/$docker
-	docker compose up -d
+log "Starting compose stacks"
+shopt -s nullglob
+for stack in /docker/*; do
+  [[ -d "$stack" ]] || continue
+  [[ -f "$stack/docker-compose.yml" || -f "$stack/compose.yml" ]] || continue
+  log "Starting $(basename "$stack")"
+  (cd "$stack" && docker compose up -d)
 done
+shopt -u nullglob
 
-systemctl restart persistent-files
-systemctl restart persistent-dirs
+log "Backing up persistent configuration"
+for svc in persistent-files persistent-dirs; do
+  systemctl stop "$svc" 2>/dev/null || true
+done
 /etc/init.d/persistent-files backup
 /etc/init.d/persistent-dirs backup
 
-echo "Done."
-echo
-lsblk "$DISK"
-read -rp "Press any key to reboot or Ctrl-C to abort." CONFIRM
-reboot
+# Verify the critical account/network state actually made it to persistent storage.
+for file in /etc/passwd /etc/group /etc/shadow /etc/gshadow /etc/thinstation.custom; do
+  [[ -f "/var/prstnt$file" ]] || die "Persistence verification failed: /var/prstnt$file missing."
+  cmp -s "$file" "/var/prstnt$file" || die "Persistence verification failed: $file differs from backup."
+done
+[[ -d /var/prstnt/etc/NetworkManager/system-connections ]] ||
+  die "Persistence verification failed: NetworkManager profiles were not backed up."
+[[ -d /var/prstnt/etc/sudoers.d ]] ||
+  die "Persistence verification failed: sudoers directory was not backed up."
+
+systemctl start persistent-dirs
+systemctl start persistent-files
+
+log "Setup complete and persistence verified."
+lsblk "$DISK" 2>/dev/null || true
+
+if (( REBOOT )); then
+  if (( NON_INTERACTIVE )); then
+    reboot
+  else
+    read -rp "Press Enter to reboot now, or Ctrl-C to leave the system running."
+    reboot
+  fi
+fi
