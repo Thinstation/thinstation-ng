@@ -36,6 +36,7 @@ firmware_ports="$(read_port_list ts/rpms/firmware)"
 system_ports="$(read_port_list ts/rpms/system)"
 ts_ports="$(read_port_list ts/rpms/ts)"
 other_ports=""
+extra_ports="${TS_EXTRA_PORTS:-}"
 
 if [ -e ts/rpms/other ]; then
 	other_ports="$(read_port_list ts/rpms/other)"
@@ -120,7 +121,8 @@ stage1()
 		$grub_ports \
 		$firmware_ports \
 		$system_ports \
-		$other_ports
+		$other_ports \
+		$extra_ports
 
 	preserve_host_repo_overrides
 	cd "$ROOT" || return 1
