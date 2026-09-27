@@ -231,7 +231,7 @@ build-gitlab-ee:
     - sudo sed -i 's/^#package gitlab-ee/package gitlab-ee/' ts/build/build.conf
     - sudo sed -i 's/^#package openssh/package openssh/' ts/build/build.conf
     
-    - printf '%s\n' 'param authorized_keys /build/authorized_keys' \
+    - printf '%s\n' 'param authorized_keys /authorized_keys' \
       | sudo tee -a ts/build/build.conf >/dev/null
 
     - printf '%s\n' "$MCP_SSH_PUBLIC_KEY" \
