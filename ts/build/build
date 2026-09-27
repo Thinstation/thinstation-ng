@@ -1448,6 +1448,20 @@ if [ -e $PACDIR/knownhosts.param ]; then
 	fi
 fi
 
+if [ -e $PACDIR/authorizied_keys.param ]; then
+	if [ -e "$ts_authorizied_keys" ] ; then
+		if [ ! -e ./tmp-tree/etc/skel/.ssh ] ; then
+			mkdir -p ./tmp-tree/etc/skel/.ssh
+		fi
+		cp $ts_authorized_keys ./tmp-tree/etc/skel/.ssh
+		echo "" >> ./tmp-tree/etc/skel/.ssh/`basename $ts_knownhosts`
+	else
+		echo "Authorized keys file not found, build aborted."
+		remove_files
+       		exit 1
+	fi
+fi
+
 echo -e "Checking for ICA encryption support"
 
 if [ -e $PACDIR/icaencryption.param ]; then
