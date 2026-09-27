@@ -8,6 +8,46 @@ FB_COMP_EXTRA=$4
 echo FASTBOOT=$2 >> etc/thinstation.env
 cp --remove-destination /bin/mount bin/.
 
+parse_fastlibneed()
+{
+	grep -v "not a dyn" "$1" | grep -v statically | grep -v ":" | sed -e 's/\t//g' | cut -d " " -f1 | sed -e 's|/lib64/||g' | sed -e 's|/lib/||g' | grep -v '^linux-vdso.so' | sort -u
+}
+
+expand_fastlib_dependencies()
+{
+	parse_fastlibneed /tmp/fastlibneed > /tmp/fastlib
+	: > /tmp/fastlibroots
+
+	for lib in `cat ../fastboot/lib-boot` ; do
+		if [ -e lib64/$lib ]; then
+			echo "$lib" >> /tmp/fastlibroots
+		fi
+	done
+
+	cat /tmp/fastlibroots /tmp/fastlib | sort -u > /tmp/fastlib.keep
+
+	while : ; do
+		cp /tmp/fastlib.keep /tmp/fastlib.previous
+		: > /tmp/fastlibdeps
+
+		for lib in `cat /tmp/fastlib.previous` ; do
+			if [ -e lib64/$lib ]; then
+				ldd lib64/$lib 2>/dev/null >> /tmp/fastlibdeps
+			fi
+		done
+
+		parse_fastlibneed /tmp/fastlibdeps > /tmp/fastlib.newdeps
+		cat /tmp/fastlib.previous /tmp/fastlib.newdeps | sort -u > /tmp/fastlib.keep
+
+		if cmp -s /tmp/fastlib.previous /tmp/fastlib.keep ; then
+			break
+		fi
+	done
+
+	cp /tmp/fastlib.keep /tmp/fastlib
+}
+
+
 if [ "$2" == "true" ] ; then
 	mv bin lib64/.
 	mv sbin lib64/.
@@ -63,7 +103,7 @@ if [ "$2" == "true" ] ; then
 	for so in `dir lib64/security/*`; do
 		ldd $so 2>/dev/null >> /tmp/fastlibneed
 	done
-\texpand_fastlib_dependencies
+	expand_fastlib_dependencies
 	for lib in `cat ../fastboot/lib-boot; cat /tmp/fastlib; ls --color=never lib64 |grep -E 'libgcc_s.so.[0-1]+|libnss_files.so.[0-9]+|libnss_dns.so.[0-9]+'` ; do
 		if [ -e lib64/$lib ]; then
 			mv lib64/$lib fastboot/.
@@ -154,7 +194,7 @@ if [ "$2" == "lotsofmem" ]; then
         for so in `dir lib64/security/*`; do
                 ldd $so 2>/dev/null >> /tmp/fastlibneed
         done
-\texpand_fastlib_dependencies
+	expand_fastlib_dependencies
 	for lib in `cat /tmp/fastlib |grep -v linux-vdso.so`; do
 		if [ ! -e lib64/$lib ]; then
 			libsource="`find /usr/lib /usr/lib64 -name $lib |grep -v vmware`"
