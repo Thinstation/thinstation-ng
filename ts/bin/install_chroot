@@ -112,7 +112,13 @@ stage1()
 	fi
 
 	ROOT=$PWD
-	dnf_install 		--installroot="$ROOT" 		"${host_config[@]}" 		$core_ports 		$kernel_ports 		$grub_ports 		$firmware_ports
+	dnf_install \
+		--installroot="$ROOT" \
+		"${host_config[@]}" \
+		$core_ports \
+		$kernel_ports \
+		$grub_ports \
+		$firmware_ports
 
 	preserve_host_repo_overrides
 	cd "$ROOT" || return 1
@@ -120,12 +126,6 @@ stage1()
 }
 
 stage2()
-{
-	rm /dostage2
-	touch /dostage3
-}
-
-stage3()
 {
 	local procs
 
@@ -158,8 +158,8 @@ stage3()
 		ln -sf ts/build /build
 	fi
 
-	rm /dostage3
-	touch /dostage4
+	rm /dostage2
+	touch /dostage3
 }
 
 unwind_package()
@@ -180,18 +180,16 @@ unwind_package()
 	fi
 }
 
-stage4()
+stage3()
 {
-	rm /dostage4
+	rm /dostage3
 }
 
 export -f unwind_package
 
 ROOT=$PWD
 
-if [ -e "$ROOT/dostage4" ]; then
-	stage4
-elif [ -e "$ROOT/dostage3" ]; then
+if [ -e "$ROOT/dostage3" ]; then
 	stage3
 elif [ -e "$ROOT/dostage2" ]; then
 	stage2
