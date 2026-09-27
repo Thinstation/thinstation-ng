@@ -118,7 +118,9 @@ stage1()
 		$core_ports \
 		$kernel_ports \
 		$grub_ports \
-		$firmware_ports
+		$firmware_ports \
+		$system_ports \
+		$other_ports
 
 	preserve_host_repo_overrides
 	cd "$ROOT" || return 1
@@ -131,8 +133,8 @@ stage2()
 
 	cp -a /ts/repos/* /etc/yum.repos.d/.
 	dnf_makecache
-	dnf_install $system_ports
-	dnf_install --allowerasing $ts_ports $other_ports
+#	dnf_install $system_ports
+	dnf_install --allowerasing $ts_ports #$other_ports
 
 	for Root in $TSWRKNG $XTRWRKNG; do
 		if [ "$Root" = "$TSWRKNG" ]; then

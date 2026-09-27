@@ -193,7 +193,7 @@ launch_chroot()
 		copy_host_essential
 		if which dbus-uuidgen > /dev/null; then
 			mkdir -p var/lib/dbus
-			dbus-uuidgen --get > var/lib/dbus/machine-id
+			dbus-uuidgen --get > etc/machine-id
 		fi
 	fi
 	if [ -n "$chuser" ]; then
