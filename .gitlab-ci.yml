@@ -46,7 +46,6 @@ build-npm:
 
     # Build Nginx Proxy Manager ThinStation image.
     - sudo ./setup-chroot -i
-    - sudo ./setup-chroot -e dnf install -y --setopt=keepcache=1 --setopt=max_parallel_downloads=10 docker
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/nginx-proxy-manager/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo sed -i 's/^#package nginx-proxy-manager/package nginx-proxy-manager/' ts/build/build.conf
