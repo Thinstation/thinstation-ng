@@ -1,0 +1,3 @@
+interface:
+  display_name: "ThinStation NG Engineering"
+  short_description: "Build, package, test, and debug ThinStation NG appliances"
