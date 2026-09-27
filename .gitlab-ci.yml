@@ -230,7 +230,8 @@ build-gitlab-ee:
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo sed -i 's/^#package gitlab-ee/package gitlab-ee/' ts/build/build.conf
     - sudo sed -i 's/^#package openssh/package openssh/' ts/build/build.conf
-    - sudo echo "$MCP_SSH_PUBLIC_KEY" >> knownhosts
+    - sudo echo "param knownhosts /known_hosts" >> ts/build/build.conf
+    - sudo echo "$MCP_SSH_PUBLIC_KEY" >> known_hosts
     - sudo sed -i -E "s#gitlab/gitlab-ee:[0-9]+\\.[0-9]+\\.[0-9]+-ee\\.0#gitlab/gitlab-ee:${GITLAB_EE_VERSION}-ee.0#" ts/build/packages/gitlab-ee/build/images.conf
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/gitlab-ee/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e stb
