@@ -4,3 +4,5 @@
 /libexec/
 /usr/
 /build/installed
+/build/scripts/
+/lib64/

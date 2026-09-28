@@ -1,2 +1,6 @@
 /opt/
 /build/installed
+/bin/
+/build/scripts/
+/etc/
+/lib64/
