@@ -58,7 +58,6 @@ nf_nat_sip
 nf_nat_tftp
 nf_synproxy_core
 nf_tables
-nfnetlink
 nfnetlink_acct
 nfnetlink_hook
 nfnetlink_log
