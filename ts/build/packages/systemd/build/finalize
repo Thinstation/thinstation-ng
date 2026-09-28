@@ -47,25 +47,40 @@ echo "Normalizing file/dir user and group ID's"
 while IFS= read -r -d '' user_id &&
       IFS= read -r -d '' group_id &&
       IFS= read -r -d '' file; do
+    target_user=""
+    target_group=""
+
     if [ -z "${valid_uids[$user_id]+x}" ]; then
-        username="${alternate_users[$user_id]}"
-        if [ -n "$username" ]; then
-            chown "$username" "$file"
-        else
+        target_user="${alternate_users[$user_id]}"
+        if [ -z "$target_user" ]; then
             echo "Invalid user ID $user_id for file $file"
         fi
     fi
 
     if [ -z "${valid_gids[$group_id]+x}" ]; then
-        groupname="${alternate_groups[$group_id]}"
-        if [ -n "$groupname" ]; then
-            caps=$(getcap "$file" | cut -d' ' -f2)
-            chgrp "$groupname" "$file"
-            if [ -n "$caps" ]; then
-                setcap "$caps" "$file"
-            fi
-        else
+        target_group="${alternate_groups[$group_id]}"
+        if [ -z "$target_group" ]; then
             echo "Invalid group ID $group_id for file $file"
+        fi
+    fi
+
+    if [ -n "$target_user" ] || [ -n "$target_group" ]; then
+        # chown/chgrp clear file capabilities and can clear setuid/setgid bits.
+        # Preserve both around the complete ownership update.
+        mode=$(stat -c '%a' "$file")
+        caps=$(getcap "$file" | cut -d' ' -f2)
+
+        if [ -n "$target_user" ] && [ -n "$target_group" ]; then
+            chown "$target_user:$target_group" "$file"
+        elif [ -n "$target_user" ]; then
+            chown "$target_user" "$file"
+        else
+            chgrp "$target_group" "$file"
+        fi
+
+        chmod "$mode" "$file"
+        if [ -n "$caps" ]; then
+            setcap "$caps" "$file"
         fi
     fi
 done < <(find / \( -path /proc -o -path /sys -o -path /dev \) -prune -o -printf '%U\0%G\0%p\0')
