@@ -3,7 +3,7 @@ variables:
     value: "0"
     description: "Set to 1 to build the NPM appliance ISO."
   GITLAB_EE_VERSION:
-    value: "19.4.0"
+    value: "19.4.1"
     description: "GitLab EE semantic version to bake into the appliance ISO (for example 19.4.0)."
   BUILD_GITLAB_EE:
     value: "0"
