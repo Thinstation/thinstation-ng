@@ -1,39 +1,40 @@
-module ac97_bus
-module ata_generic
-module bpf_preload
-module drm_ttm_helper
+# Curated QEMU/KVM machine profile.
+# Keep only top-level virtual/emulated hardware drivers here. Dependencies
+# are resolved automatically by modprobe; filesystem modules belong in the
+# normal filesystem configuration, not in a machine profile.
+
+# VirtIO devices
+module virtio_blk
+module virtio_scsi
+module virtio_net
+module virtio_console
+module virtio_balloon
+module virtio_rng
+
+# Common QEMU/KVM storage controllers
+module ahci
+module ata_piix
+module megasas
+module mptspi
+
+# Common emulated network adapters
 module e1000
 module e1000e
-module failover
-module floppy
-module i2c-piix4
-module i2c-smbus
-module i2c_i801
-module iTCO_wdt
-module joydev
-module lpc_ich
-module net_failover
-module netfs
-module parport
-module parport_pc
-module pata_acpi
-module pcspkr
-module ppdev
-module qemu_fw_cfg
+module pcnet32
+module 8139cp
+module 8139too
+
+# Common virtual display adapters
 module qxl
-module rfkill
-module serio_raw
-module snd
-module snd-ac97-codec
+module bochs
+module cirrus
+
+# Common emulated audio
 module snd-intel8x0
-module snd_hrtimer
-module snd-pcm
-module snd-seq
-module snd-seq-device
-module snd_seq_dummy
-module snd-timer
-module soundcore
-module ttm
-module uinput
-module virtio_console
-module virtio_net
+module snd-hda-intel
+
+# Miscellaneous QEMU virtual hardware
+module qemu_fw_cfg
+module floppy
+module parport_pc
+module virtio_input
