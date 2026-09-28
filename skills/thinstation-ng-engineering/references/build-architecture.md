@@ -61,3 +61,18 @@ A prior systemd/libbpf warning was fixed by retaining recursive dependencies for
 - Kernel debug console is configurable with `param debugconsole`; absence means normal non-debug builds use `console=tty1`.
 - The nftables package finalizer explicitly selects nft-backed `iptables`, `ebtables`, and `arptables` alternatives.
 - Avoid reintroducing explicit CI `dnf install ... docker` bootstrap lines. Docker-backed appliance builds use normal chroot/package machinery.
+
+
+## Static package files vs .dna
+
+Do not add static package-owned source files to `.dna` just to make them visible.
+
+ThinStation package directories can contain static runtime content directly. If a file is authored and maintained as part of the package itself, place it directly under the package tree at its intended runtime path, for example:
+
+```text
+packages/base/etc/sysctl.d/20-thinstation-hardening.conf
+```
+
+Files not listed in `.dna` are mostly ignored by the update/RPM-refresh machinery, which is desirable for static source that should remain exactly as maintained in Git.
+
+Use `.dna` for files that the package update mechanism manages, imports, links, or refreshes from RPM/package sources. Do not list ordinary static package content there unless there is a specific update-system reason.
