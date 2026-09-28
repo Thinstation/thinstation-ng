@@ -1,3 +1,4 @@
 fuse
 squashfs
+loop
 binfmt_misc
