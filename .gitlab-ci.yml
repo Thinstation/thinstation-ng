@@ -15,8 +15,8 @@ variables:
     value: "20"
     description: "Maximum number of concurrent DNF downloads per mirror during chroot setup."
   TS_EXTRA_PORTS:
-    value: "bridge-utils dbus-glib dhcp-client docker-compose docker-compose-switch slirp4netns ebtables-legacy firewall-config firewalld ipset libcap-ng-python3 python3-nftables dejavu-sans-fonts gdisk gdk-pixbuf2-modules-extra gdk-pixbuf2-xlib gtk2-immodule-xim gtk2-immodules gtk2-engines device-mapper-event device-mapper-multipath lvm2 lvm2-libs NetworkManager NetworkManager-bluetooth NetworkManager-wifi NetworkManager-wwan mobile-broadband-provider-info network-manager-applet nm-connection-editor openresolv iptables-nft iptables-legacy iptables-services iptables-utils open-vm-tools open-vm-tools-desktop python3-abrt-addon python3-tkinter qemu-guest-agent spice-vdagent sudo virtualbox-guest-additions vulkan-tools vulkan-validation-layers numlockx rgb xorg-x11-fonts-misc xset xe-guest-utilities-latest xmlsec1-gcrypt xmlsec1-gnutls xmlsec1-nss yad"
-    description: "Extra RPMs to preload into the ThinStation build chroot in one bulk DNF transaction."
+    value: "audit audit-libs audit-rules libcap-ng-utils bridge-utils dbus-glib dhcp-client docker-cli docker-buildx docker-compose docker-compose-switch containerd moby-filesystem runc tini-static moby-engine moby-engine-nano moby-engine-rootless-extras rootlesskit criu libnet pigz slirp4netns libslirp shadow-utils ebtables-legacy firewall-config firewalld firewalld-filesystem ipset ipset-libs libcap-ng-python3 python3-firewall python3-nftables libnfnetlink libnetfilter_conntrack dejavu-sans-fonts e2fsprogs gdisk parted nano gdk-pixbuf2-modules-extra gdk-pixbuf2-xlib gtk2-immodule-xim gtk2-immodules gtk2-engines device-mapper device-mapper-libs device-mapper-event device-mapper-multipath device-mapper-multipath-libs lvm2 lvm2-libs NetworkManager NetworkManager-libnm NetworkManager-bluetooth NetworkManager-wifi NetworkManager-wwan libnma mobile-broadband-provider-info network-manager-applet nm-connection-editor openresolv iptables-nft iptables-legacy iptables-legacy-libs iptables-libs iptables-services iptables-utils open-vm-tools open-vm-tools-desktop openssh-server python3-abrt-addon python3-tkinter qemu-guest-agent spice-vdagent sudo virtualbox-guest-additions vulkan-tools vulkan-validation-layers numlockx rgb xorg-x11-fonts-misc xset xe-guest-utilities-latest xmlsec1-gcrypt xmlsec1-gnutls xmlsec1-nss yad"
+    description: "Official RPMs required by the shared appliance profile, preloaded in the initial chroot DNF transaction."
 
 workflow:
   rules:
@@ -229,13 +229,16 @@ build-gitlab-ee:
     - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" TS_EXTRA_PORTS="$TS_EXTRA_PORTS" ./setup-chroot -i
     - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
     - sudo sed -i 's/^#package gitlab-ee/package gitlab-ee/' ts/build/build.conf
-    - sudo sed -i 's/^#package openssh/package openssh/' ts/build/build.conf
-    
-    - printf '%s\n' 'param authorized_keys /authorized_keys' \
-      | sudo tee -a ts/build/build.conf >/dev/null
-
-    - printf '%s\n' "$MCP_SSH_PUBLIC_KEY" \
-      | sudo tee authorized_keys >/dev/null
+    - |
+      if [[ -n "${MCP_SSH_PUBLIC_KEY:-}" ]]; then
+        sudo sed -i 's/^#package openssh/package openssh/' ts/build/build.conf
+        printf '%s\n' 'param authorized_keys /authorized_keys' \
+          | sudo tee -a ts/build/build.conf >/dev/null
+        printf '%s\n' "$MCP_SSH_PUBLIC_KEY" \
+          | sudo tee authorized_keys >/dev/null
+      else
+        echo "MCP_SSH_PUBLIC_KEY is not set; skipping debug SSH key injection."
+      fi
 
     - sudo sed -i -E "s#gitlab/gitlab-ee:[0-9]+\\.[0-9]+\\.[0-9]+-ee\\.0#gitlab/gitlab-ee:${GITLAB_EE_VERSION}-ee.0#" ts/build/packages/gitlab-ee/build/images.conf
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/gitlab-ee/build/images.conf build/boot-images/grub/efi-source/Docker
