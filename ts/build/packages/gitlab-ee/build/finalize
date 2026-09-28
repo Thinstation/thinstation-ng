@@ -11,11 +11,11 @@ services:
     environment:
       GITLAB_OMNIBUS_CONFIG: |
         external_url '${GITLAB_EXTERNAL_URL:-https://gitlab.thinstation.org}'
-        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2222}
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
     ports:
       - "80:80"
       - "443:443"
-      - "${GITLAB_SSH_PORT:-2222}:22"
+      - "2222:22"
     volumes:
       - ./config:/etc/gitlab
       - ./logs:/var/log/gitlab
