@@ -15,12 +15,14 @@ Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-S
 - Distinguish templates from the active build tree. CI copies `ts/build/conf/boot2docker/*` into `ts/build/`; `setup-chroot -e stb` parses the active files under `ts/build/`.
 - Keep organization/site specifics out of reusable source. Supply them through CI variables, environment variables, surveys, or extra vars.
 - For appliance-specific behavior, prefer CI/package selection over globally changing the shared boot2docker profile.
+- Let server packages declare their own firewall requirements through `/etc/firewall.d`; keep generic setup scripts firewall-agnostic.
 - Validate source changes in the real pipeline and, when relevant, boot the produced ISO in PVE and inspect the live guest.
 
 ## Read the relevant reference
 
 - For repo structure, build phases, active/template config rules, `install_chroot`, and fastboot: read `references/build-architecture.md`.
 - For GitLab CI, appliance package selection, Docker image export, compose payloads, and CI variables: read `references/appliance-ci.md`.
+- For firewalld, nftables, `/etc/firewall.d` package contributions, and server-package port ownership: read `references/firewall-and-server-packages.md`.
 - For `persistent-files`, immutable appliance state, `setup-docker`, first-run configuration, and idempotency: read `references/persistence-and-setup.md`.
 - For PVE, QGA/SSH validation, lab aliases, and efficient debugging: read `references/lab-validation.md`.
 

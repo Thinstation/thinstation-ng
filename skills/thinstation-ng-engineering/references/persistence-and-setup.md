@@ -91,6 +91,38 @@ The Docker appliance uses the `ts_persistent` VG with labels/mounts roughly:
 - `docker-data` -> `/var/lib/docker`
 - `container-data` -> `/var/lib/containerd`
 
-The setup flow must preserve any immutable-image compose payload from `/docker` before mounting the persistent `docker` LV, then copy that payload into the newly mounted filesystem before starting stacks.
+Do not place immutable compose seeds directly under `/docker`; the persistent `docker` LV mounts there during boot and hides image contents at that path.
+
+Keep immutable compose seeds in a non-mounted runtime path such as:
+
+```text
+/usr/lib/thinstation/docker-stacks/<stack>/docker-compose.yml
+```
+
+After persistent filesystems are mounted, `setup-docker` copies those seeds into persistent `/docker/<stack>/`. This gives first boot, upgrades, and reruns the same deterministic source of truth.
+
+On rerun, the seed should refresh the persistent compose file before `docker compose up -d`, so changes such as port mappings are applied by container recreation.
 
 `docker-iso-update` loads versioned images from `/mnt/cdrom0/Docker`, records state under `/var/prstnt/docker-image-state`, and can recreate existing compose stacks when image manifests change.
+
+## First-start service timing
+
+A successful container start does not mean the GitLab web UI is immediately ready.
+
+Observed first-start sequence:
+
+- PostgreSQL, Redis, Gitaly, KAS, and SSH start first.
+- Nginx and Workhorse may appear before Rails is ready.
+- Puma can spend roughly a minute preloading the Rails application.
+- Until Puma creates `/var/opt/gitlab/gitlab-rails/sockets/gitlab.socket`, Workhorse can return `502 Bad Gateway`.
+
+When validating GitLab startup, inspect:
+
+```bash
+docker exec gitlab gitlab-ctl status
+docker exec gitlab ls -l /var/opt/gitlab/gitlab-rails/sockets/
+docker exec gitlab tail -80 /var/log/gitlab/puma/current
+docker exec gitlab tail -80 /var/log/gitlab/gitlab-workhorse/current
+```
+
+Treat a temporary 502 during first-run initialization as a readiness condition, not immediately as a networking failure. Confirm the Rails socket and retry before changing network/firewall configuration.

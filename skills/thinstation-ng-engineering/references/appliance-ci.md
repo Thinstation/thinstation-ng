@@ -55,8 +55,28 @@ A source directory such as:
 packages/gitlab-ee/docker/gitlab-ee/docker-compose.yml
 ```
 
-is not automatically guaranteed to land in the runtime filesystem merely because it exists in the package source tree. Verify packaging mechanics. Runtime `/docker/<stack>/compose...` must actually exist before `setup-docker` can persist or launch it.
+does not automatically land in the runtime filesystem merely because it exists in the package source tree.
 
-Preferred packaging direction is to put files that must land in the runtime root under the package's `build/extra/...` tree, e.g. `build/extra/docker/gitlab-ee/docker-compose.yml`, then validate in the built ISO/live guest.
+For ordinary RPM-backed packages that run `repackage`, `build/extra` is merged into the package root. The GitLab EE and NPM appliance packages are metadata-only packages with effectively empty `.dna` files and no normal `build/install`, so `build/extra` is not sufficient for their runtime assets.
+
+For metadata-only appliance packages, use `build/finalize` to create runtime assets inside the final image. Selected package finalizers are copied into `tmp-tree/finalize` and executed inside the final `tmp-tree` chroot.
+
+Current convention:
+
+- create immutable compose seeds under `/usr/lib/thinstation/docker-stacks/<stack>/docker-compose.yml`
+- create package firewall fragments under `/etc/firewall.d/<order><package>`
+- let `setup-docker` copy the immutable compose seed into persistent `/docker/<stack>/` after persistent filesystems are mounted
+
+Do not seed compose files directly under the immutable image's `/docker` path because the persistent `docker` LV mounts there during boot and hides them before first-run setup can copy them.
 
 Always test both NPM and GitLab appliance packaging when changing generic Docker-appliance mechanics.
+
+## GitLab appliance ports
+
+Keep appliance SSH and GitLab repository SSH distinct:
+
+- host/MCP OpenSSH: TCP 22
+- GitLab container SSH: host TCP 2222 -> container TCP 22
+- GitLab HTTP/HTTPS: TCP 80/443
+
+The GitLab compose seed, GitLab advertised shell SSH port, and firewall fragment must agree on 2222. Avoid making only one of those values configurable unless the others are derived from the same source.
