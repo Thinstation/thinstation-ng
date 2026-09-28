@@ -28,7 +28,6 @@ export DROP_DIRS="	lib64/xfce4/backdrops \
 			lib64/xfce4/xfwm4 \
 			lib64/xfce4/dev-tools \
 			lib64/backgrounds \
-			lib64/locale \
 			lib64/themes/Default/balou"
 
 export DROP_FILES="	xfce4-about.desktop \

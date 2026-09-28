@@ -1865,6 +1865,16 @@ filesystem_fixups()
 		fi
 		depmod -b ./tmp-tree $KERNVER 2>/dev/null
 	fi
+
+	# Clean unnecessary locales
+	installed_locales="`find ./tmp-tree/build -maxdepth 1 -name \*.template`"
+	for localedir in `find ./tmp-tree/usr/share/locale -mindepth 1 -maxdepth 1 -type d`; do
+		ltag=`basename $localedir`
+		if test `find ./tmp-tree/build/ -iname "${ltag}*.template" -type f | wc -l` -eq 0; then
+			rm -rf $localedir
+		fi
+	done
+
 	# Clean up unncessary folders
 	rm -rf ./tmp-tree/{dependencies,build,.dna,.wind,.unwind,configurator.yaml,session_configurator.yaml}
 
