@@ -63,6 +63,21 @@ A prior systemd/libbpf warning was fixed by retaining recursive dependencies for
 - Avoid reintroducing explicit CI `dnf install ... docker` bootstrap lines. Docker-backed appliance builds use normal chroot/package machinery.
 
 
+## Package metadata contract
+
+Every package directory under `ts/build/packages/` must contain all four metadata files:
+
+- `.dna`
+- `.wind`
+- `.unwind`
+- `dependencies`
+
+This remains true for packages that are mostly static source, packages repackaged from RPMs, and packages whose `.dna` is intentionally empty.
+
+`.dna` is the source description consumed by `ts/bin/update`. `ts/bin/clean_chroot` generates or refreshes `.wind` and `.unwind` from that `.dna`; do not treat the cache files as independent source of truth. If `.dna` changes, regenerate the caches through the normal tooling rather than hand-maintaining divergent commands.
+
+An empty `.dna` is valid. Its generated cache files still exist and contain the MD5 header for the empty file. Repackaged RPM content can be handled by `build/install` and `build/remove` while the mandatory package metadata remains present.
+
 ## Static package files vs .dna
 
 Do not add static package-owned source files to `.dna` just to make them visible.
@@ -75,4 +90,4 @@ packages/base/etc/sysctl.d/20-thinstation-hardening.conf
 
 Files not listed in `.dna` are mostly ignored by the update/RPM-refresh machinery, which is desirable for static source that should remain exactly as maintained in Git.
 
-Use `.dna` for files that the package update mechanism manages, imports, links, or refreshes from RPM/package sources. Do not list ordinary static package content there unless there is a specific update-system reason.
+Use `.dna` for files that the package update mechanism manages, imports, links, or refreshes from RPM/package sources. Do not list ordinary static package content there unless there is a specific update-system reason. The rule that `.dna` itself must exist is separate from whether a particular static file belongs in it.
