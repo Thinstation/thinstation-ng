@@ -11,7 +11,7 @@ This utility is designed to simplify the folder layout of a crux port into a
 ts package. It will decompress the compiled port archive that belongs to the
 specified package and mangle it for integration into thinstation. By default,
 the destination will be in $TSWRKNG/packages/(specified package) folder.
-This can be overriden with the -t or --temp (path to temp folder)
+This can be overridden with the -t or --temp (path to temp folder)
 syntax.
 
 Usage: repackage (-t (path to temp folder)) (crux port)

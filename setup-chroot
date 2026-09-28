@@ -19,7 +19,7 @@ help()
 	completed, it will only take you into the chroot env for building. You will need to 'exit'
 	this env when you are done working in it. It takes the following options.
 
-	-a : Automaticly download and build during unwind.
+	-a : Automatically download and build during unwind.
 	-h : Show this help message.
 	-i : Install the env only. Don't enter it after-wards.
 	-b : Run build after entering chroot and exit after-wards.
