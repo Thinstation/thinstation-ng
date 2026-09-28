@@ -285,23 +285,47 @@ lib_dependencies()
 copy_module()
 {
 	unset copied
-	local rpath=`find /lib/modules/$2 -name $1 -printf %h |cut -d "/" -f5-`
-	local src=/lib/modules/$2/$rpath/$1
+	local src=""
+	local rpath=""
+	local requested="$1"
+	local modname="${requested%.ko.xz}"
+
+	# Resolve kernel module names through kmod first. This handles the
+	# underscore/hyphen equivalence used by modprobe/modinfo and tells us
+	# when a dependency is built directly into the kernel.
+	if [[ "$requested" == *.ko.xz ]]; then
+		local resolved
+		resolved=$(modinfo -k "$2" -n "$modname" 2>/dev/null || true)
+		if [ "$resolved" == "(builtin)" ]; then
+			return 3
+		elif [ -n "$resolved" ] && [ -e "$resolved" ]; then
+			src="$resolved"
+			rpath="${src#/lib/modules/$2/}"
+			rpath="${rpath%/*}"
+			requested="${src##*/}"
+		fi
+	fi
+
+	# Fall back to exact filenames for metadata files and unusual modules.
+	if [ -z "$src" ]; then
+		rpath=`find /lib/modules/$2 -name "$requested" -printf %h |cut -d "/" -f5- |head -n1`
+		src=/lib/modules/$2/$rpath/$requested
+	fi
+
 	local dest=$3/lib/modules/$2/$rpath
-	if [ ! -e $src ]; then
-		if grep /lib/modules/$2/modules.builtin -e ${1%.xz} -q; then
-			echo "Module ${1%.ko.xz} already builtin"
+	if [ ! -e "$src" ]; then
+		if grep /lib/modules/$2/modules.builtin -e "${requested%.xz}" -q; then
 			return 3
 		else
-			echo "Notice! Module ${1%.ko.xz} not found for kernel $2"
+			echo "Notice! Module $modname not found for kernel $2"
 			return 1
 		fi
 	fi
-	if [ ! -e $dest/$1 ]; then
-		mkdir -p $dest
-		ln $src $dest/$1 > /dev/null 2>&1
+	if [ ! -e "$dest/$requested" ]; then
+		mkdir -p "$dest"
+		ln "$src" "$dest/$requested" > /dev/null 2>&1
 		if [ "$?" == "0" ]; then
-			copied="$dest/$1"
+			copied="$dest/$requested"
 			return 0
 		fi
 	else
