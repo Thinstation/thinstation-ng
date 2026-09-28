@@ -4,12 +4,12 @@ if [ "$GTK_THEME" != "ALL" ]; then
 		GTK_THEME=Adwaita
 	fi
 	if [ -e /lib/themes/$GTK_THEME/gtk-2.0/gtkrc ]; then
-		engine="`grep /lib/themes/$GTK_THEME/gtk-2.0/gtkrc -e engine |grep -v \"#\" |grep -v pixmap|tail -n1 |cut -d '\"' -f2`"
+		engine="`grep /lib/themes/$GTK_THEME/gtk-2.0/gtkrc -e engine |grep -v "#" |grep -v pixmap|tail -n1 |cut -d '"' -f2`"
 		if [ -z "$engine" ] && [ -e /lib/themes/$GTK_THEME/gtk-2.0/gtk.css ]; then
 			engine="`grep /lib/themes/$GTK_THEME/gtk-2.0/gtk.css -e engine |cut -d: -f3 |cut -d ';' -f1`"
 		fi
 		if [ -z $engine ] && [ -e /lib/themes/$GTK_THEME/gtk-2.0/main.rc ]; then
-			engine="`grep /lib/themes/$GTK_THEME/gtk-2.0/main.rc -e engine |grep -v \"#\" |grep -v pixmap|tail -n1 |cut -d '\"' -f2`"
+			engine="`grep /lib/themes/$GTK_THEME/gtk-2.0/main.rc -e engine |grep -v "#" |grep -v pixmap|tail -n1 |cut -d '"' -f2`"
 		fi
 		for del_engine in `find /lib/gtk-2.0/2.10.0/engines -type f |grep -v pixmap |grep -v $engine`; do
 			rm $del_engine
@@ -18,6 +18,7 @@ if [ "$GTK_THEME" != "ALL" ]; then
 	elif [ -e /etc/gtk-2.0 ]; then
 		echo -e "\tGtk-2 Theme $GTK_THEME not found!"
 	fi
+	mkdir -p /etc/gtk-3.0
 	if [ ! -e /etc/gtk-3.0/settings.ini ]; then
 		echo "[Settings]" >> /etc/gtk-3.0/settings.ini
 	fi
