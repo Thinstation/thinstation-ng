@@ -1,9 +1,6 @@
 /bin/
 /etc/
-/lib/
-/var/
-/build/installed
 /lib64/
+/run/
 /sbin/
 /build/scripts/
-/libexec/

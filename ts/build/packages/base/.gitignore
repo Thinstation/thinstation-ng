@@ -18,7 +18,9 @@
 
 /etc/security/
 !/etc/security/limits.d/
+!/etc/security/limits.d/.gitignore
 !/etc/security/namespace.d/
+!/etc/security/namespace.d/.gitignore
 
 /lib64/security/
 !/lib64/security/pam_hooks.so

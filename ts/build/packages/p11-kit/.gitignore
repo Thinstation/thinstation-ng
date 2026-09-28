@@ -1,5 +1,5 @@
-/build/extra/
-/bin/
 /etc/
+/bin/
+/libexec/
 /lib64/
 /build/scripts/

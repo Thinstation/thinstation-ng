@@ -3,3 +3,5 @@
 /etc/
 /lib/
 /var/
+/lib64/
+/build/scripts/
