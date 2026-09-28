@@ -4,3 +4,5 @@
 /sbin/
 /var/
 /build/installed
+/build/scripts/
+/lib64/

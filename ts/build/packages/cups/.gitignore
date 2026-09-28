@@ -4,3 +4,6 @@
 /lib/
 /sbin/
 /var/
+/build/extra/
+!/build/extra/etc/
+!/build/extra/etc/**

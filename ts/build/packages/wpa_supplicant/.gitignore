@@ -2,3 +2,5 @@
 /lib/
 /sbin/
 /build/installed
+/lib64/
+/build/scripts/

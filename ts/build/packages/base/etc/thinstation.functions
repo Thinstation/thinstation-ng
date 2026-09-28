@@ -633,7 +633,7 @@ get_res ()
 check_last_session ()
 {
 	if [ $(ls -l $APPLOGDIR |grep -e xorg -c) -gt 0 ]; then
-		lastlog=$(ls -ltr $APPLOGDIR |grep -e xorg |tail -n1 |cut -c 58-)
+		lastlog=$(ls -1tr $APPLOGDIR |grep -e xorg |tail -n1)
 		if [ $(tail -n1 $APPLOGDIR/$lastlog |grep -cF '(0)') -gt 0 ]; then
 			return 0
 		else

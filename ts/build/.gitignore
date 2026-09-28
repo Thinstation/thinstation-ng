@@ -1,1 +1,8 @@
 background.svg
+/boot-images/grub/efi-source/boot/
+/boot-images/grub/efi-source/EFI/
+/*tmp
+/tmp*
+*.iso
+!/Documentation/README.iso
+/packages/*/build/installed

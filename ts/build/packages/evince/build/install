@@ -1,0 +1,12 @@
+#!/bin/sh
+
+export PACKAGE=evince
+export PORTS="evince evince-libs"
+export DROP_DIRS="lib64/gnome"
+repackage -e
+
+returnval=$?
+
+icon-gen evince
+
+exit $returnval

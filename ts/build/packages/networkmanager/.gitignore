@@ -5,3 +5,8 @@
 /libexec/
 /sbin/
 /var/
+/build/extra/bin/
+/build/extra/etc/libnl/
+/run/
+/lib64/
+/build/scripts/

@@ -3,3 +3,7 @@
 /lib/
 /var/
 /build/installed
+/lib64/
+/sbin/
+/build/scripts/
+/libexec/

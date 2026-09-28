@@ -1,2 +1,7 @@
 *.pyc
 /ts/thingui/output
+/*
+!.gitignore
+!/ts
+!/setup-chroot
+!/README.md

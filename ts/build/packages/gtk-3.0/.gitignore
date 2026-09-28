@@ -3,3 +3,5 @@
 /lib/
 /libexec/
 /build/installed
+/lib64/
+/build/scripts/
