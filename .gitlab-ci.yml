@@ -287,3 +287,16 @@ arm-cross-smoke:
   after_script:
     - sudo umount build-aarch64 || true
     - sudo rm -rf build-aarch64
+
+
+show-runner-repos:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
+  script:
+    - grep -R -nE '^(baseurl|metalink|mirrorlist)=|thinstation-replaces' /etc/yum.repos.d || true
