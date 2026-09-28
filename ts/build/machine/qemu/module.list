@@ -8,6 +8,7 @@ module failover
 module floppy
 module i2c-piix4
 module i2c-smbus
+module i2c_i801
 module iTCO_wdt
 module joydev
 module lpc_ich
@@ -25,9 +26,11 @@ module serio_raw
 module snd
 module snd-ac97-codec
 module snd-intel8x0
+module snd_hrtimer
 module snd-pcm
 module snd-seq
 module snd-seq-device
+module snd_seq_dummy
 module snd-timer
 module soundcore
 module ttm
