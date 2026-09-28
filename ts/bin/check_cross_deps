@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+TARGET_ARCH="${1:-aarch64}"
+case "$TARGET_ARCH" in
+    arm64) TARGET_ARCH=aarch64 ;;
+    amd64) TARGET_ARCH=x86_64 ;;
+esac
+
+case "$TARGET_ARCH" in
+    aarch64) qemu=qemu-aarch64-static; package=qemu-user-static-aarch64 ;;
+    x86_64) qemu=qemu-x86_64-static; package=qemu-user-static-x86 ;;
+    *) echo "Unsupported target architecture: $TARGET_ARCH"; exit 1 ;;
+esac
+
+echo "Checking cross-build dependencies for $TARGET_ARCH..."
+if ! command -v "$qemu" >/dev/null 2>&1; then
+    echo "$qemu not found"
+    echo "Install: dnf install $package"
+    exit 1
+fi
+
+if [ ! -r /proc/sys/fs/binfmt_misc/status ] || [ "$(cat /proc/sys/fs/binfmt_misc/status)" != enabled ]; then
+    echo "binfmt_misc is not enabled"
+    echo "Enable: systemctl start systemd-binfmt"
+    exit 1
+fi
+
+echo "$qemu: $(command -v "$qemu")"
+echo "binfmt_misc: enabled"
+echo "Cross-build prerequisites are ready."
