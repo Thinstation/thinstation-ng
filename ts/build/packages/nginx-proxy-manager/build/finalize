@@ -1,0 +1,24 @@
+#nginx-proxy-manager 92
+install -d -m 0755 /usr/lib/thinstation/docker-stacks/npm
+cat > /usr/lib/thinstation/docker-stacks/npm/docker-compose.yml <<'EOF'
+services:
+  app:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    environment:
+      TZ: "Australia/Brisbane"
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+EOF
+
+install -d -m 0755 /etc/firewall.d
+cat > /etc/firewall.d/70nginx-proxy-manager <<'EOF'
+firewall-cmd --add-service=http
+firewall-cmd --add-service=https
+firewall-cmd --add-port=81/tcp
+EOF

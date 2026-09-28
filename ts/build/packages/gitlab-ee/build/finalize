@@ -1,3 +1,6 @@
+#gitlab-ee 92
+install -d -m 0755 /usr/lib/thinstation/docker-stacks/gitlab-ee
+cat > /usr/lib/thinstation/docker-stacks/gitlab-ee/docker-compose.yml <<'EOF'
 services:
   gitlab:
     image: thinstation/gitlab-ee:appliance
@@ -8,12 +11,20 @@ services:
     environment:
       GITLAB_OMNIBUS_CONFIG: |
         external_url '${GITLAB_EXTERNAL_URL:-https://gitlab.thinstation.org}'
-        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-22}
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
     ports:
       - "80:80"
       - "443:443"
-      - "${GITLAB_SSH_PORT:-22}:22"
+      - "2222:22"
     volumes:
       - ./config:/etc/gitlab
       - ./logs:/var/log/gitlab
       - ./data:/var/opt/gitlab
+EOF
+
+install -d -m 0755 /etc/firewall.d
+cat > /etc/firewall.d/70gitlab-ee <<'EOF'
+firewall-cmd --add-service=http
+firewall-cmd --add-service=https
+firewall-cmd --add-port=2222/tcp
+EOF
