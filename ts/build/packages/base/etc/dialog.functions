@@ -44,16 +44,18 @@ check_reconnect()
 				echo "$kill_time  * * * * $NO_SESSION" >> /tmp/shutdown
 				crontab /tmp/shutdown
 			fi
+			reconnect_label="$(gettext "Reconnect")"
+			shutdown_label="$(gettext "Shutdown")"
 			unset choice_error
 			while [ "$choice_error" != "0" ] ; do
 				choice=$(Xdialog	--stdout \
 							--title "$(gettext "Reconnect/Shutdown?")" \
 							--clear \
 							--no-cancel \
-							--combobox "$(gettext "The session has ended. How would you like to continue?")" 10 70 Reconnect Shutdown)
+							--combobox "$(gettext "The session has ended. How would you like to continue?")" 10 70 "$reconnect_label" "$shutdown_label")
 				choice_error=$?
 			done
-			if [ "$choice" = "Shutdown" ] ; then
+			if [ "$choice" = "$shutdown_label" ] ; then
 				$NO_SESSION
 			elif [ -e /tmp/shutdown ] ; then
 				crontab /tmp/crontab
@@ -89,13 +91,6 @@ confirm_exit()
 	Xdialog --title "$(gettext "Logout")" --clear --yesno "$(gettext "Click yes to Confirm Exit?")" 10 70
 }
 
-dialog_no_value()
-{
-	export TEXTDOMAIN='thinstation'
-	Xdialog --title "$1 Client" \
-		--clear \
-		--msgbox "$(gettext "You must enter value, aborted")" 10 70 10000
-}
 
 dialog_get_value()
 {
@@ -402,16 +397,16 @@ net_progress()
 			sleep 1
 		fi
 	done
-	echo 100 Done
+	echo 100 "$(gettext "Done")"
 }
 
 x_error()
 {
-	title="$1"
 	export TEXTDOMAIN='thinstation'
+	title="$(gettext "$1")"
 	shift
 	while [ -n "$1" ]; do
-		local text_widget="$text_widget `gen_text_widget \"$1\"`"
+		local text_widget="$text_widget `gen_text_widget \"$(gettext "$1")\"`"
 		shift
 	done
 	export MAIN_DIALOG='
@@ -457,7 +452,6 @@ find_network()
 		<vseparator height-request="5"></vseparator>
 		<progressbar>
 			<variable>PROGRESS_BAR</variable>
-			<label>Some Text</label>
 			<input>bash -c net_progress</input>
 			<action function="refresh">ENTRY</action>
 			<action function="closewindow">BAR_DIALOG</action>
@@ -473,7 +467,7 @@ find_network()
 		$GTKDIALOG -c --program=BAR_DIALOG
 	fi
 	if [ -z "`/bin/busybox.shared ifconfig |grep -e 'inet ' |grep -v 127.0`" ]; then
-		x_error "$(gettext "Network")" "$(gettext "Timed out waiting for network!")"
+		x_error "Network" "Timed out waiting for network!"
 		return 1
 	fi
 }
