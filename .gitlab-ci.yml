@@ -274,6 +274,11 @@ arm-cross-smoke:
   script:
     - sudo dnf install -y qemu-user-static-aarch64
     - sudo systemctl restart systemd-binfmt
+    - sudo mkdir -p /tmp/ts-cross-repos
+    - sudo mv /etc/yum.repos.d/thinstation.repo /tmp/ts-cross-repos/ 2>/dev/null || true
+    - sudo mv /etc/yum.repos.d/thinstation-foreman-fedora.repo /tmp/ts-cross-repos/ 2>/dev/null || true
+    - sudo cp /etc/yum.repos.d/upstream-disabled/fedora.repo /etc/yum.repos.d/fedora.repo
+    - sudo cp /etc/yum.repos.d/upstream-disabled/fedora-updates.repo /etc/yum.repos.d/fedora-updates.repo
     - sudo rm -rf build-aarch64
     - sudo mkdir build-aarch64
     - sudo mount -t tmpfs -o size=40G tmpfs build-aarch64
