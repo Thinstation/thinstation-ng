@@ -1,0 +1,4 @@
+# Activate legacy provider to support legacy algorithms such as MD4, SHA1, and RC4.
+# This is required for FreeRDP to work with older servers that do not support modern algorithms.
+# For security reasons, it only can be enabled during build time and cannot be enabled at runtime.
+# OPENSSL_LEGACY=true

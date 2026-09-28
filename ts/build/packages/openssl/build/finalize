@@ -1,0 +1,9 @@
+#OpenSSL_legacy 60
+
+# This script is used to activate legacy algorithms by writing the necessary file.
+if is_enabled "$OPENSSL_LEGACY"; then
+    cat > "/etc/pki/tls/openssl.d/legacy.cnf" <<EOF
+[legacy_set]
+activate = 1
+EOF
+fi
