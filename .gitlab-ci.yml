@@ -260,3 +260,23 @@ build-gitlab-ee:
   after_script:
     - sudo umount build-gitlab-ee || true
     - sudo rm -rf build-gitlab-ee
+
+
+gtkdialog-fedora44-smoke:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
+  script:
+    - sudo dnf install -y gcc meson ninja-build pkgconf-pkg-config gtk2-devel glib2-devel git
+    - rm -rf /tmp/gtkdialog-build /tmp/gtkdialog-src
+    - git clone https://github.com/puppylinux-woof-CE/gtkdialog.git /tmp/gtkdialog-src
+    - git -C /tmp/gtkdialog-src checkout d4fb57727826ee43fb6d58ca6b837509e96202c7
+    - meson setup /tmp/gtkdialog-build /tmp/gtkdialog-src -Dgtkver=2 -Ddocs=false
+    - meson compile -C /tmp/gtkdialog-build
+    - /tmp/gtkdialog-build/src/gtkdialog --version
+    - file /tmp/gtkdialog-build/src/gtkdialog
