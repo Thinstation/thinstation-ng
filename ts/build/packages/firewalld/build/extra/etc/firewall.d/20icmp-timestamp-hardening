@@ -1,0 +1,3 @@
+# Block legacy IPv4 ICMP timestamp requests (type 13).
+# There is no ICMPv6 timestamp-request equivalent; do not block IPv6 control types.
+firewall-cmd --add-icmp-block=timestamp-request
