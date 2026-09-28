@@ -300,16 +300,11 @@ fi
 
 mkdir -p /var/prstnt /docker /var/log /var/lib/docker /var/lib/containerd
 
-# Preserve immutable-image compose payload before mounting the persistent /docker LV.
-if ! mountpoint -q /docker && [[ -d /docker ]]; then
-  rm -rf /run/docker-inst
-  mkdir -p /run/docker-inst
-  cp -a /docker/. /run/docker-inst/ 2>/dev/null || true
-fi
-
 for mp in /var/prstnt /var/log /docker /var/lib/docker /var/lib/containerd; do
   mountpoint -q "$mp" || mount "$mp"
 done
+
+DOCKER_SEED_ROOT="${DOCKER_SEED_ROOT:-/usr/lib/thinstation/docker-stacks}"
 
 log "Applying identity and network configuration"
 if id "$A_USER" >/dev/null 2>&1; then
@@ -358,9 +353,9 @@ NET_HOSTNAME=$NET_HOSTNAME
 NET_USE_DHCP=Off
 EOF
 
-log "Restoring appliance compose payload"
-if [[ -d /run/docker-inst ]]; then
-  cp -a /run/docker-inst/. /docker/
+log "Seeding appliance compose payload"
+if [[ -d "$DOCKER_SEED_ROOT" ]]; then
+  cp -a "$DOCKER_SEED_ROOT"/. /docker/
 fi
 
 log "Starting Docker and loading ISO images"
