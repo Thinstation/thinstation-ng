@@ -5,7 +5,7 @@ GTKDIALOG_REPO="${GTKDIALOG_REPO:-https://github.com/puppylinux-woof-CE/gtkdialo
 GTKDIALOG_COMMIT="${GTKDIALOG_COMMIT:-d4fb57727826ee43fb6d58ca6b837509e96202c7}"
 
 package_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-workdir="${GTKDIALOG_WORKDIR:-$(mktemp -d)}"
+workdir="${GTKDIALOG_WORKDIR:-$(mktemp -d "$package_dir/.rebuild.XXXXXX")}"
 srcdir="$workdir/src"
 builddir="$workdir/build"
 
