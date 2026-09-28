@@ -1,0 +1,3 @@
+# Audit OpenSSH configuration changes.
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+-w /etc/ssh/sshd_config.d/ -p wa -k sshd_config
