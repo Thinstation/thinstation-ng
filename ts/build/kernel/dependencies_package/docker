@@ -2,3 +2,8 @@ br_netfilter
 bridge
 overlay
 veth
+iptable_nat
+xt_MASQUERADE
+xt_addrtype
+xt_conntrack
+xt_nat
