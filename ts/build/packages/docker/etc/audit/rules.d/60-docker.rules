@@ -3,5 +3,5 @@
 -w /etc/containerd/ -p wa -k containerd_config
 
 # Audit interactive/user execution of the Docker CLI without tracing daemon internals.
--a always,exit -F arch=b64 -F path=/usr/bin/docker -F perm=x -F auid>=1000 -F auid!=unset -k docker_cli
--a always,exit -F arch=b32 -F path=/usr/bin/docker -F perm=x -F auid>=1000 -F auid!=unset -k docker_cli
+-a always,exit -F arch=b64 -F path=/bin/docker -F perm=x -F auid>=1000 -F auid!=unset -k docker_cli
+-a always,exit -F arch=b32 -F path=/bin/docker -F perm=x -F auid>=1000 -F auid!=unset -k docker_cli
