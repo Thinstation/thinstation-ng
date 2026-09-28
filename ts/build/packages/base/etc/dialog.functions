@@ -467,7 +467,7 @@ find_network()
 		$GTKDIALOG -c --program=BAR_DIALOG
 	fi
 	if [ -z "`/bin/busybox.shared ifconfig |grep -e 'inet ' |grep -v 127.0`" ]; then
-		x_error "$(gettext "Network")" "$(gettext "Timed out waiting for network!")"
+		x_error "Network" "Timed out waiting for network!"
 		return 1
 	fi
 }
