@@ -21,7 +21,7 @@
 test $(id -u) -ne 0 && echo "please run as root" && exit 1
 
 PID=$$
-MNTDIR=`mktemp -t -d mkmbrdrv.XXX`
+MNTDIR=`mktemp -t -d mkmbrdrv.XXXXXX`
 ESP=$MNTDIR
 cpt=262144 #default Copy Progress Threshold
 
