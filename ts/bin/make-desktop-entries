@@ -21,7 +21,7 @@ make_desktop_build()
 	local menufile="$1"
 	local LINK="$MENUDIR/$(echo "$title.desktop" | sed 's/[ \/]/_/g')"
 	local ref_file="${source:-$(basename "$menufile").desktop}"
-	local ref_desktop="$ROOTDIR/usr/share/applications/$ref_file"
+	local ref_desktop="$ROOTDIR/lib64/applications/$ref_file"
 
 	if [ -n "$menu" ]; then
 		submenu="$(echo $menu | awk -F:: '{ print $NF }')"
@@ -32,7 +32,7 @@ make_desktop_build()
 	echo "[Desktop Entry]"				>"$LINK"
 	echo "Version=1.0"				>>"$LINK"
 	echo "Name=$title"				>>"$LINK"
-	# Inject translated Name/Comment/GenericName/Keywords from usr/share/applications if available
+	# Inject translated Name/Comment/GenericName/Keywords from lib64/applications if available
 	if [ -f "$ref_desktop" ]; then
 		awk '/^\[Desktop Entry\]/{found=1; next} /^\[/{found=0} found && /^(Name|Comment|GenericName|Keywords)\[/' "$ref_desktop"	>>"$LINK"
 	fi
