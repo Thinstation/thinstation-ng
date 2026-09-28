@@ -5,3 +5,5 @@
 /libexec/
 /sbin/
 /var/
+/build/extra/bin/
+/build/extra/etc/libnl/
