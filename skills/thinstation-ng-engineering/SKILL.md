@@ -20,7 +20,8 @@ Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-S
 
 ## Read the relevant reference
 
-- For repo structure, build phases, active/template config rules, `install_chroot`, and fastboot: read `references/build-architecture.md`.
+- For repo structure, build phases, active/template config rules, `install_chroot`, and package metadata rules: read `references/build-architecture.md`.
+- For the fastboot build/runtime handoff, loader selection, service ordering, and failure diagnostics: read `references/fastboot-runtime.md`.
 - For GitLab CI, appliance package selection, Docker image export, compose payloads, and CI variables: read `references/appliance-ci.md`.
 - For firewalld, nftables, `/etc/firewall.d` package contributions, and server-package port ownership: read `references/firewall-and-server-packages.md`.
 - For `persistent-files`, immutable appliance state, `setup-docker`, first-run configuration, and idempotency: read `references/persistence-and-setup.md`.
