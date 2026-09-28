@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: da\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Brugernavn"
+
+msgid "Password"
+msgstr "Adgangskode"
+
+msgid "Username and Server"
+msgstr "Brugernavn og Server"
+
+msgid "Server DNS name or IP address"
+msgstr "Server DNS-navn eller IP-adresse"
+
+msgid "type server name here"
+msgstr "indtast servernavn her"
+
+msgid "Options"
+msgstr "Indstillinger"
+
+msgid "Windowed"
+msgstr "I vindue"
+
+msgid "Exit"
+msgstr "Afslut"
+
+msgid "Connect"
+msgstr "Forbind"
+
+msgid "Authentication"
+msgstr "Godkendelse"
+
+msgid "Connection"
+msgstr "Forbindelse"
+
+msgid "Kiosk Progress"
+msgstr "Kiosk fremskridt"
+
+msgid "Scanning"
+msgstr "Søger"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Venter på netværk til 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Tidsudløb ved ventetid på netværk!"
+
+msgid "Network"
+msgstr "Netværk"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Applikation PACKAGE fejlede med en fejl (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Vil du gennemgå kommandoens outputlog?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Vis log"
+
+msgid "Done"
+msgstr "Færdig"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Genforbind / Luk ned?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Sessionen er afsluttet. Hvordan vil du fortsætte?"
+
+msgid "Reconnect"
+msgstr "Genforbind"
+
+msgid "Shutdown"
+msgstr "Luk ned"
+
+msgid "No Server Response"
+msgstr "Intet svar fra server"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Serveren svarer ikke - venter TIME sekunder"
+
+msgid "Reconnect?"
+msgstr "Genforbind?"
+
+msgid "Click yes to reconnect."
+msgstr "Klik ja for at genforbinde."
+
+msgid "Logout"
+msgstr "Log ud"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Klik ja for at bekræfte afslutning."
+
+msgid "You must enter value, aborted"
+msgstr "Du skal indtaste en værdi, afbrudt."
+
+msgid "NAME Client"
+msgstr "NAME klient"
+
+msgid "Enter FIELD:"
+msgstr "Indtast FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Du skal indtaste en værdi for FIELD."

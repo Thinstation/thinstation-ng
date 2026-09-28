@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: tr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Kullanıcı adı"
+
+msgid "Password"
+msgstr "Şifre"
+
+msgid "Username and Server"
+msgstr "Kullanıcı adı ve Sunucu"
+
+msgid "Server DNS name or IP address"
+msgstr "Sunucu DNS adı veya IP adresi"
+
+msgid "type server name here"
+msgstr "sunucu adını buraya yazın"
+
+msgid "Options"
+msgstr "Seçenekler"
+
+msgid "Windowed"
+msgstr "Pencereli"
+
+msgid "Exit"
+msgstr "Çıkış"
+
+msgid "Connect"
+msgstr "Bağlan"
+
+msgid "Authentication"
+msgstr "Kimlik doğrulama"
+
+msgid "Connection"
+msgstr "Bağlantı"
+
+msgid "Kiosk Progress"
+msgstr "Kiosk İlerlemesi"
+
+msgid "Scanning"
+msgstr "Taranıyor"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "'PACKAGE' için ağ bekleniyor."
+
+msgid "Timed out waiting for network!"
+msgstr "Ağ beklenirken zaman aşımı!"
+
+msgid "Network"
+msgstr "Ağ"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Uygulama PACKAGE bir hata ile başarısız oldu (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Komut çıktı günlüğünü gözden geçirmek ister misiniz?"
+
+msgid "OK"
+msgstr "Tamam"
+
+msgid "View Log"
+msgstr "Günlüğü görüntüle"
+
+msgid "Done"
+msgstr "Tamamlandı"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Yeniden bağlan / Kapat?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Oturum sona erdi. Nasıl devam etmek istersiniz?"
+
+msgid "Reconnect"
+msgstr "Yeniden bağlan"
+
+msgid "Shutdown"
+msgstr "Kapat"
+
+msgid "No Server Response"
+msgstr "Sunucu yanıtı yok"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Sunucu yanıt vermiyor - TIME saniye bekleniyor"
+
+msgid "Reconnect?"
+msgstr "Yeniden bağlan?"
+
+msgid "Click yes to reconnect."
+msgstr "Yeniden bağlanmak için evet'e tıklayın."
+
+msgid "Logout"
+msgstr "Çıkış yap"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Çıkışı onaylamak için evet'e tıklayın."
+
+msgid "You must enter value, aborted"
+msgstr "Bir değer girmelisiniz, iptal edildi."
+
+msgid "NAME Client"
+msgstr "NAME İstemci"
+
+msgid "Enter FIELD:"
+msgstr "FIELD girin:"
+
+msgid "You must enter value for FIELD."
+msgstr "FIELD için bir değer girmelisiniz."

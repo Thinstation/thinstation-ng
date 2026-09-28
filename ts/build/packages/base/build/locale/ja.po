@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: ja\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "ユーザー名"
+
+msgid "Password"
+msgstr "パスワード"
+
+msgid "Username and Server"
+msgstr "ユーザー名とサーバー"
+
+msgid "Server DNS name or IP address"
+msgstr "サーバーのDNS名またはIPアドレス"
+
+msgid "type server name here"
+msgstr "ここにサーバー名を入力"
+
+msgid "Options"
+msgstr "オプション"
+
+msgid "Windowed"
+msgstr "ウィンドウ表示"
+
+msgid "Exit"
+msgstr "終了"
+
+msgid "Connect"
+msgstr "接続"
+
+msgid "Authentication"
+msgstr "認証"
+
+msgid "Connection"
+msgstr "接続"
+
+msgid "Kiosk Progress"
+msgstr "キオスクの進行状況"
+
+msgid "Scanning"
+msgstr "スキャン中"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "'PACKAGE'のネットワークを待機中。"
+
+msgid "Timed out waiting for network!"
+msgstr "ネットワーク待機がタイムアウトしました！"
+
+msgid "Network"
+msgstr "ネットワーク"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "アプリケーションPACKAGEがエラーで失敗しました（STATUS）"
+
+msgid "Would you like to review the command output log?"
+msgstr "コマンド出力ログを確認しますか？"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "ログを表示"
+
+msgid "Done"
+msgstr "完了"
+
+msgid "Reconnect/Shutdown?"
+msgstr "再接続 / シャットダウン？"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "セッションが終了しました。どのように続けますか？"
+
+msgid "Reconnect"
+msgstr "再接続"
+
+msgid "Shutdown"
+msgstr "シャットダウン"
+
+msgid "No Server Response"
+msgstr "サーバーからの応答なし"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "サーバーが応答しません - TIME秒待機中"
+
+msgid "Reconnect?"
+msgstr "再接続しますか？"
+
+msgid "Click yes to reconnect."
+msgstr "再接続するには「はい」をクリックしてください。"
+
+msgid "Logout"
+msgstr "ログアウト"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "終了を確認するには「はい」をクリックしてください。"
+
+msgid "You must enter value, aborted"
+msgstr "値を入力する必要があります、中止されました。"
+
+msgid "NAME Client"
+msgstr "NAMEクライアント"
+
+msgid "Enter FIELD:"
+msgstr "FIELDを入力："
+
+msgid "You must enter value for FIELD."
+msgstr "FIELDの値を入力する必要があります。"

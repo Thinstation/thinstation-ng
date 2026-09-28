@@ -29,3 +29,5 @@
 /sbin/
 !/sbin/session
 !/sbin/shutdown
+
+/lib64/locale/

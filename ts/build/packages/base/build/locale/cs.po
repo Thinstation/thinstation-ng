@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: cs\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Uživatelské jméno"
+
+msgid "Password"
+msgstr "Heslo"
+
+msgid "Username and Server"
+msgstr "Uživatelské jméno a Server"
+
+msgid "Server DNS name or IP address"
+msgstr "DNS název serveru nebo IP adresa"
+
+msgid "type server name here"
+msgstr "zadejte název serveru zde"
+
+msgid "Options"
+msgstr "Možnosti"
+
+msgid "Windowed"
+msgstr "V okně"
+
+msgid "Exit"
+msgstr "Ukončit"
+
+msgid "Connect"
+msgstr "Připojit"
+
+msgid "Authentication"
+msgstr "Ověření"
+
+msgid "Connection"
+msgstr "Připojení"
+
+msgid "Kiosk Progress"
+msgstr "Průběh kiosku"
+
+msgid "Scanning"
+msgstr "Vyhledávání"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Čekání na síť pro 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Vypršel časový limit čekání na síť!"
+
+msgid "Network"
+msgstr "Síť"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Aplikace PACKAGE selhala s chybou (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Chcete zkontrolovat výstupní protokol příkazu?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Zobrazit protokol"
+
+msgid "Done"
+msgstr "Hotovo"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Znovu připojit / Vypnout?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Relace skončila. Jak chcete pokračovat?"
+
+msgid "Reconnect"
+msgstr "Znovu připojit"
+
+msgid "Shutdown"
+msgstr "Vypnout"
+
+msgid "No Server Response"
+msgstr "Žádná odpověď serveru"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Server neodpovídá - čekání TIME sekund"
+
+msgid "Reconnect?"
+msgstr "Znovu připojit?"
+
+msgid "Click yes to reconnect."
+msgstr "Klikněte na ano pro opětovné připojení."
+
+msgid "Logout"
+msgstr "Odhlásit se"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Klikněte na ano pro potvrzení odhlášení."
+
+msgid "You must enter value, aborted"
+msgstr "Musíte zadat hodnotu, přerušeno."
+
+msgid "NAME Client"
+msgstr "Klient NAME"
+
+msgid "Enter FIELD:"
+msgstr "Zadejte FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Musíte zadat hodnotu pro FIELD."
