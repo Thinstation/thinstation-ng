@@ -50,10 +50,10 @@ The GitLab appliance CI can enable OpenSSH specifically for lab debugging. The M
 Current successful test pattern used root key-only access. Verify in the guest:
 
 - `sshd` active
-- port 22 listening
+- port 22 listening for appliance/MCP SSH
 - `/root/.ssh/authorized_keys` exists with mode 0600
 
-Then test the real MCP-side key login, not only the presence of the file.
+Then test the real MCP-side key login, not only the presence of the file. For the GitLab appliance, repository SSH should be published separately on host TCP 2222.
 
 ## Current disposable GitLab test VM pattern
 
@@ -68,3 +68,26 @@ Treat IDs/IPs as lab observations, not reusable source defaults.
 - Inspect `tmp-tree` and `fastboot-tmp` for fastboot issues.
 - Use exact PIDs for QEMU cleanup; avoid broad `pkill -f`.
 - Do not launch duplicate builds just because connector calls time out; first inspect pipeline/job/process state.
+
+## Web-service validation
+
+When a Docker-backed service is unreachable, isolate layers in this order:
+
+1. Confirm the VM address with QGA.
+2. Confirm Docker container state and published ports.
+3. Confirm host listeners with `ss -lntp`.
+4. Confirm package firewall fragments and effective firewalld zone state.
+5. Confirm the service inside the container is actually listening/ready.
+6. Test from a PVE node to the guest IP.
+
+Do not assume `docker ps ... healthy` means GitLab Rails is ready. For GitLab, confirm the Puma Rails socket before treating 502 responses as a network problem.
+
+For firewalld validation, inspect both declarative package fragments and effective state:
+
+```bash
+cat /etc/firewall.d/<fragment>
+firewall-cmd --get-active-zones
+firewall-cmd --zone=public --list-services
+firewall-cmd --zone=public --list-ports
+nft list ruleset
+```
