@@ -109,3 +109,32 @@ msgstr "FIELDを入力："
 
 msgid "You must enter value for FIELD."
 msgstr "FIELDの値を入力する必要があります。"
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "設定"
+
+msgid "Installer"
+msgstr "インストーラー"
+
+msgid "Connectivity"
+msgstr "接続"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "テストビルド"
+
+msgid "Internet"
+msgstr "インターネット"
+
+msgid "Multimedia"
+msgstr "マルチメディア"
+
+msgid "Office"
+msgstr "オフィス"
+
+msgid "Utilities"
+msgstr "ユーティリティ"

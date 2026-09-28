@@ -109,3 +109,32 @@ msgstr "Voer FIELD in:"
 
 msgid "You must enter value for FIELD."
 msgstr "U moet een waarde invoeren voor FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Configuratie"
+
+msgid "Installer"
+msgstr "Installatieprogramma"
+
+msgid "Connectivity"
+msgstr "Connectiviteit"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Testbuild"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimedia"
+
+msgid "Office"
+msgstr "Kantoor"
+
+msgid "Utilities"
+msgstr "Hulpmiddelen"

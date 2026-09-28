@@ -286,8 +286,24 @@ xfconf_settings()
 	fi
 }
 
+write_menu_directory()
+{
+	menu_key="$1"
+	menu_file="$menudir/$menu_key.directory"
+	menu_display="$(gettext "$menu_key")"
+	cat > "$menu_file" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Directory
+Icon=$menu_key
+Name=$menu_display
+Comment=$menu_display
+EOF
+}
+
 wm_menu()
 {
+	export TEXTDOMAIN='thinstation'
 	xfconf_settings
 	rm -f $HOME/Desktop/*.desktop
 	rm -f $HOME/.local/share/applications/*
@@ -463,7 +479,7 @@ wm_menu()
 	cat /tmp/typelist |sort -u | while read menu_type; do
 		menu_dirtype="`echo $menu_type | awk -F:: "{ print \\$NF }"`"
 		menudirfile=$menudir/$menu_dirtype.directory
-		echo $menu_type | awk -F:: "{ for (i=1; i<NF; i++) { print \"<Menu>\"; print \"<Name>\"\$i\"</Name>\" } }"	>>$menufile
+		echo $menu_type | awk -F:: "{ for (i=1; i<NF; i++) { print \"<Menu>\"; print \"<Name>\"\$i\"</Name>\"; print \"<Directory>\"\$i\".directory</Directory>\" } }"	>>$menufile
 		echo "    <Menu>"								>>$menufile
 		echo "        <Name>$menu_dirtype</Name>"					>>$menufile
 		echo "        <Directory>$menu_dirtype.directory</Directory>"			>>$menufile
@@ -473,12 +489,9 @@ wm_menu()
 		echo "    </Menu>"								>>$menufile
 		echo $menu_type | awk -F:: "{ for (i=1; i<NF; i++) print \"</Menu>\" }"		>>$menufile
 		echo ""										>>$menufile
-		echo "[Desktop Entry]"								>>$menudirfile
-		echo "Version=1.0"								>>$menudirfile
-		echo "Type=Directory"								>>$menudirfile
-		echo "Icon=$menu_dirtype"							>>$menudirfile
-		echo "Name=$menu_dirtype"							>>$menudirfile
-		echo "Comment=$menu_dirtype"							>>$menudirfile
+		for menu_component in `echo "$menu_type" | sed 's/::/ /g'`; do
+			write_menu_directory "$menu_component"
+		done
 	done
 		echo "</Menu>"									>>$menufile
 

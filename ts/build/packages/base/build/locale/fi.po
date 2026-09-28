@@ -109,3 +109,32 @@ msgstr "Syötä FIELD:"
 
 msgid "You must enter value for FIELD."
 msgstr "Sinun on syötettävä arvo kentälle FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Asetukset"
+
+msgid "Installer"
+msgstr "Asennusohjelma"
+
+msgid "Connectivity"
+msgstr "Yhteydet"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Testikoonti"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimedia"
+
+msgid "Office"
+msgstr "Toimisto"
+
+msgid "Utilities"
+msgstr "Apuohjelmat"

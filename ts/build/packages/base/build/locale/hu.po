@@ -109,3 +109,32 @@ msgstr "Adja meg a FIELD mezőt:"
 
 msgid "You must enter value for FIELD."
 msgstr "Értéket kell megadnia a FIELD mezőhöz."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Beállítások"
+
+msgid "Installer"
+msgstr "Telepítő"
+
+msgid "Connectivity"
+msgstr "Kapcsolatok"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Teszt build"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimédia"
+
+msgid "Office"
+msgstr "Iroda"
+
+msgid "Utilities"
+msgstr "Segédprogramok"

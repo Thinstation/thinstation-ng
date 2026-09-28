@@ -109,3 +109,32 @@ msgstr "Indtast FIELD:"
 
 msgid "You must enter value for FIELD."
 msgstr "Du skal indtaste en værdi for FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Konfiguration"
+
+msgid "Installer"
+msgstr "Installationsprogram"
+
+msgid "Connectivity"
+msgstr "Forbindelse"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Test-build"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimedie"
+
+msgid "Office"
+msgstr "Kontor"
+
+msgid "Utilities"
+msgstr "Værktøjer"

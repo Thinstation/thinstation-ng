@@ -109,3 +109,32 @@ msgstr "Angi FIELD:"
 
 msgid "You must enter value for FIELD."
 msgstr "Du må angi en verdi for FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Konfigurasjon"
+
+msgid "Installer"
+msgstr "Installeringsprogram"
+
+msgid "Connectivity"
+msgstr "Tilkobling"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Testbygg"
+
+msgid "Internet"
+msgstr "Internett"
+
+msgid "Multimedia"
+msgstr "Multimedia"
+
+msgid "Office"
+msgstr "Kontor"
+
+msgid "Utilities"
+msgstr "Verktøy"
