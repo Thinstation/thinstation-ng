@@ -6,6 +6,13 @@
 DIST_VER="${DIST_VER:-44}"
 MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-3}"
 MAX_DOWNLOADS_PER_MIRROR="${MAX_DOWNLOADS_PER_MIRROR:-3}"
+TARGET_ARCH="${TARGET_ARCH:-$(uname -m)}"
+CROSS_COMPILE="${CROSS_COMPILE:-false}"
+
+case "$TARGET_ARCH" in
+	amd64) TARGET_ARCH=x86_64 ;;
+	arm64) TARGET_ARCH=aarch64 ;;
+esac
 
 dnf_common_opts=(
 	--setopt=keepcache=1
@@ -13,6 +20,10 @@ dnf_common_opts=(
 	--setopt=max_downloads_per_mirror="$MAX_DOWNLOADS_PER_MIRROR"
 	--releasever="$DIST_VER"
 )
+
+if [ "$CROSS_COMPILE" = "true" ]; then
+	dnf_common_opts+=(--forcearch="$TARGET_ARCH")
+fi
 
 dnf_install()
 {
@@ -29,18 +40,28 @@ read_port_list()
 	grep -v '^[[:space:]]*#' "$1" | sed ':a;N;$!ba;s/\n/ /g'
 }
 
-core_ports="$(read_port_list ts/rpms/core)"
-grub_ports="$(read_port_list ts/rpms/grub)"
-kernel_ports="$(read_port_list ts/rpms/kernel)"
-firmware_ports="$(read_port_list ts/rpms/firmware)"
-system_ports="$(read_port_list ts/rpms/system)"
-ts_ports="$(read_port_list ts/rpms/ts)"
-other_ports=""
-extra_ports="${TS_EXTRA_PORTS:-}"
+read_port_set()
+{
+	local name file ports=""
 
-if [ -e ts/rpms/other ]; then
-	other_ports="$(read_port_list ts/rpms/other)"
-fi
+	for name in "$@"; do
+		for file in "ts/rpms/$name" "ts/rpms/$name-$TARGET_ARCH"; do
+			[ -f "$file" ] || continue
+			ports="$ports $(read_port_list "$file")"
+		done
+	done
+
+	printf '%s\n' "${ports# }"
+}
+
+core_ports="$(read_port_set core)"
+boot_ports="$(read_port_set boot)"
+kernel_ports="$(read_port_set kernel)"
+firmware_ports="$(read_port_set firmware)"
+system_ports="$(read_port_set system)"
+ts_ports="$(read_port_set ts)"
+other_ports="$(read_port_set other)"
+extra_ports="${TS_EXTRA_PORTS:-}"
 
 preserve_host_repo_overrides()
 {
@@ -118,7 +139,7 @@ stage1()
 		"${host_config[@]}" \
 		$core_ports \
 		$kernel_ports \
-		$grub_ports \
+		$boot_ports \
 		$firmware_ports \
 		$system_ports \
 		$other_ports \
