@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: it\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Nome utente"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "Username and Server"
+msgstr "Nome utente e Server"
+
+msgid "Server DNS name or IP address"
+msgstr "Nome DNS del server o indirizzo IP"
+
+msgid "type server name here"
+msgstr "digitare il nome del server qui"
+
+msgid "Options"
+msgstr "Opzioni"
+
+msgid "Windowed"
+msgstr "In finestra"
+
+msgid "Exit"
+msgstr "Esci"
+
+msgid "Connect"
+msgstr "Connetti"
+
+msgid "Authentication"
+msgstr "Autenticazione"
+
+msgid "Connection"
+msgstr "Connessione"
+
+msgid "Kiosk Progress"
+msgstr "Avanzamento Kiosk"
+
+msgid "Scanning"
+msgstr "Ricerca"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "In attesa della rete per 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Timeout in attesa della rete!"
+
+msgid "Network"
+msgstr "Rete"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "L'applicazione PACKAGE è fallita con un errore (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Vuoi rivedere il registro di output del comando?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Visualizza registro"
+
+msgid "Done"
+msgstr "Fatto"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Riconnetti / Spegni?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "La sessione è terminata. Come vuoi continuare?"
+
+msgid "Reconnect"
+msgstr "Riconnetti"
+
+msgid "Shutdown"
+msgstr "Spegni"
+
+msgid "No Server Response"
+msgstr "Nessuna risposta dal server"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Il server non risponde - attesa di TIME secondi"
+
+msgid "Reconnect?"
+msgstr "Riconnetti?"
+
+msgid "Click yes to reconnect."
+msgstr "Clicca sì per riconnetterti."
+
+msgid "Logout"
+msgstr "Disconnetti"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Clicca sì per confermare l'uscita."
+
+msgid "You must enter value, aborted"
+msgstr "Devi inserire un valore, interrotto."
+
+msgid "NAME Client"
+msgstr "Client NAME"
+
+msgid "Enter FIELD:"
+msgstr "Inserisci FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Devi inserire un valore per FIELD."

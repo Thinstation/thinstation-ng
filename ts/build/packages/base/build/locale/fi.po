@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: fi\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Käyttäjätunnus"
+
+msgid "Password"
+msgstr "Salasana"
+
+msgid "Username and Server"
+msgstr "Käyttäjätunnus ja Palvelin"
+
+msgid "Server DNS name or IP address"
+msgstr "Palvelimen DNS-nimi tai IP-osoite"
+
+msgid "type server name here"
+msgstr "kirjoita palvelimen nimi tähän"
+
+msgid "Options"
+msgstr "Asetukset"
+
+msgid "Windowed"
+msgstr "Ikkunoitu"
+
+msgid "Exit"
+msgstr "Poistu"
+
+msgid "Connect"
+msgstr "Yhdistä"
+
+msgid "Authentication"
+msgstr "Todennus"
+
+msgid "Connection"
+msgstr "Yhteys"
+
+msgid "Kiosk Progress"
+msgstr "Kioskin edistyminen"
+
+msgid "Scanning"
+msgstr "Etsitään"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Odotetaan verkkoa 'PACKAGE' varten."
+
+msgid "Timed out waiting for network!"
+msgstr "Aikakatkaisu odotettaessa verkkoa!"
+
+msgid "Network"
+msgstr "Verkko"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Sovellus PACKAGE epäonnistui virheellä (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Haluatko tarkastella komennon tulostelokia?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Näytä loki"
+
+msgid "Done"
+msgstr "Valmis"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Yhdistä uudelleen / Sammuta?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "Istunto on päättynyt. Miten haluat jatkaa?"
+
+msgid "Reconnect"
+msgstr "Yhdistä uudelleen"
+
+msgid "Shutdown"
+msgstr "Sammuta"
+
+msgid "No Server Response"
+msgstr "Ei vastausta palvelimelta"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Palvelin ei vastaa - odotetaan TIME sekuntia"
+
+msgid "Reconnect?"
+msgstr "Yhdistä uudelleen?"
+
+msgid "Click yes to reconnect."
+msgstr "Napsauta kyllä yhdistääksesi uudelleen."
+
+msgid "Logout"
+msgstr "Kirjaudu ulos"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Napsauta kyllä vahvistaaksesi poistumisen."
+
+msgid "You must enter value, aborted"
+msgstr "Sinun on syötettävä arvo, keskeytetty."
+
+msgid "NAME Client"
+msgstr "NAME Asiakas"
+
+msgid "Enter FIELD:"
+msgstr "Syötä FIELD:"
+
+msgid "You must enter value for FIELD."
+msgstr "Sinun on syötettävä arvo kentälle FIELD."

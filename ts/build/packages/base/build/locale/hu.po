@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: hu\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Felhasználónév"
+
+msgid "Password"
+msgstr "Jelszó"
+
+msgid "Username and Server"
+msgstr "Felhasználónév és Szerver"
+
+msgid "Server DNS name or IP address"
+msgstr "Szerver DNS név vagy IP cím"
+
+msgid "type server name here"
+msgstr "írja be a szerver nevét ide"
+
+msgid "Options"
+msgstr "Beállítások"
+
+msgid "Windowed"
+msgstr "Ablakban"
+
+msgid "Exit"
+msgstr "Kilépés"
+
+msgid "Connect"
+msgstr "Csatlakozás"
+
+msgid "Authentication"
+msgstr "Hitelesítés"
+
+msgid "Connection"
+msgstr "Kapcsolat"
+
+msgid "Kiosk Progress"
+msgstr "Kioszk folyamat"
+
+msgid "Scanning"
+msgstr "Keresés"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Várakozás a 'PACKAGE' hálózatra."
+
+msgid "Timed out waiting for network!"
+msgstr "Időtúllépés a hálózatra várva!"
+
+msgid "Network"
+msgstr "Hálózat"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "A PACKAGE alkalmazás hibával leállt (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Szeretné áttekinteni a parancs kimeneti naplóját?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Napló megtekintése"
+
+msgid "Done"
+msgstr "Kész"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Újracsatlakozás / Leállítás?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "A munkamenet véget ért. Hogyan szeretne folytatni?"
+
+msgid "Reconnect"
+msgstr "Újracsatlakozás"
+
+msgid "Shutdown"
+msgstr "Leállítás"
+
+msgid "No Server Response"
+msgstr "Nincs szerver válasz"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "A szerver nem válaszol - várakozás TIME másodperc"
+
+msgid "Reconnect?"
+msgstr "Újracsatlakozás?"
+
+msgid "Click yes to reconnect."
+msgstr "Kattintson az igenre az újracsatlakozáshoz."
+
+msgid "Logout"
+msgstr "Kijelentkezés"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Kattintson az igenre a kilépés megerősítéséhez."
+
+msgid "You must enter value, aborted"
+msgstr "Értéket kell megadnia, megszakítva."
+
+msgid "NAME Client"
+msgstr "NAME Kliens"
+
+msgid "Enter FIELD:"
+msgstr "Adja meg a FIELD mezőt:"
+
+msgid "You must enter value for FIELD."
+msgstr "Értéket kell megadnia a FIELD mezőhöz."

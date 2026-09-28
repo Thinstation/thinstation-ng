@@ -1,0 +1,111 @@
+# PO File for thinstation dialogs
+msgid ""
+msgstr ""
+"Project-Id-Version: thinstation\n"
+"Language: nl\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Username"
+msgstr "Gebruikersnaam"
+
+msgid "Password"
+msgstr "Wachtwoord"
+
+msgid "Username and Server"
+msgstr "Gebruikersnaam en Server"
+
+msgid "Server DNS name or IP address"
+msgstr "Server DNS-naam of IP-adres"
+
+msgid "type server name here"
+msgstr "typ hier de servernaam"
+
+msgid "Options"
+msgstr "Opties"
+
+msgid "Windowed"
+msgstr "In venster"
+
+msgid "Exit"
+msgstr "Afsluiten"
+
+msgid "Connect"
+msgstr "Verbinden"
+
+msgid "Authentication"
+msgstr "Authenticatie"
+
+msgid "Connection"
+msgstr "Verbinding"
+
+msgid "Kiosk Progress"
+msgstr "Kiosk voortgang"
+
+msgid "Scanning"
+msgstr "Zoeken"
+
+msgid "Waiting for 'PACKAGE' network."
+msgstr "Wachten op netwerk voor 'PACKAGE'."
+
+msgid "Timed out waiting for network!"
+msgstr "Time-out bij wachten op netwerk!"
+
+msgid "Network"
+msgstr "Netwerk"
+
+msgid "Application PACKAGE failed with an error (STATUS)"
+msgstr "Toepassing PACKAGE is mislukt met een fout (STATUS)"
+
+msgid "Would you like to review the command output log?"
+msgstr "Wilt u het opdrachtuitvoerlogboek bekijken?"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "View Log"
+msgstr "Logboek bekijken"
+
+msgid "Done"
+msgstr "Klaar"
+
+msgid "Reconnect/Shutdown?"
+msgstr "Opnieuw verbinden / Afsluiten?"
+
+msgid "The session has ended. How would you like to continue?"
+msgstr "De sessie is beëindigd. Hoe wilt u doorgaan?"
+
+msgid "Reconnect"
+msgstr "Opnieuw verbinden"
+
+msgid "Shutdown"
+msgstr "Afsluiten"
+
+msgid "No Server Response"
+msgstr "Geen serverreactie"
+
+msgid "Server not responding - waiting TIME seconds"
+msgstr "Server reageert niet - wachten TIME seconden"
+
+msgid "Reconnect?"
+msgstr "Opnieuw verbinden?"
+
+msgid "Click yes to reconnect."
+msgstr "Klik op ja om opnieuw verbinding te maken."
+
+msgid "Logout"
+msgstr "Afmelden"
+
+msgid "Click yes to Confirm Exit?"
+msgstr "Klik op ja om afsluiten te bevestigen."
+
+msgid "You must enter value, aborted"
+msgstr "U moet een waarde invoeren, afgebroken."
+
+msgid "NAME Client"
+msgstr "NAME Client"
+
+msgid "Enter FIELD:"
+msgstr "Voer FIELD in:"
+
+msgid "You must enter value for FIELD."
+msgstr "U moet een waarde invoeren voor FIELD."
