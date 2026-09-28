@@ -38,8 +38,8 @@ get_opts()
 {
 	until [ -z "$1" ] ; do
 		case $1 in
-		-a|--autodl)	export autodl=true;;
-		-i|--install)	install_only=true; export autodl=true;;
+		-a|--autodl)	export AUTODL=true;;
+		-i|--install)	install_only=true; export AUTODL=true;;
 		-b|--build)	export build=true ;;
 		-h|--help)	help ; exit 255 ;;
 		-o|--options)	shift ; export build_opts=$@ ; shift $# ;;
