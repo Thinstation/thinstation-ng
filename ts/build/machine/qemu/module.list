@@ -14,7 +14,7 @@ module virtio_rng
 # Common QEMU/KVM storage controllers
 module ahci
 module ata_piix
-module megasas
+module megaraid_sas
 module mptspi
 
 # Common emulated network adapters
@@ -27,7 +27,6 @@ module 8139too
 # Common virtual display adapters
 module qxl
 module bochs
-module cirrus
 
 # Common emulated audio
 module snd-intel8x0
