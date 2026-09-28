@@ -1,0 +1,43 @@
+#!/bin/bash
+set -euo pipefail
+
+GTKDIALOG_REPO="${GTKDIALOG_REPO:-https://github.com/puppylinux-woof-CE/gtkdialog.git}"
+GTKDIALOG_COMMIT="${GTKDIALOG_COMMIT:-d4fb57727826ee43fb6d58ca6b837509e96202c7}"
+
+package_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+workdir="${GTKDIALOG_WORKDIR:-$(mktemp -d)}"
+srcdir="$workdir/src"
+builddir="$workdir/build"
+
+cleanup()
+{
+    if [ -z "${GTKDIALOG_WORKDIR:-}" ]; then
+        rm -rf "$workdir"
+    fi
+}
+trap cleanup EXIT
+
+for cmd in git meson ninja pkg-config bison flex cc; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "Missing build dependency: $cmd" >&2
+        exit 1
+    }
+done
+
+pkg-config --exists gtk+-2.0 || {
+    echo "Missing GTK2 development files (gtk2-devel on Fedora)." >&2
+    exit 1
+}
+
+rm -rf "$srcdir" "$builddir"
+git clone "$GTKDIALOG_REPO" "$srcdir"
+git -C "$srcdir" checkout "$GTKDIALOG_COMMIT"
+
+meson setup "$builddir" "$srcdir" -Dgtkver=2 -Ddocs=false
+meson compile -C "$builddir"
+
+install -m 0755 "$builddir/src/gtkdialog" "$package_dir/bin/gtkdialog"
+
+echo "Built gtkdialog from $GTKDIALOG_COMMIT"
+"$package_dir/bin/gtkdialog" --version
+file "$package_dir/bin/gtkdialog"
