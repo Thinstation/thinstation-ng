@@ -1,0 +1,22 @@
+gtkdialog source build
+======================
+
+The runtime package contains a prebuilt gtkdialog binary so normal ThinStation
+image builds do not need a compiler toolchain.
+
+To regenerate it on Fedora, install these build dependencies:
+
+    dnf install gcc meson ninja-build pkgconf-pkg-config gtk2-devel \
+        glib2-devel bison flex git
+
+Then run:
+
+    ts/build/packages/gtkdialog/rebuild
+
+The source is pinned by default to upstream commit:
+
+    d4fb57727826ee43fb6d58ca6b837509e96202c7
+
+This upstream revision identifies itself as gtkdialog 0.8.5 and contains the
+GCC 14+ compatibility fixes. Override GTKDIALOG_COMMIT or GTKDIALOG_REPO when
+testing a newer upstream revision.
