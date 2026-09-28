@@ -272,11 +272,13 @@ gtkdialog-fedora44-smoke:
       when: manual
     - when: never
   script:
-    - sudo dnf install -y gcc meson ninja-build pkgconf-pkg-config gtk2-devel glib2-devel git
-    - rm -rf "$CI_PROJECT_DIR/.gtkdialog-build" "$CI_PROJECT_DIR/.gtkdialog-src"
-    - git clone https://github.com/puppylinux-woof-CE/gtkdialog.git "$CI_PROJECT_DIR/.gtkdialog-src"
-    - git -C "$CI_PROJECT_DIR/.gtkdialog-src" checkout d4fb57727826ee43fb6d58ca6b837509e96202c7
-    - meson setup "$CI_PROJECT_DIR/.gtkdialog-build" "$CI_PROJECT_DIR/.gtkdialog-src" -Dgtkver=2 -Ddocs=false
-    - meson compile -C "$CI_PROJECT_DIR/.gtkdialog-build"
-    - "$CI_PROJECT_DIR/.gtkdialog-build/src/gtkdialog" --version
-    - file "$CI_PROJECT_DIR/.gtkdialog-build/src/gtkdialog"
+    - |
+      set -e
+      sudo dnf install -y gcc meson ninja-build pkgconf-pkg-config gtk2-devel glib2-devel git
+      rm -rf "$CI_PROJECT_DIR/.gtkdialog-build" "$CI_PROJECT_DIR/.gtkdialog-src"
+      git clone https://github.com/puppylinux-woof-CE/gtkdialog.git "$CI_PROJECT_DIR/.gtkdialog-src"
+      git -C "$CI_PROJECT_DIR/.gtkdialog-src" checkout d4fb57727826ee43fb6d58ca6b837509e96202c7
+      meson setup "$CI_PROJECT_DIR/.gtkdialog-build" "$CI_PROJECT_DIR/.gtkdialog-src" -Dgtkver=2 -Ddocs=false
+      meson compile -C "$CI_PROJECT_DIR/.gtkdialog-build"
+      "$CI_PROJECT_DIR/.gtkdialog-build/src/gtkdialog" --version
+      file "$CI_PROJECT_DIR/.gtkdialog-build/src/gtkdialog"
