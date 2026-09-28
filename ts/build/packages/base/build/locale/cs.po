@@ -109,3 +109,32 @@ msgstr "Zadejte FIELD:"
 
 msgid "You must enter value for FIELD."
 msgstr "Musíte zadat hodnotu pro FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Nastavení"
+
+msgid "Installer"
+msgstr "Instalátor"
+
+msgid "Connectivity"
+msgstr "Připojení"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Testovací sestavení"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimédia"
+
+msgid "Office"
+msgstr "Kancelář"
+
+msgid "Utilities"
+msgstr "Nástroje"

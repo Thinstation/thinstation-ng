@@ -109,3 +109,32 @@ msgstr "Unesite FIELD:"
 
 msgid "You must enter value for FIELD."
 msgstr "Morate unijeti vrijednost za FIELD."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Konfiguracija"
+
+msgid "Installer"
+msgstr "Instalacijski program"
+
+msgid "Connectivity"
+msgstr "Povezivanje"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Testna izgradnja"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Multimedia"
+msgstr "Multimedija"
+
+msgid "Office"
+msgstr "Ured"
+
+msgid "Utilities"
+msgstr "Alati"

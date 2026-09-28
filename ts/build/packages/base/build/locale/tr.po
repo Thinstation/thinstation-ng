@@ -109,3 +109,32 @@ msgstr "FIELD girin:"
 
 msgid "You must enter value for FIELD."
 msgstr "FIELD için bir değer girmelisiniz."
+
+# Menu group labels
+
+msgid "Configuration"
+msgstr "Yapılandırma"
+
+msgid "Installer"
+msgstr "Yükleyici"
+
+msgid "Connectivity"
+msgstr "Bağlantı"
+
+msgid "DevStation"
+msgstr "DevStation"
+
+msgid "Test-Build"
+msgstr "Test derlemesi"
+
+msgid "Internet"
+msgstr "İnternet"
+
+msgid "Multimedia"
+msgstr "Multimedya"
+
+msgid "Office"
+msgstr "Ofis"
+
+msgid "Utilities"
+msgstr "Araçlar"
