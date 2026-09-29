@@ -1322,6 +1322,18 @@ for filename in `cat ./filelist | grep "\.param"` ; do
 done
 rm ./filelist
 
+# Compile ThinStation's own gettext catalogs from source for every build.
+# The generated package cache may contain older .mo files when a .po changes;
+# overwrite them in the image tree so runtime gettext always matches Git.
+for po_file in ./packages/base/build/locale/*.po; do
+	[ -f "$po_file" ] || continue
+	locale_name="${po_file##*/}"
+	locale_name="${locale_name%.po}"
+	locale_dir="./tmp-tree/lib64/locale/$locale_name/LC_MESSAGES"
+	mkdir -p "$locale_dir"
+	msgfmt --check "$po_file" -o "$locale_dir/thinstation.mo"
+done
+
 # Generate .desktop menu entries from /lib64/menu definition files
 echo -e "\nGenerating .desktop menu entries\n"
 if [ -e ./tmp-tree/lib64/menu ]; then
