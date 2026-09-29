@@ -122,14 +122,65 @@ bridge()
 {
 	bootroot=build/boot-images/grub/efi-source
 	case $1 in
-	net) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/boot/grub2/pxeboot.img -device virtio-net-pci,netdev=net0";;
-	net-efi) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/EFI/BOOT/BOOTX64.EFI -device virtio-net-pci,netdev=net0";;
+	net) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/boot/ipxe/undionly.kpxe -device virtio-net-pci,netdev=net0";;
+	net-efi) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/boot/ipxe/snponly.efi -device virtio-net-pci,netdev=net0";;
 	*)	if [ -n "`ifconfig |grep -e br0`" ]; then
 		#	echo "-netdev bridge,id=br0,br=br0 -device virtio-net,netdev=br0"
 			echo "-netdev bridge,id=n1 -device virtio-net,netdev=n1"
 		fi
 	;;
 	esac
+}
+
+
+setup_ipxe_netboot()
+{
+        IPXE_BOOT_ROOT="$(mktemp -d /build/bt-ipxe.XXXXXX)"
+        IPXE_HTTP_PORT="${BT_HTTP_PORT:-8000}"
+        IPXE_HTTP_PID=""
+        mkdir -p "$IPXE_BOOT_ROOT/boot/ipxe"
+
+        case "$1" in
+                net)
+                        cp /build/boot-images/grub/efi-source/boot/ipxe/undionly.kpxe "$IPXE_BOOT_ROOT/boot/ipxe/"
+                        IPXE_BOOTFILE=/boot/ipxe/undionly.kpxe
+                ;;
+                net-efi)
+                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
+                        IPXE_BOOTFILE=/boot/ipxe/snponly.efi
+                ;;
+        esac
+
+        cat > "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe" <<EOF
+#!ipxe
+set boot_url http://${next-server}:$IPXE_HTTP_PORT
+set BOOT_IMAGE /boot/vmlinuz
+kernel ${boot_url}${BOOT_IMAGE} BOOT_IMAGE=${BOOT_IMAGE} selinux=0 console=tty1 boot_device=${boot_url}
+initrd ${boot_url}/boot/initrd
+boot
+EOF
+
+        python3 -m http.server "$IPXE_HTTP_PORT" --bind 0.0.0.0 \
+                --directory /build/boot-images/grub/efi-source \
+                >/build/bt-ipxe-http.log 2>&1 &
+        IPXE_HTTP_PID=$!
+        sleep 0.5
+        kill -0 "$IPXE_HTTP_PID" 2>/dev/null || {
+                echo "Unable to start iPXE HTTP server on port $IPXE_HTTP_PORT" >&2
+                cat /build/bt-ipxe-http.log >&2 || true
+                exit 1
+        }
+}
+
+cleanup_ipxe_netboot()
+{
+        if [ -n "${IPXE_HTTP_PID:-}" ]; then
+                kill "$IPXE_HTTP_PID" 2>/dev/null || true
+                wait "$IPXE_HTTP_PID" 2>/dev/null || true
+        fi
+        if [ -n "${IPXE_BOOT_ROOT:-}" ]; then
+                rm -rf "$IPXE_BOOT_ROOT"
+        fi
 }
 
 wrap_bios()
@@ -170,11 +221,15 @@ case $1 in
 		echo "Exit code $?"
 	;;
 	net)
-		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/boot/grub2/pxeboot.img $PCAP
+                setup_ipxe_netboot net
+                trap cleanup_ipxe_netboot EXIT INT TERM
+		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $PCAP $EFI
+                setup_ipxe_netboot net-efi
+                trap cleanup_ipxe_netboot EXIT INT TERM
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $EFI
 		echo "Exit code $?"
 	;;
         cd)
