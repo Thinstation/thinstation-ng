@@ -132,6 +132,10 @@ do_test_cd_efi()
 {
         $XTERM_CMD -T Test-CD-EFI --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt cd-efi" /home/$TSUSER/Desktop/test.log
 }
+do_test_cd_efi_secure()
+{
+        $XTERM_CMD -T Test-CD-EFI-SB --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt cd-efi-secure" /home/$TSUSER/Desktop/test.log
+}
 do_test_hd()
 {
         $XTERM_CMD -T Test-HD --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt hd" /home/$TSUSER/Desktop/test.log
@@ -139,6 +143,10 @@ do_test_hd()
 do_test_hd_efi()
 {
         $XTERM_CMD -T Test-HD-EFI --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt hd-efi" /home/$TSUSER/Desktop/test.log
+}
+do_test_hd_efi_secure()
+{
+        $XTERM_CMD -T Test-HD-EFI-SB --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt hd-efi-secure" /home/$TSUSER/Desktop/test.log
 }
 do_test_net()
 {
@@ -148,7 +156,12 @@ do_test_net()
 do_test_net_efi()
 {
         cd /thinstation
-        $XTERM_CMD -T Test-Network --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt net-efi" /home/$TSUSER/Desktop/test.log
+        $XTERM_CMD -T Test-Network-EFI --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt net-efi" /home/$TSUSER/Desktop/test.log
+}
+do_test_net_efi_secure()
+{
+        cd /thinstation
+        $XTERM_CMD -T Test-Network-EFI-SB --working-directory=/thinstation $ARG script -c "./setup-chroot -e bt net-efi-secure" /home/$TSUSER/Desktop/test.log
 }
 
 terminal_arg()
@@ -196,17 +209,26 @@ case $1 in
 	test-cd-efi)
                 do_test_cd_efi
 		;;
+        test-cd-efi-secure)
+                do_test_cd_efi_secure
+                ;;
 	test-hd)
                 do_test_hd
 		;;
 	test-hd-efi)
                 do_test_hd_efi
 		;;
+        test-hd-efi-secure)
+                do_test_hd_efi_secure
+                ;;
 	test-net)
                 do_test_net
 		;;
         test-net-efi)
 		do_test_net_efi
 		;;
+        test-net-efi-secure)
+                do_test_net_efi_secure
+                ;;
 esac
 exit 0

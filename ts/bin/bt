@@ -135,42 +135,28 @@ bridge()
 
 setup_ipxe_netboot()
 {
-        IPXE_BOOT_ROOT="$(mktemp -d /build/bt-ipxe.XXXXXX)"
-        IPXE_HTTP_PORT="${BT_HTTP_PORT:-8000}"
+        IPXE_BOOT_ROOT=/build/boot-images/grub/efi-source
         IPXE_HTTP_PID=""
-        mkdir -p "$IPXE_BOOT_ROOT/boot/ipxe"
 
         case "$1" in
                 net)
-                        cp /build/boot-images/grub/efi-source/boot/ipxe/undionly.kpxe "$IPXE_BOOT_ROOT/boot/ipxe/"
                         IPXE_BOOTFILE=/boot/ipxe/undionly.kpxe
                 ;;
                 net-efi)
-                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
                         IPXE_BOOTFILE=/boot/ipxe/snponly.efi
                 ;;
                 net-efi-secure)
-                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
-                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
                         IPXE_BOOTFILE=/boot/ipxe/snponly-shim.efi
                 ;;
         esac
 
-        # Exercise the exact autoexec.ipxe shipped in the generated boot tree.
-        # The local test server uses a non-standard HTTP port, so rewrite only
-        # the URL origin in the staged copy; the boot logic itself is unchanged.
-        cp /build/boot-images/grub/efi-source/boot/ipxe/autoexec.ipxe "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe"
-        if [ "$IPXE_HTTP_PORT" != "80" ]; then
-                sed -i "s|http://\${next-server}|http://\${next-server}:$IPXE_HTTP_PORT|" "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe"
-        fi
-
-        python3 -m http.server "$IPXE_HTTP_PORT" --bind 0.0.0.0 \
-                --directory /build/boot-images/grub/efi-source \
+        python3 -m http.server 80 --bind 0.0.0.0 \
+                --directory "$IPXE_BOOT_ROOT" \
                 >/build/bt-ipxe-http.log 2>&1 &
         IPXE_HTTP_PID=$!
         sleep 0.5
         kill -0 "$IPXE_HTTP_PID" 2>/dev/null || {
-                echo "Unable to start iPXE HTTP server on port $IPXE_HTTP_PORT" >&2
+                echo "Unable to start iPXE HTTP server on port 80" >&2
                 cat /build/bt-ipxe-http.log >&2 || true
                 exit 1
         }
@@ -182,9 +168,10 @@ cleanup_ipxe_netboot()
                 kill "$IPXE_HTTP_PID" 2>/dev/null || true
                 wait "$IPXE_HTTP_PID" 2>/dev/null || true
         fi
-        if [ -n "${IPXE_BOOT_ROOT:-}" ]; then
-                rm -rf "$IPXE_BOOT_ROOT"
-        fi
+}
+
+cleanup_secure_ovmf()
+{
         if [ -n "${SECBOOT_VARS:-}" ]; then
                 rm -f "$SECBOOT_VARS"
         fi
@@ -244,6 +231,13 @@ case $1 in
 		$QEMU $STANDARD_MACHINE $EFI $HDD --boot c
 		echo "Exit code $?"
 	;;
+	hd-efi-secure)
+                setup_secure_ovmf
+                trap cleanup_secure_ovmf EXIT INT TERM
+		wrap_efi && \
+                $QEMU $STANDARD_MACHINE $SECBOOT_EFI $HDD --boot c
+                echo "Exit code $?"
+        ;;
 	net)
                 setup_ipxe_netboot net
                 trap cleanup_ipxe_netboot EXIT INT TERM
@@ -259,7 +253,7 @@ case $1 in
         net-efi-secure)
                 setup_ipxe_netboot net-efi-secure
                 setup_secure_ovmf
-                trap cleanup_ipxe_netboot EXIT INT TERM
+                trap 'cleanup_ipxe_netboot; cleanup_secure_ovmf' EXIT INT TERM
                 $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $SECBOOT_EFI
                 echo "Exit code $?"
         ;;
@@ -273,6 +267,14 @@ case $1 in
 		confirm_usb_hd && \
 		$QEMU $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
 		echo "Exit code $?"
+        ;;
+	cd-efi-secure)
+                setup_secure_ovmf
+                trap cleanup_secure_ovmf EXIT INT TERM
+		confirm_iso grub && \
+		confirm_usb_hd && \
+                $QEMU $STANDARD_MACHINE $CDROM $USBHD $SECBOOT_EFI --boot d
+                echo "Exit code $?"
         ;;
 	image)
                 confirm_hd && \
