@@ -195,6 +195,13 @@ unwind_package()
 
 	if [ -e .unwind ]; then
 		if grep -e "#" .unwind | cut -d "#" -f2 | md5sum -c --quiet; then
+			# Replaying an install cache must be idempotent. Remove only the
+			# .dna-managed payload first, preserving manual package content.
+			if [ -e .wind ] && grep -e "#" .wind | cut -d "#" -f2 | md5sum -c --quiet; then
+				. .wind
+			else
+				update -c "$pkg"
+			fi
 			. .unwind
 		else
 			update "$pkg"
