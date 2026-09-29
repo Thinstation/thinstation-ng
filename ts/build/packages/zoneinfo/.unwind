@@ -1,4 +1,4 @@
-#e001f99d956e7185725ca9352e5ddf79  .dna
+#0188aa43b7af55789017a3a1efed14b8  .dna
 
-mkdir -p /ts/build/packages/zoneinfo/lib64/zoneinfo
-ln /usr/share/zoneinfo/iso3166.tab /ts/build/packages/zoneinfo/lib64/zoneinfo/iso3166.tab
+mkdir -p /ts/build/packages/zoneinfo/usr/share/zoneinfo
+ln /usr/share/zoneinfo/iso3166.tab /ts/build/packages/zoneinfo/usr/share/zoneinfo/iso3166.tab

@@ -1,7 +1,7 @@
-#acb5decbcf112d5b3e654361c1baddb0  .dna
-rm /ts/build/packages/xorg7-intel/lib64/xorg/modules/drivers/intel_drv.so
-rm /ts/build/packages/xorg7-intel/lib64/vulkan/icd.d/intel_hasvk_icd.x86_64.json
-rm /ts/build/packages/xorg7-intel/lib64/vulkan/icd.d/intel_icd.x86_64.json
-rm /ts/build/packages/xorg7-intel/lib64/libvulkan_intel.so
-rm /ts/build/packages/xorg7-intel/lib64/libvulkan_intel_hasvk.so
+#af716077c2e31e8743d8444fb31c00bc  .dna
 
+rm -f /ts/build/packages/xorg7-intel/lib64/libvulkan_intel.so
+rm -f /ts/build/packages/xorg7-intel/lib64/libvulkan_intel_hasvk.so
+rm -f /ts/build/packages/xorg7-intel/lib64/xorg/modules/drivers/intel_drv.so
+rm -f /ts/build/packages/xorg7-intel/usr/share/vulkan/icd.d/intel_hasvk_icd.x86_64.json
+rm -f /ts/build/packages/xorg7-intel/usr/share/vulkan/icd.d/intel_icd.x86_64.json

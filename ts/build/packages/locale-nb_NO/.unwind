@@ -1,13 +1,13 @@
-#8362817b33b8418f0aeeddcde6abbf6d  .dna
+#17758866161c50d5ffa07997fd81220c  .dna
 
-mkdir -p /ts/build/packages/locale-nb_NO/lib64/X11/locale/C
-mkdir -p /ts/build/packages/locale-nb_NO/lib64/X11/locale/en_US.UTF-8
-mkdir -p /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-1
-mkdir -p /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-15
 mkdir -p /ts/build/packages/locale-nb_NO/lib64/gconv
 mkdir -p /ts/build/packages/locale-nb_NO/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-nb_NO/lib64/kbd/keymaps/include
 mkdir -p /ts/build/packages/locale-nb_NO/lib64/kbd/keymaps/qwerty
+mkdir -p /ts/build/packages/locale-nb_NO/usr/share/X11/locale/C
+mkdir -p /ts/build/packages/locale-nb_NO/usr/share/X11/locale/en_US.UTF-8
+mkdir -p /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-1
+mkdir -p /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-15
 ln /usr/lib/kbd/consolefonts/default8x16.psfu.gz /ts/build/packages/locale-nb_NO/lib64/kbd/consolefonts/default8x16.psfu.gz
 ln /usr/lib/kbd/keymaps/legacy/i386/include/compose.inc /ts/build/packages/locale-nb_NO/lib64/kbd/keymaps/include/compose.inc
 ln /usr/lib/kbd/keymaps/legacy/i386/include/euro1.map.gz /ts/build/packages/locale-nb_NO/lib64/kbd/keymaps/include/euro1.map.gz
@@ -30,15 +30,15 @@ ln /usr/lib64/gconv/UNICODE.so /ts/build/packages/locale-nb_NO/lib64/gconv/UNICO
 ln /usr/lib64/gconv/UTF-16.so /ts/build/packages/locale-nb_NO/lib64/gconv/UTF-16.so
 ln /usr/lib64/gconv/UTF-32.so /ts/build/packages/locale-nb_NO/lib64/gconv/UTF-32.so
 ln /usr/lib64/gconv/UTF-7.so /ts/build/packages/locale-nb_NO/lib64/gconv/UTF-7.so
-ln /usr/share/X11/locale/C/XI18N_OBJS /ts/build/packages/locale-nb_NO/lib64/X11/locale/C/XI18N_OBJS
-ln /usr/share/X11/locale/C/XLC_LOCALE /ts/build/packages/locale-nb_NO/lib64/X11/locale/C/XLC_LOCALE
-ln /usr/share/X11/locale/en_US.UTF-8/Compose /ts/build/packages/locale-nb_NO/lib64/X11/locale/en_US.UTF-8/Compose
-ln /usr/share/X11/locale/en_US.UTF-8/XI18N_OBJS /ts/build/packages/locale-nb_NO/lib64/X11/locale/en_US.UTF-8/XI18N_OBJS
-ln /usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE /ts/build/packages/locale-nb_NO/lib64/X11/locale/en_US.UTF-8/XLC_LOCALE
-ln /usr/share/X11/locale/iso8859-1/Compose /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-1/Compose
-ln /usr/share/X11/locale/iso8859-1/XI18N_OBJS /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-1/XI18N_OBJS
-ln /usr/share/X11/locale/iso8859-1/XLC_LOCALE /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-1/XLC_LOCALE
-ln /usr/share/X11/locale/iso8859-15/Compose /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-15/Compose
-ln /usr/share/X11/locale/iso8859-15/XI18N_OBJS /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-15/XI18N_OBJS
-ln /usr/share/X11/locale/iso8859-15/XLC_LOCALE /ts/build/packages/locale-nb_NO/lib64/X11/locale/iso8859-15/XLC_LOCALE
-touch /ts/build/packages/locale-nb_NO/lib64/X11/locale/C/Compose
+ln /usr/share/X11/locale/C/XI18N_OBJS /ts/build/packages/locale-nb_NO/usr/share/X11/locale/C/XI18N_OBJS
+ln /usr/share/X11/locale/C/XLC_LOCALE /ts/build/packages/locale-nb_NO/usr/share/X11/locale/C/XLC_LOCALE
+ln /usr/share/X11/locale/en_US.UTF-8/Compose /ts/build/packages/locale-nb_NO/usr/share/X11/locale/en_US.UTF-8/Compose
+ln /usr/share/X11/locale/en_US.UTF-8/XI18N_OBJS /ts/build/packages/locale-nb_NO/usr/share/X11/locale/en_US.UTF-8/XI18N_OBJS
+ln /usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE /ts/build/packages/locale-nb_NO/usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE
+ln /usr/share/X11/locale/iso8859-1/Compose /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-1/Compose
+ln /usr/share/X11/locale/iso8859-1/XI18N_OBJS /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-1/XI18N_OBJS
+ln /usr/share/X11/locale/iso8859-1/XLC_LOCALE /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-1/XLC_LOCALE
+ln /usr/share/X11/locale/iso8859-15/Compose /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-15/Compose
+ln /usr/share/X11/locale/iso8859-15/XI18N_OBJS /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-15/XI18N_OBJS
+ln /usr/share/X11/locale/iso8859-15/XLC_LOCALE /ts/build/packages/locale-nb_NO/usr/share/X11/locale/iso8859-15/XLC_LOCALE
+touch /ts/build/packages/locale-nb_NO/usr/share/X11/locale/C/Compose

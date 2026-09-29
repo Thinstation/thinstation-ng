@@ -1,14 +1,14 @@
-#a0467b79a141ecbf467d857d1641fda8  .dna
+#89692b85dd5a3a93c0634cdf0a9f5c24  .dna
 
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/C
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.JIS
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.SJIS
-mkdir -p /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/gconv
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/kbd/consolefonts
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/kbd/keymaps
 mkdir -p /ts/build/packages/locale-ja_JP/lib64/kbd/keymaps/include
+mkdir -p /ts/build/packages/locale-ja_JP/usr/share/X11/locale/C
+mkdir -p /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja
+mkdir -p /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.JIS
+mkdir -p /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.SJIS
+mkdir -p /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja_JP.UTF-8
 ln /usr/lib/kbd/consolefonts/default8x16.psfu.gz /ts/build/packages/locale-ja_JP/lib64/kbd/consolefonts/default8x16.psfu.gz
 ln /usr/lib/kbd/keymaps/legacy/i386/include/compose.inc /ts/build/packages/locale-ja_JP/lib64/kbd/keymaps/include/compose.inc
 ln /usr/lib/kbd/keymaps/legacy/i386/include/euro1.map.gz /ts/build/packages/locale-ja_JP/lib64/kbd/keymaps/include/euro1.map.gz
@@ -39,18 +39,18 @@ ln /usr/lib64/gconv/UTF-32.so /ts/build/packages/locale-ja_JP/lib64/gconv/UTF-32
 ln /usr/lib64/gconv/UTF-7.so /ts/build/packages/locale-ja_JP/lib64/gconv/UTF-7.so
 ln /usr/lib64/gconv/libJIS.so /ts/build/packages/locale-ja_JP/lib64/gconv/libJIS.so
 ln /usr/lib64/gconv/libJISX0213.so /ts/build/packages/locale-ja_JP/lib64/gconv/libJISX0213.so
-ln /usr/share/X11/locale/C/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/C/XI18N_OBJS
-ln /usr/share/X11/locale/C/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/C/XLC_LOCALE
-ln /usr/share/X11/locale/ja.JIS/Compose /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.JIS/Compose
-ln /usr/share/X11/locale/ja.JIS/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.JIS/XI18N_OBJS
-ln /usr/share/X11/locale/ja.JIS/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.JIS/XLC_LOCALE
-ln /usr/share/X11/locale/ja.SJIS/Compose /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.SJIS/Compose
-ln /usr/share/X11/locale/ja.SJIS/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.SJIS/XI18N_OBJS
-ln /usr/share/X11/locale/ja.SJIS/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja.SJIS/XLC_LOCALE
-ln /usr/share/X11/locale/ja/Compose /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja/Compose
-ln /usr/share/X11/locale/ja/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja/XI18N_OBJS
-ln /usr/share/X11/locale/ja/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja/XLC_LOCALE
-ln /usr/share/X11/locale/ja_JP.UTF-8/XI18N_OBJS /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/XI18N_OBJS
-ln /usr/share/X11/locale/ja_JP.UTF-8/XLC_LOCALE /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/XLC_LOCALE
-touch /ts/build/packages/locale-ja_JP/lib64/X11/locale/C/Compose
-touch /ts/build/packages/locale-ja_JP/lib64/X11/locale/ja_JP.UTF-8/Compose
+ln /usr/share/X11/locale/C/XI18N_OBJS /ts/build/packages/locale-ja_JP/usr/share/X11/locale/C/XI18N_OBJS
+ln /usr/share/X11/locale/C/XLC_LOCALE /ts/build/packages/locale-ja_JP/usr/share/X11/locale/C/XLC_LOCALE
+ln /usr/share/X11/locale/ja.JIS/Compose /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.JIS/Compose
+ln /usr/share/X11/locale/ja.JIS/XI18N_OBJS /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.JIS/XI18N_OBJS
+ln /usr/share/X11/locale/ja.JIS/XLC_LOCALE /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.JIS/XLC_LOCALE
+ln /usr/share/X11/locale/ja.SJIS/Compose /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.SJIS/Compose
+ln /usr/share/X11/locale/ja.SJIS/XI18N_OBJS /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.SJIS/XI18N_OBJS
+ln /usr/share/X11/locale/ja.SJIS/XLC_LOCALE /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja.SJIS/XLC_LOCALE
+ln /usr/share/X11/locale/ja/Compose /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja/Compose
+ln /usr/share/X11/locale/ja/XI18N_OBJS /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja/XI18N_OBJS
+ln /usr/share/X11/locale/ja/XLC_LOCALE /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja/XLC_LOCALE
+ln /usr/share/X11/locale/ja_JP.UTF-8/XI18N_OBJS /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja_JP.UTF-8/XI18N_OBJS
+ln /usr/share/X11/locale/ja_JP.UTF-8/XLC_LOCALE /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja_JP.UTF-8/XLC_LOCALE
+touch /ts/build/packages/locale-ja_JP/usr/share/X11/locale/C/Compose
+touch /ts/build/packages/locale-ja_JP/usr/share/X11/locale/ja_JP.UTF-8/Compose

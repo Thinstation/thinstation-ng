@@ -1,11 +1,11 @@
-#10f27555317c979d052851a700961b97  .dna
+#fd8f579ef2489bcf6e262719a9da8d65  .dna
 
 mkdir -p /ts/build/packages/extensions/bin
-mkdir -p /ts/build/packages/extensions/lib64/terminfo/a
-mkdir -p /ts/build/packages/extensions/lib64/terminfo/d
-mkdir -p /ts/build/packages/extensions/lib64/terminfo/l
-mkdir -p /ts/build/packages/extensions/lib64/terminfo/v
 mkdir -p /ts/build/packages/extensions/sbin
+mkdir -p /ts/build/packages/extensions/usr/share/terminfo/a
+mkdir -p /ts/build/packages/extensions/usr/share/terminfo/d
+mkdir -p /ts/build/packages/extensions/usr/share/terminfo/l
+mkdir -p /ts/build/packages/extensions/usr/share/terminfo/v
 ln /bin/setserial /ts/build/packages/extensions/bin/setserial
 ln /usr/bin/bzip2 /ts/build/packages/extensions/bin/bzip2
 ln /usr/bin/chroot /ts/build/packages/extensions/sbin/chroot
@@ -20,12 +20,12 @@ ln /usr/bin/setpci /ts/build/packages/extensions/bin/setpci
 ln /usr/bin/strace /ts/build/packages/extensions/bin/strace
 ln /usr/bin/umount /ts/build/packages/extensions/bin/umount
 ln /usr/bin/usb-devices /ts/build/packages/extensions/bin/usb-devices
-ln /usr/share/terminfo/a/ansi /ts/build/packages/extensions/lib64/terminfo/a/ansi
-ln /usr/share/terminfo/d/dumb /ts/build/packages/extensions/lib64/terminfo/d/dumb
-ln /usr/share/terminfo/l/linux /ts/build/packages/extensions/lib64/terminfo/l/linux
-ln /usr/share/terminfo/v/vt100 /ts/build/packages/extensions/lib64/terminfo/v/vt100
-ln /usr/share/terminfo/v/vt100-am /ts/build/packages/extensions/lib64/terminfo/v/vt100-am
-ln /usr/share/terminfo/v/vt100-nav /ts/build/packages/extensions/lib64/terminfo/v/vt100-nav
-ln /usr/share/terminfo/v/vt102 /ts/build/packages/extensions/lib64/terminfo/v/vt102
-ln /usr/share/terminfo/v/vt200 /ts/build/packages/extensions/lib64/terminfo/v/vt200
-ln /usr/share/terminfo/v/vt220 /ts/build/packages/extensions/lib64/terminfo/v/vt220
+ln /usr/share/terminfo/a/ansi /ts/build/packages/extensions/usr/share/terminfo/a/ansi
+ln /usr/share/terminfo/d/dumb /ts/build/packages/extensions/usr/share/terminfo/d/dumb
+ln /usr/share/terminfo/l/linux /ts/build/packages/extensions/usr/share/terminfo/l/linux
+ln /usr/share/terminfo/v/vt100 /ts/build/packages/extensions/usr/share/terminfo/v/vt100
+ln /usr/share/terminfo/v/vt100-am /ts/build/packages/extensions/usr/share/terminfo/v/vt100-am
+ln /usr/share/terminfo/v/vt100-nav /ts/build/packages/extensions/usr/share/terminfo/v/vt100-nav
+ln /usr/share/terminfo/v/vt102 /ts/build/packages/extensions/usr/share/terminfo/v/vt102
+ln /usr/share/terminfo/v/vt200 /ts/build/packages/extensions/usr/share/terminfo/v/vt200
+ln /usr/share/terminfo/v/vt220 /ts/build/packages/extensions/usr/share/terminfo/v/vt220

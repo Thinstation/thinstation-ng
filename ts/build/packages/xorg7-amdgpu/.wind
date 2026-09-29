@@ -1,9 +1,9 @@
-#4a8e3d6daaf70a59c02a6f8c6a34bb1f  .dna
-rm /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/amdgpu_drv.so
-rm /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/ati_drv.so
-rm /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/radeon_drv.so
-rm /ts/build/packages/xorg7-amdgpu/lib64/X11/xorg.conf.d/10-amdgpu.conf
-rm /ts/build/packages/xorg7-amdgpu/lib64/X11/xorg.conf.d/10-radeon.conf
-rm /ts/build/packages/xorg7-amdgpu/lib64/vulkan/icd.d/radeon_icd.x86_64.json
-rm /ts/build/packages/xorg7-amdgpu/lib64/libvulkan_radeon.so
+#9b29ae955fe14b38b911ae042a82cd47  .dna
 
+rm -f /ts/build/packages/xorg7-amdgpu/lib64/libvulkan_radeon.so
+rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/amdgpu_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/ati_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/radeon_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/usr/share/X11/xorg.conf.d/10-amdgpu.conf
+rm -f /ts/build/packages/xorg7-amdgpu/usr/share/X11/xorg.conf.d/10-radeon.conf
+rm -f /ts/build/packages/xorg7-amdgpu/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
