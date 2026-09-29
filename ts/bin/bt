@@ -39,7 +39,11 @@ setup_qemu()
         MOUSE="-usb -device usb-tablet"
         KVM="-enable-kvm"
 #       EFI="-L . --bios usr/share/edk2.git/ovmf-x64/OVMF-pure-efi.fd"
-        EFI="-L . --bios usr/share/edk2/ovmf/OVMF_CODE.fd"
+        EFI_CODE="usr/share/edk2/ovmf/OVMF_CODE.fd"
+        if [ ! -f "$EFI_CODE" ]; then
+                EFI_CODE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
+        fi
+        EFI="-drive if=pflash,format=raw,readonly=on,file=$EFI_CODE"
 #        NETWORK=`bridge $1`
 #       QEMU=qemu-system-i386
         QEMU=qemu-system-x86_64
@@ -152,7 +156,7 @@ case $1 in
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
 		echo "Exit code $?"
 	;;
         cd)
