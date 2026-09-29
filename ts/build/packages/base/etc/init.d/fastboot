@@ -89,8 +89,8 @@ pxe()
 	MEMORY_CONSTRAINED=TRUE
 	FILE=/tmp/lib.squash
 	cd /tmp
-	if [ -z "$FASTBOOT_URL" ] && [ ${initrd:0:4} == "http" ]; then
-		FASTBOOT_URL=${initrd%/*}
+	if [ -z "$FASTBOOT_URL" ] && [[ "$boot_device" == http://* || "$boot_device" == https://* ]]; then
+		FASTBOOT_URL="${boot_device%/}/${squash_location%/}"
 	fi
 	if [ -n "$FASTBOOT_URL" ]; then
 		wget $FASTBOOT_URL/lib.squash 2>&1

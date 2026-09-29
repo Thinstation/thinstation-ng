@@ -296,7 +296,7 @@ test-ipxe-image-layout:
     - test -s ts/build/boot-images/grub/efi-source/shimx64.efi
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/BOOTX64.EFI
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/grubx64.efi
-    - grep -F 'boot_device=http' ts/build/boot-images/grub/efi-source/autoexec.ipxe
+    - grep -F 'boot_device=${boot_url}' ts/build/boot-images/grub/efi-source/autoexec.ipxe
     - find ts/build/boot-images/grub/efi-source -maxdepth 2 -type f -o -type l | sort
   after_script:
     - sudo umount build-ipxe-image-layout || true
