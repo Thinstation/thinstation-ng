@@ -539,11 +539,10 @@ usrmerge_tree()
 
 	# Preserve ThinStation's historical aliases, but point them at the
 	# canonical usr-merged tree where applicable.
-	rm -f usr/icons usr/X11R7 usr/share usr/etc usr/local share
+	rm -f usr/icons usr/share usr/etc usr/local share
 	ln -sf /etc usr/etc
 	ln -sf /usr/lib64 usr/share
 	ln -sf /usr/lib64 share
-	ln -sf / usr/X11R7
 	ln -sf /usr/lib64/icons usr/icons
 	ln -sf /usr usr/local
 }
