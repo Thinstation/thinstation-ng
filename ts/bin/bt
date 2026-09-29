@@ -44,6 +44,10 @@ setup_qemu()
                 EFI_CODE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
         fi
         EFI="-drive if=pflash,format=raw,readonly=on,file=$EFI_CODE"
+        EFI_VIRTIO_ROM="usr/share/ipxe/efi-virtio.rom"
+        if [ ! -f "$EFI_VIRTIO_ROM" ]; then
+                EFI_VIRTIO_ROM="$(rpm -ql ipxe-roms-qemu 2>/dev/null | grep -F '/efi-virtio.rom' | head -1)"
+        fi
 #        NETWORK=`bridge $1`
 #       QEMU=qemu-system-i386
         QEMU=qemu-system-x86_64
@@ -156,7 +160,7 @@ case $1 in
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,romfile="$EFI_VIRTIO_ROM" -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
 		echo "Exit code $?"
 	;;
         cd)
