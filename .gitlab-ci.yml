@@ -2,6 +2,7 @@ default:
   hooks:
     pre_get_sources_script:
       - sudo umount "$CI_PROJECT_DIR/build-tiny-networkmanager" 2>/dev/null || true
+      - sudo umount "$CI_PROJECT_DIR/build-grub-network-benchmark" 2>/dev/null || true
 
 variables:
   BUILD_NPM:
