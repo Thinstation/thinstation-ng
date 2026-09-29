@@ -490,9 +490,55 @@ strip_files()
 	fi
 }
 
+merge_root_into_usr()
+{
+	local rootdir=$1
+	local usrdir=$2
+
+	# Package assembly still uses ThinStation's historical root layout.
+	# Convert only the completed filesystem so package definitions do not
+	# need to know about usr-merge.
+	if [ -L "$usrdir" ]; then
+		rm -f "$usrdir"
+	fi
+	mkdir -p "$usrdir"
+
+	if [ -d "$rootdir" ] && [ ! -L "$rootdir" ]; then
+		cp -a --remove-destination "$rootdir"/. "$usrdir"/
+		rm -rf "$rootdir"
+	else
+		rm -f "$rootdir"
+	fi
+
+	ln -s "usr/${usrdir#usr/}" "$rootdir"
+}
+
+usrmerge_tree()
+{
+	echo -e "\tNormalizing runtime tree to usr-merge"
+
+	mkdir -p usr
+	merge_root_into_usr bin usr/bin
+	merge_root_into_usr sbin usr/sbin
+	merge_root_into_usr lib usr/lib
+	merge_root_into_usr lib64 usr/lib64
+
+	# Preserve ThinStation's historical aliases, but point them at the
+	# canonical usr-merged tree where applicable.
+	rm -f usr/icons usr/X11R7 usr/share usr/etc usr/local share usr/libexec
+	ln -sf /usr/libexec usr/libexec
+	ln -sf /etc usr/etc
+	ln -sf /usr/lib64 usr/share
+	ln -sf /usr/lib64 share
+	ln -sf / usr/X11R7
+	ln -sf /usr/lib64/icons usr/icons
+	ln -sf / usr/local
+}
+
 make_initrd()
 {
    cd tmp-tree
+	usrmerge_tree
 	if [ "$ts_fastboot" == "true" ] || [ "$ts_fastboot" == "lotsofmem" ] ;then
 		echo -e "\nMaking initramfs - Fastboot Enabled"
 		../fastboot/fastboot-mangle "$INITDIR" "$ts_fastboot" "$ts_hardlinkfs" "$ts_squashopt"
@@ -502,19 +548,7 @@ make_initrd()
 		fi
 		echo -e "\nMaking initramfs"
 	fi
-	echo -e "\tFixing-Up links"
-	rm -f usr/bin usr/sbin usr/lib usr/lib64 usr/icons usr/X11R7 usr/share usr/etc usr/local share usr/libexec
-	ln -sf /bin usr/bin
-	ln -sf /sbin usr/sbin
-	ln -sf /lib64 usr/lib64
-	ln -sf /lib64 usr/lib
-	ln -sf /libexec usr/libexec
-	ln -sf /etc usr/etc
-	ln -sf /lib64 usr/share
-	ln -sf /lib64 share
-	ln -sf / usr/X11R7
-	ln -sf /lib64/icons usr/icons
-	ln -sf / usr/local
+	echo -e "\tUsr-merge links already normalized"
 
 	if [ "$ts_hardlinkfs" == "true" ]; then
 		hardlink .

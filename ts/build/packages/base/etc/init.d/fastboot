@@ -159,21 +159,21 @@ mount_squash()
 {
 	echo "SquashFS is file $FILE"
 	if [ "$FASTBOOT" == "lotsofmem" ] ; then
-		echo "Decompressing data directly to /"
-		/sbin/unsquashfs -f -d / -f $FILE
+		echo "Decompressing vendor tree directly to /usr"
+		/sbin/unsquashfs -f -d /usr -f $FILE
 		if [ -e /tmp/lib.squash ] ; then
 			rm /tmp/lib.squash
 		fi
 	else
 		if is_enabled $MEMORY_CONSTRAINED ; then
-			echo "Mounting data without copy to /lib64"
-			systemd-mount --fsck=no -o ro,loop -t squashfs $FILE /lib64
+			echo "Mounting vendor tree without copy to /usr"
+			systemd-mount --fsck=no -o ro,loop -t squashfs $FILE /usr
 		else
-			echo "Mounting data after copy to /lib64"
+			echo "Mounting vendor tree after copy to /usr"
 			if [ ! -e /tmp/lib.squash ] ; then
 				cp $FILE /tmp/lib.squash
 			fi
-			systemd-mount --fsck=no -o ro,loop -t squashfs /tmp/lib.squash /lib64
+			systemd-mount --fsck=no -o ro,loop -t squashfs /tmp/lib.squash /usr
 		fi
 	fi
 }

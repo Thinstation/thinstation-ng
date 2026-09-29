@@ -1,12 +1,13 @@
 #!/bin/bash
 # Fastboot by Donald A. Cupp Jr. don cupp jr at yahoo dot com
 #
-# This script splits the built root filesystem into:
-#   - the early boot filesystem that remains in the initrd
-#   - the deferred filesystem stored in lib.squash
+# The package/build format remains ThinStation's historical merged-root layout.
+# make_initrd() converts the completed tree to usr-merge before this script runs.
 #
-# The files in ../fastboot/ are policy lists. Keep policy there and keep the
-# mechanics here.
+# lib.squash is the complete /usr vendor tree. The initrd keeps only the early
+# subset required to activate that tree:
+#   FASTBOOT=true      -> mount lib.squash read-only on /usr
+#   FASTBOOT=lotsofmem -> expand lib.squash onto /usr
 
 LANG=C
 
@@ -16,8 +17,13 @@ HARDLINK=$3
 FB_COMP_EXTRA=$4
 
 FASTBOOT_DIR=../fastboot
-DEFERRED_DIR=../fastboot-tmp
 WORK_DIR=${TMPDIR:-/tmp}/thinstation-fastboot.$$
+
+USR_DIR=usr
+BIN_DIR=$USR_DIR/bin
+SBIN_DIR=$USR_DIR/sbin
+LIB_DIR=$USR_DIR/lib
+LIB64_DIR=$USR_DIR/lib64
 
 FASTLIB_NEED=$WORK_DIR/fastlibneed
 FASTLIB_KEEP=$WORK_DIR/fastlib.keep
@@ -29,7 +35,8 @@ mkdir -p "$WORK_DIR"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 echo "FASTBOOT=$FASTBOOT_MODE" >> etc/thinstation.env
-cp --remove-destination /bin/mount bin/.
+mkdir -p "$BIN_DIR" "$SBIN_DIR" "$LIB_DIR" "$LIB64_DIR"
+cp --remove-destination /bin/mount "$BIN_DIR/."
 
 read_list()
 {
@@ -74,14 +81,28 @@ parse_ldd_names()
 	' "$file" | sort -u
 }
 
-find_library_source()
+target_library()
 {
 	local lib=$1
 
-	if [ -e "lib64/$lib" ]; then
-		printf '%s\n' "lib64/$lib"
+	for dir in "$LIB64_DIR" "$LIB_DIR"; do
+		if [ -e "$dir/$lib" ]; then
+			printf '%s\n' "$dir/$lib"
+			return 0
+		fi
+	done
+	return 1
+}
+
+find_library_source()
+{
+	local lib=$1
+	local target
+
+	target=$(target_library "$lib") && {
+		printf '%s\n' "$target"
 		return 0
-	fi
+	}
 
 	for dir in /usr/lib64 /usr/lib /lib64 /lib; do
 		if [ -e "$dir/$lib" ]; then
@@ -99,9 +120,7 @@ seed_retained_libraries()
 
 	while IFS= read -r lib; do
 		[ -n "$lib" ] || continue
-		if [ -e "lib64/$lib" ]; then
-			printf '%s\n' "$lib" >> "$FASTLIB_ROOTS"
-		fi
+		target_library "$lib" >/dev/null && printf '%s\n' "$lib" >> "$FASTLIB_ROOTS"
 	done < <(read_list "$FASTBOOT_DIR/lib-boot")
 
 	parse_ldd_names "$FASTLIB_NEED" >> "$FASTLIB_ROOTS"
@@ -110,7 +129,6 @@ seed_retained_libraries()
 
 expand_retained_library_dependencies()
 {
-	local allow_host_fallback=${1:-false}
 	local lib source
 
 	seed_retained_libraries
@@ -122,13 +140,8 @@ expand_retained_library_dependencies()
 
 		while IFS= read -r lib; do
 			[ -n "$lib" ] || continue
-
-			if [ -e "lib64/$lib" ]; then
-				record_ldd "lib64/$lib"
-			elif [ "$allow_host_fallback" = "true" ]; then
-				source=$(find_library_source "$lib") || continue
-				record_ldd "$source"
-			fi
+			source=$(target_library "$lib") || source=$(find_library_source "$lib") || continue
+			record_ldd "$source"
 		done < "$FASTLIB_PREVIOUS"
 
 		parse_ldd_names "$FASTLIB_NEED" > "$FASTLIB_NEW"
@@ -138,38 +151,26 @@ expand_retained_library_dependencies()
 	done
 }
 
-collect_runtime_dependencies()
+collect_early_dependencies()
 {
-	local path
+	local item path
 
 	: > "$FASTLIB_NEED"
 
-	for path in bin/* sbin/*; do
+	while IFS= read -r item; do
+		[ -n "$item" ] || continue
+		for path in "$BIN_DIR/$item" "$SBIN_DIR/$item"; do
+			[ -e "$path" ] || continue
+			record_ldd "$path"
+		done
+	done < <(read_list "$FASTBOOT_DIR/bin-boot")
+
+	for path in "$LIB64_DIR"/plymouth/*.so "$LIB64_DIR"/plymouth/renderers/drm.so "$LIB64_DIR"/security/*; do
 		[ -e "$path" ] || continue
 		record_ldd "$path"
 	done
 
-	for path in lib64/plymouth/*.so lib64/plymouth/renderers/drm.so lib64/security/*; do
-		[ -e "$path" ] || continue
-		record_ldd "$path"
-	done
-}
-
-copy_missing_retained_libraries()
-{
-	local lib source
-
-	while IFS= read -r lib; do
-		[ -n "$lib" ] || continue
-		[ -e "lib64/$lib" ] && continue
-
-		source=$(find_library_source "$lib") || {
-			echo "WARNING: retained library dependency not found: $lib" >&2
-			continue
-		}
-
-		cp -L --preserve=mode,timestamps "$source" "lib64/$lib"
-	done < "$FASTLIB_KEEP"
+	expand_retained_library_dependencies
 }
 
 is_core_runtime_library()
@@ -182,232 +183,99 @@ is_core_runtime_library()
 	return 1
 }
 
-split_fonts_lotsofmem()
+prepare_vendor_tree()
 {
-	local path
+	local item
 
-	[ -e lib64/fontconfig/conf.avail/57-dejavu-sans-fonts.conf ] || return 0
-	[ -e lib64/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf ] || return 0
+	mkdir -p "$LIB64_DIR/etc" var
 
-	mkdir -p "$DEFERRED_DIR/lib64/fonts/dejavu-sans-fonts"
-	mkdir -p "$DEFERRED_DIR/lib64/fontconfig/conf.avail"
-
-	for path in lib64/fonts/dejavu-sans-fonts/*; do
-		[ -e "$path" ] || continue
-		[ "$path" = "lib64/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf" ] && continue
-		mv "$path" "$DEFERRED_DIR/lib64/fonts/dejavu-sans-fonts/"
-	done
-
-	for path in lib64/fonts/*; do
-		[ -e "$path" ] || continue
-		[ "$path" = "lib64/fonts/dejavu-sans-fonts" ] && continue
-		mv "$path" "$DEFERRED_DIR/lib64/fonts/"
-	done
-
-	for path in lib64/fontconfig/conf.avail/*; do
-		[ -e "$path" ] || continue
-		[ "$path" = "lib64/fontconfig/conf.avail/57-dejavu-sans-fonts.conf" ] && continue
-		mv "$path" "$DEFERRED_DIR/lib64/fontconfig/conf.avail/"
-	done
-}
-
-split_fonts_fastboot()
-{
-	[ -e lib64/fontconfig/conf.avail/57-dejavu-sans-fonts.conf ] || return 0
-	[ -e lib64/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf ] || return 0
-
-	mkdir -p fastboot/fontconfig/conf.avail
-	mkdir -p fastboot/fonts/dejavu-sans-fonts
-
-	mv lib64/fontconfig/conf.avail/57-dejavu-sans-fonts.conf fastboot/fontconfig/conf.avail/
-	mv lib64/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf fastboot/fonts/dejavu-sans-fonts/
-}
-
-make_squash()
-{
-	local source=$1
-	local output=../$INITDIR/lib.squash
-
-	if [ "$HARDLINK" = "true" ]; then
-		hardlink "$source"
-	fi
-
-	echo -e "\tMaking lib.squash"
-	mksquashfs "$source" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
-}
-
-run_fastboot_mode()
-{
-	local item lib file timestamp
-
-	mv bin lib64/
-	mv sbin lib64/
-	ln -sf /lib64/bin bin
-	ln -sf /lib64/sbin sbin
-	ln -sf . lib64/lib64
-
-	mkdir -p lib64/etc fastboot/bin fastboot/sbin
-
+	# Keep historical ThinStation top-level compatibility paths, but put their
+	# immutable payload under /usr so one squash contains the vendor OS.
 	for item in opt jre lib32; do
 		[ -e "$item" ] || continue
-		mv "$item" lib64/
-		ln -sf "/lib64/$item" "$item"
+		rm -rf "$LIB64_DIR/$item"
+		mv "$item" "$LIB64_DIR/"
+		ln -sf "/usr/lib64/$item" "$item"
 	done
 
 	while IFS= read -r item; do
 		[ -e "etc/$item" ] || continue
-		mv "etc/$item" lib64/etc/
-		ln -sf "/lib64/etc/$item" "etc/$item"
+		rm -rf "$LIB64_DIR/etc/$item"
+		mv "etc/$item" "$LIB64_DIR/etc/"
+		ln -sf "/usr/lib64/etc/$item" "etc/$item"
 	done < <(read_list "$FASTBOOT_DIR/etc-ro")
 
 	while IFS= read -r item; do
-		[ -e "lib64/$item" ] || continue
-		mv "lib64/$item" var/
-		ln -sf "/var/$item" "lib64/$item"
+		[ -e "$LIB64_DIR/$item" ] || continue
+		rm -rf "var/$item"
+		mv "$LIB64_DIR/$item" var/
+		ln -sf "/var/$item" "$LIB64_DIR/$item"
 	done < <(read_list "$FASTBOOT_DIR/lib-rw")
+}
 
-	for item in usr/*; do
-		[ -e "$item" ] || continue
-		item=${item#usr/}
-		is_listed "$item" "$FASTBOOT_DIR/usr-rw" && continue
-		mv "usr/$item" lib64/
-		ln -sf "/lib64/$item" "usr/$item"
-	done
+make_usr_squash()
+{
+	local output=../$INITDIR/lib.squash
 
-	: > "$FASTLIB_NEED"
+	if [ "$HARDLINK" = "true" ]; then
+		hardlink "$USR_DIR"
+	fi
 
-	while IFS= read -r item; do
-		[ -n "$item" ] || continue
+	echo -e "\tMaking /usr lib.squash"
+	mksquashfs "$USR_DIR" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
+}
 
-		if [ -e "lib64/bin/$item" ]; then
-			mv "lib64/bin/$item" fastboot/bin/
-			ln -sf "/fastboot/bin/$item" "lib64/bin/$item"
-			record_ldd "fastboot/bin/$item"
-		fi
+prune_early_binaries()
+{
+	local item file
 
-		if [ -e "lib64/sbin/$item" ]; then
-			mv "lib64/sbin/$item" fastboot/sbin/
-			ln -sf "/fastboot/sbin/$item" "lib64/sbin/$item"
-			record_ldd "fastboot/sbin/$item"
-		fi
-	done < <(read_list "$FASTBOOT_DIR/bin-boot")
-
-	for file in lib64/plymouth/*.so lib64/plymouth/renderers/drm.so lib64/security/*; do
-		[ -e "$file" ] || continue
-		record_ldd "$file"
-	done
-
-	expand_retained_library_dependencies false
-
-	while IFS= read -r lib; do
-		[ -n "$lib" ] || continue
-		[ -e "lib64/$lib" ] || continue
-		mv "lib64/$lib" fastboot/
-		ln -sf "/fastboot/$lib" "lib64/$lib"
-	done < <(
-		{
-			read_list "$FASTBOOT_DIR/lib-boot"
-			cat "$FASTLIB_KEEP"
-			for lib in lib64/*; do
-				[ -e "$lib" ] || continue
-				lib=${lib#lib64/}
-				is_core_runtime_library "$lib" && printf '%s\n' "$lib"
-			done
-		} | sort -u
-	)
-
-	split_fonts_fastboot
-
-	timestamp="$(date +%Y%m%d)0000"
-	while IFS= read -r -d '' file; do
-		touch -c -h -t "$timestamp" "$file"
-	done < <(find lib64 -print0)
-
-	make_squash lib64
-
-	rm -rf lib64/fontconfig lib64/fonts
-	ln -sf /fastboot/fontconfig lib64/fontconfig
-	ln -sf /fastboot/fonts lib64/fonts
-
-	for item in lib64/*; do
-		[ -e "$item" ] || continue
-		item=${item#lib64/}
-
-		case "$item" in
-			bin|sbin|dbus-1|fonts|fontconfig)
-				continue
-				;;
-		esac
-
-		is_listed "$item" "$FASTBOOT_DIR/lib-boot" && continue
-		grep -Fxq "$item" "$FASTLIB_KEEP" && continue
-		is_core_runtime_library "$item" && continue
-
-		rm -rf "lib64/$item"
-	done
-
-	for item in lib64/bin/* lib64/sbin/*; do
-		[ -e "$item" ] || continue
+	for item in "$BIN_DIR"/* "$SBIN_DIR"/*; do
+		[ -e "$item" ] || [ -L "$item" ] || continue
 		file=${item##*/}
 		is_listed "$file" "$FASTBOOT_DIR/bin-boot" && continue
 		rm -rf "$item"
 	done
-
-	cd ..
-	echo -e "\tRe-Linking BusyBox\n"
-	chroot ./tmp-tree /bin/busybox.shared --install -s
-	cd tmp-tree
 }
 
-run_lotsofmem_mode()
+prune_early_fonts()
+{
+	local path
+
+	if [ -d "$LIB64_DIR/fonts/dejavu-sans-fonts" ]; then
+		for path in "$LIB64_DIR"/fonts/dejavu-sans-fonts/*; do
+			[ -e "$path" ] || continue
+			[ "${path##*/}" = "DejaVuSans-Bold.ttf" ] && continue
+			rm -rf "$path"
+		done
+	fi
+
+	if [ -d "$LIB64_DIR/fonts" ]; then
+		for path in "$LIB64_DIR"/fonts/*; do
+			[ -e "$path" ] || continue
+			[ "${path##*/}" = "dejavu-sans-fonts" ] && continue
+			rm -rf "$path"
+		done
+	fi
+
+	if [ -d "$LIB64_DIR/fontconfig/conf.avail" ]; then
+		for path in "$LIB64_DIR"/fontconfig/conf.avail/*; do
+			[ -e "$path" ] || continue
+			[ "${path##*/}" = "57-dejavu-sans-fonts.conf" ] && continue
+			rm -rf "$path"
+		done
+	fi
+}
+
+prune_early_libraries()
 {
 	local item lib
 
-	mkdir -p "$DEFERRED_DIR"/{bin,sbin,lib64,etc,usr}
-
-	cp --remove-destination "$(command -v cp)" bin/
-	cp --remove-destination "$(command -v mv)" bin/
-	cp --remove-destination "$(command -v unsquashfs)" sbin/
-
-	for item in opt jre; do
-		[ -e "$item" ] || continue
-		mv "$item" "$DEFERRED_DIR/"
-	done
-
-	for item in usr/*; do
-		[ -e "$item" ] || continue
-		item=${item#usr/}
-		is_listed "$item" "$FASTBOOT_DIR/usr-rw" && continue
-		mv "usr/$item" "$DEFERRED_DIR/usr/"
-	done
-
-	while IFS= read -r item; do
-		[ -e "etc/$item" ] || continue
-		mv "etc/$item" "$DEFERRED_DIR/etc/"
-	done < <(read_list "$FASTBOOT_DIR/etc-ro")
-
-	for item in bin/* sbin/*; do
-		[ -e "$item" ] || continue
-		file=${item##*/}
-		is_listed "$file" "$FASTBOOT_DIR/bin-boot" && continue
-		[ "$(readlink "$item")" = "/bin/busybox.shared" ] && continue
-
-		case "$item" in
-			bin/*) mv "$item" "$DEFERRED_DIR/bin/" ;;
-			sbin/*) mv "$item" "$DEFERRED_DIR/sbin/" ;;
-		esac
-	done
-
-	collect_runtime_dependencies
-	expand_retained_library_dependencies true
-	copy_missing_retained_libraries
-
-	for item in lib64/*; do
-		[ -e "$item" ] || continue
-		lib=${item#lib64/}
+	for item in "$LIB64_DIR"/*; do
+		[ -e "$item" ] || [ -L "$item" ] || continue
+		lib=${item##*/}
 
 		case "$lib" in
-			fonts|fontconfig)
+			dbus-1|fonts|fontconfig)
 				continue
 				;;
 		esac
@@ -416,25 +284,30 @@ run_lotsofmem_mode()
 		grep -Fxq "$lib" "$FASTLIB_KEEP" && continue
 		is_core_runtime_library "$lib" && continue
 
-		mv "$item" "$DEFERRED_DIR/lib64/"
+		rm -rf "$item"
 	done
 
-	split_fonts_lotsofmem
-	make_squash "$DEFERRED_DIR/."
+	prune_early_fonts
 }
 
-case "$FASTBOOT_MODE" in
-	true)
-		run_fastboot_mode
-		;;
-	lotsofmem)
-		run_lotsofmem_mode
-		;;
-	*)
-		echo "Unsupported fastboot mode: $FASTBOOT_MODE" >&2
-		exit 1
-		;;
-esac
+prune_early_usr()
+{
+	prune_early_binaries
+	prune_early_libraries
+
+	cd ..
+	echo -e "\tRe-Linking BusyBox\n"
+	chroot ./tmp-tree /bin/busybox.shared --install -s
+	cd tmp-tree
+}
+
+prepare_vendor_tree
+collect_early_dependencies
+
+# Both fastboot modes use the same complete vendor image. They differ only in
+# whether runtime mounts it read-only or expands it into the initrd tmpfs.
+make_usr_squash
+prune_early_usr
 
 cd ..
 chmod 755 "$INITDIR/lib.squash"

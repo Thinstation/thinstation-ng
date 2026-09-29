@@ -325,3 +325,79 @@ test-ipxe-sibling-config:
       - ipxe-sibling-test/bios.packets
       - ipxe-sibling-test/bios-bootstrap.ipxe
     expire_in: 14 days
+
+test-usr-merge-prototype:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "usr-merge-prototype" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api")'
+      when: on_success
+    - when: never
+  script:
+    - |
+      set -Eeuo pipefail
+
+      sudo rm -rf build-usr-merge
+      sudo mkdir build-usr-merge
+      sudo mount -t tmpfs -o size=24G tmpfs build-usr-merge
+      sudo chown gitlab-runner:gitlab-runner build-usr-merge
+      ln -s "$CI_PROJECT_DIR/.git" build-usr-merge/.git
+      cd build-usr-merge
+      git checkout -f "$CI_COMMIT_SHA"
+
+      sudo ./setup-chroot -i
+      sudo ./setup-chroot -e cp -a /build/conf/tiny/* /build/.
+      sudo sed -i 's#param kernelcmdline "selinux=0"#param kernelcmdline "selinux=0 console=ttyS0"#' ts/build/build.conf
+
+      check_layout() {
+          test "$(readlink ts/build/tmp-tree/bin)" = "usr/bin"
+          test "$(readlink ts/build/tmp-tree/sbin)" = "usr/sbin"
+          test "$(readlink ts/build/tmp-tree/lib)" = "usr/lib"
+          test "$(readlink ts/build/tmp-tree/lib64)" = "usr/lib64"
+          test -x ts/build/tmp-tree/usr/bin/systemctl
+          test -d ts/build/tmp-tree/usr/lib64
+      }
+
+      boot_and_check() {
+          mode="$1"
+          serial="/build/usr-merge-${mode}.serial"
+          rm -f "ts/build/usr-merge-${mode}.serial" ts/build/bt-ipxe-http.log
+          sudo env BT_SERIAL_FILE="$serial" timeout 70 ./setup-chroot -e ts/bin/bt net-efi --remote || true
+          grep -E 'Decompressing vendor tree directly to /usr|Mounting vendor tree (without|after) copy to /usr' "ts/build/usr-merge-${mode}.serial"
+      }
+
+      echo "=== lotsofmem ==="
+      sudo ./setup-chroot -e stb
+      check_layout
+      rm -rf ts/build/usr-squash-check
+      sudo unsquashfs -f -d ts/build/usr-squash-check ts/build/boot-images/initrd/lib.squash >/dev/null
+      test -x ts/build/usr-squash-check/bin/systemctl
+      test -d ts/build/usr-squash-check/lib64
+      cp ts/build/build.log ts/build/usr-merge-lotsofmem-build.log
+      boot_and_check lotsofmem
+
+      echo "=== mounted fastboot ==="
+      sudo sed -i 's/^param fastboot[[:space:]].*/param fastboot       true/' ts/build/build.conf
+      sudo ./setup-chroot -e stb
+      check_layout
+      cp ts/build/build.log ts/build/usr-merge-fastboot-build.log
+      boot_and_check fastboot
+
+      echo "=== non-fastboot ==="
+      sudo sed -i 's/^param fastboot[[:space:]].*/param fastboot       false/' ts/build/build.conf
+      sudo ./setup-chroot -e stb
+      check_layout
+      test ! -e ts/build/boot-images/initrd/lib.squash
+      cp ts/build/build.log ts/build/usr-merge-nofastboot-build.log
+  artifacts:
+    when: always
+    paths:
+      - build-usr-merge/ts/build/usr-merge-*.serial
+      - build-usr-merge/ts/build/usr-merge-*-build.log
+      - build-usr-merge/ts/build/bt-ipxe-http.log
+    expire_in: 7 days
+  after_script:
+    - sudo umount build-usr-merge || sudo umount -l build-usr-merge || true
+    - sudo rm -rf build-usr-merge
