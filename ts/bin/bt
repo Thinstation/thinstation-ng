@@ -160,7 +160,7 @@ case $1 in
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,romfile="$EFI_VIRTIO_ROM" -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,romfile="$EFI_VIRTIO_ROM",bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
 		echo "Exit code $?"
 	;;
         cd)

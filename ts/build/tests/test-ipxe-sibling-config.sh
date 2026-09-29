@@ -99,7 +99,7 @@ cp "$uefi_image" "$work/tftp/nested/BOOTX64.EFI"
 timeout 30 qemu-system-x86_64 \
   -accel kvm -machine q35 -m 512 -smp 1 -boot n \
   -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
-  -device virtio-net-pci,netdev=n2,romfile="$efi_virtio_rom" \
+  -device virtio-net-pci,netdev=n2,romfile="$efi_virtio_rom",bootindex=1 \
   -netdev user,id=n2,tftp="$work/tftp",bootfile=/nested/BOOTX64.EFI \
   -object filter-dump,id=dump2,netdev=n2,file="$work/uefi-pxe.pcap" \
   -display none -monitor none -serial stdio -no-reboot \
@@ -109,6 +109,9 @@ strings "$work/uefi-pxe.pcap" > "$work/uefi-pxe.strings"
 
 grep -q 'nested/BOOTX64.EFI' "$work/uefi-pxe.strings" || {
   echo "UEFI PXE did not request nested/BOOTX64.EFI over virtio-net" >&2
+  echo "----- UEFI PXE console -----" >&2
+  cat "$work/uefi-pxe.log" >&2 || true
+  echo "----- end UEFI PXE console -----" >&2
   exit 1
 }
 grep -q 'nested/autoexec.ipxe' "$work/uefi-pxe.strings" || {
