@@ -4,4 +4,5 @@ set boot_url http://${next-server}
 set BOOT_IMAGE /boot/vmlinuz
 kernel ${boot_url}${BOOT_IMAGE} BOOT_IMAGE=${BOOT_IMAGE} $KERNEL_PARAMETERS boot_device=${boot_url}
 initrd ${boot_url}/boot/initrd
+iseq ${platform} efi && shim ${boot_url}/EFI/BOOT/BOOTX64.EFI ||
 boot
