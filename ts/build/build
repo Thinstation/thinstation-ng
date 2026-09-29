@@ -2260,6 +2260,11 @@ wrap_efi()
 			sys_copy boot-images/templates/ipxe/$ts_grubtheme/autoexec.ipxe $ESP/autoexec.ipxe
 			sed -i -e "s/\$KERNEL_PARAMETERS/$KERNEL_PARAMETERS/g" $ESP/autoexec.ipxe
 		fi
+		if [ -e /usr/share/ipxe/secureboot/snponly.efi ] && [ -e /usr/share/ipxe/secureboot/snponly-shim.efi ]; then
+			sys_copy /usr/share/ipxe/secureboot/snponly.efi $ESP/snponly.efi
+			sys_copy /usr/share/ipxe/secureboot/snponly-shim.efi $ESP/snponly-shim.efi
+			sys_copy /usr/share/ipxe/secureboot/shimx64.efi $ESP/shimx64.efi
+		fi
 
 		if is_enabled $ts_earlymicrocode ; then
 			sed -i -e "s:/boot/initrd:/boot/ucode /boot/initrd:" $ESP/boot/grub2/grub.cfg
