@@ -216,13 +216,18 @@ prepare_vendor_tree()
 make_usr_squash()
 {
 	local output=../$INITDIR/lib.squash
+	local squash_root="$WORK_DIR/squash-root"
+
+	rm -rf "$squash_root"
+	mkdir -p "$squash_root"
+	cp -a --reflink=auto "$USR_DIR" "$squash_root/usr"
 
 	if [ "$HARDLINK" = "true" ]; then
-		hardlink "$USR_DIR"
+		hardlink "$squash_root"
 	fi
 
-	echo -e "\tMaking /usr lib.squash"
-	mksquashfs "$USR_DIR" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
+	echo -e "\tMaking root-relative /usr lib.squash"
+	mksquashfs "$squash_root" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
 }
 
 prune_early_binaries()

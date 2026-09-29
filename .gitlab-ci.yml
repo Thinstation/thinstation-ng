@@ -365,7 +365,7 @@ test-usr-merge-prototype:
           serial="/build/usr-merge-${mode}.serial"
           rm -f "ts/build/usr-merge-${mode}.serial" ts/build/bt-ipxe-http.log
           sudo env BT_SERIAL_FILE="$serial" timeout 70 ./setup-chroot -e ts/bin/bt net-efi --remote || true
-          grep -E 'Decompressing vendor tree directly to /usr|Mounting vendor tree (without|after) copy to /usr' "ts/build/usr-merge-${mode}.serial"
+          grep -E 'Decompressing vendor tree directly to /|Mounting (copied )?root-relative vendor tree and binding /usr' "ts/build/usr-merge-${mode}.serial"
       }
 
       echo "=== lotsofmem ==="
@@ -373,8 +373,8 @@ test-usr-merge-prototype:
       check_layout
       rm -rf ts/build/usr-squash-check
       sudo unsquashfs -f -d ts/build/usr-squash-check ts/build/boot-images/initrd/lib.squash >/dev/null
-      test -x ts/build/usr-squash-check/bin/systemctl
-      test -d ts/build/usr-squash-check/lib64
+      test -x ts/build/usr-squash-check/usr/bin/systemctl
+      test -d ts/build/usr-squash-check/usr/lib64
       cp ts/build/build.log ts/build/usr-merge-lotsofmem-build.log
       boot_and_check lotsofmem
 
