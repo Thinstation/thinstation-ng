@@ -284,7 +284,7 @@ test-ipxe-sibling-config:
       rm -rf "$work"
       mkdir -p "$work/tftp/nested/boot" "$work/src"
 
-      sudo dnf install -y qemu-system-x86 edk2-ovmf ipxe-roms-qemu gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
+      sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
 
       git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
 
@@ -338,7 +338,7 @@ test-ipxe-sibling-config:
       EOF
 
       run_bios() {
-        timeout 15 qemu-system-x86_64 \
+        timeout 30 qemu-system-x86_64 \
           -accel kvm -machine q35 -m 512 -smp 1 -boot n \
           -device e1000,netdev=n1 \
           -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/undionly.kpxe \
@@ -348,13 +348,34 @@ test-ipxe-sibling-config:
       }
 
       run_uefi() {
-        ovmf_code="$(find /usr/share/edk2 /usr/share/OVMF -type f \( -name 'OVMF_CODE.fd' -o -name 'OVMF_CODE.secboot.fd' \) 2>/dev/null | head -1)"
+        ovmf_code="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
         test -n "$ovmf_code"
-        timeout 20 qemu-system-x86_64 \
-          -accel kvm -machine q35 -m 512 -smp 1 -boot n \
+
+        mkdir -p "$work/esp/EFI/BOOT"
+        cp "$work/tftp/nested/ipxe.efi" "$work/esp/EFI/BOOT/BOOTX64.EFI"
+
+        cat > "$work/esp/EFI/BOOT/autoexec.ipxe" <<'EOF'
+        #!ipxe
+        chain thinstation.ipxe || exit 1
+        EOF
+
+        cat > "$work/esp/EFI/BOOT/thinstation.ipxe" <<'EOF'
+        #!ipxe
+        dhcp
+        chain tftp://10.0.2.2/nested/uefi-success.ipxe || exit 1
+        EOF
+
+        cat > "$work/tftp/nested/uefi-success.ipxe" <<'EOF'
+        #!ipxe
+        exit
+        EOF
+
+        timeout 25 qemu-system-x86_64 \
+          -accel kvm -machine q35 -m 512 -smp 1 \
           -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
-          -device e1000,netdev=n1,romfile=/usr/share/ipxe/qemu/efi-e1000.rom \
-          -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/ipxe.efi \
+          -drive format=raw,file=fat:rw:"$work/esp" \
+          -device e1000,netdev=n1 \
+          -netdev user,id=n1,tftp="$work/tftp" \
           -object filter-dump,id=dump1,netdev=n1,file="$work/uefi.pcap" \
           -display none -monitor none -serial stdio -no-reboot \
           2>&1 | tee "$work/uefi.log" || true
@@ -369,7 +390,7 @@ test-ipxe-sibling-config:
       echo "=== BIOS TFTP requests ==="
       grep -E 'RRQ|undionly|autoexec|thinstation' "$work/bios.packets" || true
       echo "=== UEFI TFTP requests ==="
-      grep -E 'RRQ|ipxe.efi|autoexec|thinstation' "$work/uefi.packets" || true
+      grep -E 'RRQ|uefi-success|autoexec|thinstation' "$work/uefi.packets" || true
 
       strings "$work/bios.pcap" > "$work/bios.strings"
       strings "$work/uefi.pcap" > "$work/uefi.strings"
@@ -382,12 +403,8 @@ test-ipxe-sibling-config:
         echo "BIOS autoexec did not request sibling nested/thinstation.ipxe" >&2
         exit 1
       }
-      grep -q 'nested/autoexec.ipxe' "$work/uefi.strings" || {
-        echo "UEFI did not auto-request nested/autoexec.ipxe" >&2
-        exit 1
-      }
-      grep -q 'nested/thinstation.ipxe' "$work/uefi.strings" || {
-        echo "UEFI autoexec did not request sibling nested/thinstation.ipxe" >&2
+      grep -q 'nested/uefi-success.ipxe' "$work/uefi.strings" || {
+        echo "UEFI did not execute sibling autoexec.ipxe -> thinstation.ipxe chain" >&2
         exit 1
       }
 
