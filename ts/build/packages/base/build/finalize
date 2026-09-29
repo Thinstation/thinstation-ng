@@ -125,6 +125,11 @@ EOF
 write_release
 
 chmod 644 /etc/busybox.conf
+
+# Privileged helpers must be owned by root before enabling setuid. Build
+# workspaces may be owned by an unprivileged runner account, and cp -a keeps
+# that numeric ownership in the assembled tree.
+chown root:root /bin/busybox.shared /bin/su /sbin/unix_chkpwd 2>/dev/null || true
 chmod u+s /bin/busybox.shared /bin/su
 chmod u+s /sbin/unix_chkpwd
 
