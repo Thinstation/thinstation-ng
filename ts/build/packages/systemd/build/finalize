@@ -13,7 +13,7 @@ if [ ! -e /etc/init.d/ntpconf ] && [ ! -e /etc/init.d/ntpdate ]; then
 fi
 
 systemctl enable systemd-resolved
-rm /lib64/systemd/system/sysinit.target.wants/systemd-update-done.service
+rm /usr/lib64/systemd/system/sysinit.target.wants/systemd-update-done.service
 
 # Specify the alternate passwd and group files
 ALTERNATE_PASSWD="/build/passwd"

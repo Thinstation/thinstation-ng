@@ -1,6 +1,6 @@
 ,install,0,0,build,0,,,,,,,,,
 ,remove,0,0,build,0,,,,,,,,,
-,sssd.conf,0,0,build/extra/lib64/tmpfiles.d,0,,,,,,,,,
+,sssd.conf,0,0,build/extra/usr/lib64/tmpfiles.d,0,,,,,,,,,
 ,sssd.conf,0,0,build/extra/etc/persistent-files.d,0,,,,,,,,,
 ,sssd.conf,0,0,build/extra/etc/persistent-dirs.d,0,,,,,,,,,
 ,overrides.conf,0,0,build/extra/etc/systemd/system/oddjobd.service.d,0,,,,,,,,,

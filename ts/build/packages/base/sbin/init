@@ -54,4 +54,4 @@ if [ -e $XATTR_FILE ]; then
 fi
 
 # Hand over control to systemd
-exec /lib64/systemd/systemd
+exec /usr/lib64/systemd/systemd

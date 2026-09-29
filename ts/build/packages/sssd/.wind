@@ -1,7 +1,7 @@
-#180214583bb7e0b2678f83a8803a7142  .dna
+#a7f4742cf8e46cd301f6c62cf2afbc1d  .dna
 
-rm -f /ts/build/packages/sssd/build/extra/bin/chgrp
-rm -f /ts/build/packages/sssd/build/extra/bin/chown
-rm -f /ts/build/packages/sssd/build/extra/bin/id
-rm -f /ts/build/packages/sssd/build/extra/bin/ls
-rm -f /ts/build/packages/sssd/build/extra/bin/su
+rm -f /root/usrshare-migrate/ts/build/packages/sssd/build/extra/bin/chgrp
+rm -f /root/usrshare-migrate/ts/build/packages/sssd/build/extra/bin/chown
+rm -f /root/usrshare-migrate/ts/build/packages/sssd/build/extra/bin/id
+rm -f /root/usrshare-migrate/ts/build/packages/sssd/build/extra/bin/ls
+rm -f /root/usrshare-migrate/ts/build/packages/sssd/build/extra/bin/su

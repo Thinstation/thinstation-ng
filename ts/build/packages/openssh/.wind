@@ -1,3 +1,3 @@
-#307bf0853fe87c1ccfea4326117bdb33  .dna
+#05a3968bb466ac1fe9178af831ec951c  .dna
 
-rm -f /ts/build/packages/openssh/build/extra/lib64/security/pam_motd.so
+rm -f /root/usrshare-migrate/ts/build/packages/openssh/build/extra/usr/lib64/security/pam_motd.so
