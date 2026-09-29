@@ -303,7 +303,7 @@ test-ipxe-sibling-config:
       exit 1
       EOF
 
-      make -C "$work/src/ipxe/src" -j"$(nproc)" bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
+      make -C "$work/src/ipxe/src" -j"$(nproc)" NO_WERROR=1 bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
       cp "$work/src/ipxe/src/bin/undionly.kpxe" "$work/tftp/nested/undionly.kpxe"
 
       mkdir -p "$work/f45"
