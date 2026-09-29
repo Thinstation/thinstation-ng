@@ -284,7 +284,7 @@ test-ipxe-sibling-config:
       rm -rf "$work"
       mkdir -p "$work/tftp/nested/boot" "$work/src"
 
-      sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core
+      sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
 
       git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
 
@@ -342,6 +342,7 @@ test-ipxe-sibling-config:
           -accel kvm -machine q35 -m 512 -smp 1 -boot n \
           -device e1000,netdev=n1 \
           -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/undionly.kpxe \
+          -object filter-dump,id=dump1,netdev=n1,file="$work/bios.pcap" \
           -display none -monitor none -serial stdio -no-reboot \
           2>&1 | tee "$work/bios.log" || true
       }
@@ -354,6 +355,7 @@ test-ipxe-sibling-config:
           -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
           -device e1000,netdev=n1 \
           -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/ipxe.efi \
+          -object filter-dump,id=dump1,netdev=n1,file="$work/uefi.pcap" \
           -display none -monitor none -serial stdio -no-reboot \
           2>&1 | tee "$work/uefi.log" || true
       }
@@ -361,21 +363,31 @@ test-ipxe-sibling-config:
       run_bios
       run_uefi
 
-      echo "=== BIOS path result ==="
-      grep -E 'TSIPXE_|cwuri=|cwduri=|filename=|next-server=' "$work/bios.log" || true
-      echo "=== UEFI path result ==="
-      grep -E 'TSIPXE_|cwuri=|cwduri=|filename=|next-server=' "$work/uefi.log" || true
+      tcpdump -nn -vvv -r "$work/bios.pcap" > "$work/bios.packets" 2>&1 || true
+      tcpdump -nn -vvv -r "$work/uefi.pcap" > "$work/uefi.packets" 2>&1 || true
 
-      grep -q 'TSIPXE_SIBLING_CONFIG_OK' "$work/bios.log" || {
-        echo "BIOS did not reach nested sibling config" >&2
+      echo "=== BIOS TFTP requests ==="
+      grep -E 'RRQ|undionly|autoexec|thinstation' "$work/bios.packets" || true
+      echo "=== UEFI TFTP requests ==="
+      grep -E 'RRQ|ipxe.efi|autoexec|thinstation' "$work/uefi.packets" || true
+
+      strings "$work/bios.pcap" > "$work/bios.strings"
+      strings "$work/uefi.pcap" > "$work/uefi.strings"
+
+      grep -q 'nested/autoexec.ipxe' "$work/bios.strings" || {
+        echo "BIOS did not request sibling nested/autoexec.ipxe" >&2
         exit 1
       }
-      grep -q 'TSIPXE_AUTOEXEC' "$work/uefi.log" || {
-        echo "UEFI did not auto-load nested autoexec.ipxe" >&2
+      grep -q 'nested/thinstation.ipxe' "$work/bios.strings" || {
+        echo "BIOS autoexec did not request sibling nested/thinstation.ipxe" >&2
         exit 1
       }
-      grep -q 'TSIPXE_SIBLING_CONFIG_OK' "$work/uefi.log" || {
-        echo "UEFI autoexec did not chain nested sibling config" >&2
+      grep -q 'nested/autoexec.ipxe' "$work/uefi.strings" || {
+        echo "UEFI did not auto-request nested/autoexec.ipxe" >&2
+        exit 1
+      }
+      grep -q 'nested/thinstation.ipxe' "$work/uefi.strings" || {
+        echo "UEFI autoexec did not request sibling nested/thinstation.ipxe" >&2
         exit 1
       }
 
@@ -385,6 +397,10 @@ test-ipxe-sibling-config:
       - ipxe-sibling-test/bios.log
       - ipxe-sibling-test/uefi.log
       - ipxe-sibling-test/bios-bootstrap.ipxe
+      - ipxe-sibling-test/bios.pcap
+      - ipxe-sibling-test/uefi.pcap
+      - ipxe-sibling-test/bios.packets
+      - ipxe-sibling-test/uefi.packets
       - ipxe-sibling-test/tftp/nested/autoexec.ipxe
       - ipxe-sibling-test/tftp/nested/thinstation.ipxe
     expire_in: 14 days
