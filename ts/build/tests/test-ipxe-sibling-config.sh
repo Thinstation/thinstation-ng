@@ -2,7 +2,10 @@
 set -Eeuo pipefail
 
 work="${CI_PROJECT_DIR:-$PWD}/ipxe-sibling-test"
-rm -rf "$work"
+reuse="${IPXE_TEST_REUSE:-0}"
+if [ "$reuse" != "1" ]; then
+  rm -rf "$work"
+fi
 mkdir -p "$work/tftp/nested" "$work/src" "$work/f45"
 
 cat > "$work/bios-bootstrap.ipxe" <<'EOF'
@@ -21,16 +24,22 @@ echo TSIPXE_BIOS_SIBLING_OK
 exit
 EOF
 
-git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
-make -C "$work/src/ipxe/src" -j"$(nproc)" NO_WERROR=1 \
-  bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
-cp "$work/src/ipxe/src/bin/undionly.kpxe" "$work/tftp/nested/undionly.kpxe"
+if [ ! -s "$work/tftp/nested/undionly.kpxe" ]; then
+  git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
+  make -C "$work/src/ipxe/src" -j"$(nproc)" NO_WERROR=1 \
+    bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
+  cp "$work/src/ipxe/src/bin/undionly.kpxe" "$work/tftp/nested/undionly.kpxe"
+fi
 
-dnf download --destdir "$work/f45" --releasever=45 --repo=fedora ipxe-bootimgs-x86
-rpm2cpio "$work"/f45/ipxe-bootimgs-x86-*.rpm | (cd "$work/f45" && cpio -idm --quiet)
-uefi_image="$(find "$work/f45" -type f \
-  \( -name 'ipxe-snponly-x86_64.efi' -o -name 'ipxe-x86_64.efi' \) | head -1)"
-test -n "$uefi_image"
+uefi_image="$work/tftp/nested/BOOTX64.EFI"
+if [ ! -s "$uefi_image" ]; then
+  dnf download --destdir "$work/f45" --releasever=45 --repo=fedora ipxe-bootimgs-x86
+  rpm2cpio "$work"/f45/ipxe-bootimgs-x86-*.rpm | (cd "$work/f45" && cpio -idm --quiet)
+  downloaded_uefi="$(find "$work/f45" -type f \
+    \( -name 'ipxe-snponly-x86_64.efi' -o -name 'ipxe-x86_64.efi' \) | head -1)"
+  test -n "$downloaded_uefi"
+  cp "$downloaded_uefi" "$uefi_image"
+fi
 
 timeout 30 qemu-system-x86_64 \
   -accel kvm -machine q35 -m 512 -smp 1 -boot n \
@@ -88,18 +97,15 @@ grep -q 'thinstation.ipxe.*ok' "$work/uefi.log" || {
 echo "UEFI sibling chaining: PASS"
 
 
-# Fedora OVMF does not expose a usable built-in PXE path for virtio-net in
-# this configuration, so attach Fedora's iPXE EFI option ROM explicitly.
-efi_virtio_rom="$(rpm -ql ipxe-roms-qemu | grep -F '/efi-virtio.rom' | head -1)"
-test -n "$efi_virtio_rom"
-test -s "$efi_virtio_rom"
-echo "Using UEFI virtio option ROM: $efi_virtio_rom"
-cp "$uefi_image" "$work/tftp/nested/BOOTX64.EFI"
-
+# edk2 NetworkPkg requires EFI_RNG_PROTOCOL for DHCP/PXE after the
+# CVE-2023-45237 hardening.  OVMF's built-in virtio-net SNP driver works
+# without an external NIC option ROM once a virtio RNG device is present.
 timeout 30 qemu-system-x86_64 \
   -accel kvm -machine q35 -m 512 -smp 1 -boot n \
+  -object rng-random,filename=/dev/urandom,id=rng0 \
+  -device virtio-rng-pci,rng=rng0 \
   -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
-  -device virtio-net-pci,netdev=n2,romfile="$efi_virtio_rom",bootindex=1 \
+  -device virtio-net-pci,netdev=n2,bootindex=1 \
   -netdev user,id=n2,tftp="$work/tftp",bootfile=/nested/BOOTX64.EFI \
   -object filter-dump,id=dump2,netdev=n2,file="$work/uefi-pxe.pcap" \
   -display none -monitor none -serial stdio -no-reboot \

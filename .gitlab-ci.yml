@@ -312,7 +312,7 @@ test-ipxe-sibling-config:
       when: on_success
     - when: never
   script:
-    - sudo dnf install -y qemu-system-x86 edk2-ovmf ipxe-roms-qemu gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
+    - sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
     - bash ts/build/tests/test-ipxe-sibling-config.sh
   artifacts:
     when: always

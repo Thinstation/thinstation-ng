@@ -35,7 +35,9 @@ setup_qemu()
 	SOUND="-audiodev pipewire,id=pw -device AC97,audiodev=pw"
         CPU="-cpu host -machine q35 -smp cores=$procs,threads=1,sockets=1"
         MEMORY="-m 8192"
-#       RNG="-object rng-random,id=RNG"
+        # Modern edk2 NetworkPkg requires EFI_RNG_PROTOCOL for DHCP/PXE
+        # after the CVE-2023-45237 hardening.  Expose a virtio RNG device.
+        RNG="-object rng-random,filename=/dev/urandom,id=RNG -device virtio-rng-pci,rng=RNG"
         MOUSE="-usb -device usb-tablet"
         KVM="-enable-kvm"
 #       EFI="-L . --bios usr/share/edk2.git/ovmf-x64/OVMF-pure-efi.fd"
@@ -44,10 +46,6 @@ setup_qemu()
                 EFI_CODE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
         fi
         EFI="-drive if=pflash,format=raw,readonly=on,file=$EFI_CODE"
-        EFI_VIRTIO_ROM="usr/share/ipxe/efi-virtio.rom"
-        if [ ! -f "$EFI_VIRTIO_ROM" ]; then
-                EFI_VIRTIO_ROM="$(rpm -ql ipxe-roms-qemu 2>/dev/null | grep -F '/efi-virtio.rom' | head -1)"
-        fi
 #        NETWORK=`bridge $1`
 #       QEMU=qemu-system-i386
         QEMU=qemu-system-x86_64
@@ -160,7 +158,7 @@ case $1 in
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,romfile="$EFI_VIRTIO_ROM",bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
 		echo "Exit code $?"
 	;;
         cd)
