@@ -2,7 +2,7 @@
 set -x
 start=$PWD
 self="$0"
-self_path="`echo $0 |sed -e 's|ts/bin/bt||g'`"
+self_path="$(dirname "$0")/../.."
 cd "$self_path"
 #set -e
 
@@ -51,17 +51,29 @@ setup_qemu()
         QEMU=qemu-system-x86_64
 
 	if $REMOTE_ACCESS; then
+		# Headless mode for automated diagnostics.
+		SOUND=""
+		VGA="-display none"
 		SERIAL_PORT="${BT_SERIAL_PORT:-4444}"
 		MONITOR_PORT="${BT_MONITOR_PORT:-4445}"
 		SSH_PORT="${BT_SSH_PORT:-2222}"
-		CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=off -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
+		SERIAL_WAIT="${BT_SERIAL_WAIT:-off}"
+		if [ -n "${BT_SERIAL_FILE:-}" ]; then
+			CONSOLE="-serial file:$BT_SERIAL_FILE -monitor none"
+		else
+			CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=$SERIAL_WAIT -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
+		fi
 		case "$1" in
 			net|net-efi) NETWORK="" ;;
 			*) NETWORK="-netdev user,id=bt-net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 -device virtio-net-pci,netdev=bt-net0" ;;
 		esac
 		echo "Remote access enabled:"
-		echo "  serial:  127.0.0.1:$SERIAL_PORT"
-		echo "  monitor: 127.0.0.1:$MONITOR_PORT"
+		if [ -n "${BT_SERIAL_FILE:-}" ]; then
+			echo "  serial:  $BT_SERIAL_FILE"
+		else
+			echo "  serial:  127.0.0.1:$SERIAL_PORT"
+			echo "  monitor: 127.0.0.1:$MONITOR_PORT"
+		fi
 		[ -n "$NETWORK" ] && echo "  ssh:     127.0.0.1:$SSH_PORT -> guest:22"
 	else
 		CONSOLE="-serial stdio"
@@ -69,6 +81,10 @@ setup_qemu()
 
         STANDARD_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $NETWORK $CONSOLE $AGENT $SHARED_FOLDER"
         NET_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $CONSOLE"
+        PCAP=""
+        if [ -n "${BT_PCAP_FILE:-}" ]; then
+                PCAP="-object filter-dump,id=bt-dump,netdev=n1,file=$BT_PCAP_FILE"
+        fi
 }
 
 confirm_iso()
@@ -154,11 +170,11 @@ case $1 in
 		echo "Exit code $?"
 	;;
 	net)
-		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/boot/grub2/pxeboot.img
+		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/boot/grub2/pxeboot.img $PCAP
 		echo "Exit code $?"
 	;;
         net-efi)
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $PCAP $EFI
 		echo "Exit code $?"
 	;;
         cd)
