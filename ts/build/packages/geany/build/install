@@ -2,7 +2,7 @@
 
 export PACKAGE=geany
 export PORTS="geany geany-libgeany geany-plugins-common geany-plugins-spellcheck geany-plugins-codenav geany-plugins-overview geany-plugins-markdown geany-plugins-git-changebar enchant hunspell-en-US"
-export DROP_DIRS=lib/icons/Tango
+export DROP_DIRS=usr/share/icons/Tango
 repackage -e
 
 returnval=$?

@@ -1,7 +1,7 @@
 #polkit 10
 
 chgrp polkitd /etc/polkit-1/rules.d
-chgrp polkitd /lib64/polkit-1/rules.d
+chgrp polkitd /usr/share/polkit-1/rules.d
 chown root:polkitd /etc/polkit-1/localauthority
 
 chmod 0750 /etc/polkit-1/localauthority 

@@ -1831,12 +1831,14 @@ filesystem_fixups()
 		rm -f ./tmp-tree/etc/background.jpg
 	else
 		echo -e "\tRunning mkfontdir and mkfontscale"
-		for fontdir in `find ./tmp-tree/usr/share/X11/fonts -mindepth 1 -type d`; do
+		if [ -d ./tmp-tree/usr/share/X11/fonts ]; then
+			for fontdir in `find ./tmp-tree/usr/share/X11/fonts -mindepth 1 -type d`; do
 			if [ ! -e $fontdir/fonts.scale ]; then
 				mkfontscale $fontdir
 			fi
 			mkfontdir $fontdir
 		done
+			fi
 		if [ -e ./tmp-tree/lib64/gdk-pixbuf-2.0/2.10.0/loaders ] ; then
 			echo -e "\tCaching pixbuf loaders"
 			for loader in `find ./tmp-tree/lib64/gdk-pixbuf-2.0/ -type f -printf "%f "`; do

@@ -20,8 +20,8 @@ cd NVIDIA-Linux-x86_64-$version
 
 mkdir -p $INSTALLDIR/lib/licenses/nvidia
   mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/LICENSE $INSTALLDIR/lib/licenses/nvidia/.
-mkdir -p $INSTALLDIR/lib/icons/hicolor/48x48/apps
-  mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/nvidia-settings.png $INSTALLDIR/lib/icons/hicolor/48x48/apps/.
+mkdir -p $INSTALLDIR/usr/share/icons/hicolor/48x48/apps
+  mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/nvidia-settings.png $INSTALLDIR/usr/share/icons/hicolor/48x48/apps/.
 rm -rf $INSTALLDIR/share
 
 #mkdir -p $INSTALLDIR/lib/applications
