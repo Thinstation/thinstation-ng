@@ -9,7 +9,7 @@ Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-S
 
 ## Operating rules
 
-- Treat GitLab as source of truth. Use a feature branch, commit logically related changes, open an MR, review the diff, then merge.
+- Treat GitLab as source of truth. Default to a focused feature branch + MR, but honor an explicit thread/project instruction to commit directly to the active stable branch. In the current ThinStation engineering workflow, direct commits to `7.4-Stable` are valid when the user has established that mode.
 - Prefer the GitLab Self-Managed connector for canonical source changes. The Fedora workspace at `/thinstation-ng` may be stale, generated, or intentionally dirty.
 - Never broadly reset or clean the Fedora workspace. `./setup-chroot -c` is the approved way to remove most build artifacts when inspecting real diffs.
 - Distinguish templates from the active build tree. CI copies `ts/build/conf/boot2docker/*` into `ts/build/`; `setup-chroot -e stb` parses the active files under `ts/build/`.
