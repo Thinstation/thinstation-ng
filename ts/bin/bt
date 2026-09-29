@@ -44,6 +44,163 @@ setup_qemu()
                 EFI_CODE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
         fi
         EFI="-drive if=pflash,format=raw,readonly=on,file=$EFI_CODE"
+        EFI_VIRTIO_ROM="usr/share/ipxe/efi-virtio.rom"
+        if [ ! -f "$EFI_VIRTIO_ROM" ]; then
+                EFI_VIRTIO_ROM="$(rpm -ql ipxe-roms-qemu 2>/dev/null | grep '/efi-virtio\\.rom
+#        NETWORK=`bridge $1`
+#       QEMU=qemu-system-i386
+        QEMU=qemu-system-x86_64
+
+	if $REMOTE_ACCESS; then
+		SERIAL_PORT="${BT_SERIAL_PORT:-4444}"
+		MONITOR_PORT="${BT_MONITOR_PORT:-4445}"
+		SSH_PORT="${BT_SSH_PORT:-2222}"
+		CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=off -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
+		case "$1" in
+			net|net-efi) NETWORK="" ;;
+			*) NETWORK="-netdev user,id=bt-net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 -device virtio-net-pci,netdev=bt-net0" ;;
+		esac
+		echo "Remote access enabled:"
+		echo "  serial:  127.0.0.1:$SERIAL_PORT"
+		echo "  monitor: 127.0.0.1:$MONITOR_PORT"
+		[ -n "$NETWORK" ] && echo "  ssh:     127.0.0.1:$SSH_PORT -> guest:22"
+	else
+		CONSOLE="-serial stdio"
+	fi
+
+        STANDARD_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $NETWORK $CONSOLE $AGENT $SHARED_FOLDER"
+        NET_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $CONSOLE"
+}
+
+confirm_iso()
+{
+	case $1 in
+		grub) ISO=build/boot-images/grub/thinstation-efi.iso;;
+	esac
+	if [ ! = $ISO ]; then
+		"$1 ISO $ISO"
+		"Not Found!"
+		exit 1
+	fi
+	CDROM="-drive file=$ISO,if=ide,media=cdrom,readonly=on"
+}
+
+confirm_hd()
+{
+	if [ ! -e $HD ]; then
+		qemu-img create -f raw $HD 32G
+	        if [ "$?" != "0" ]; then
+			echo "Likely not enought space to create hd image."
+			exit 3
+		fi
+	fi
+}
+
+confirm_usb_hd()
+{
+	if [ ! -e /usbhd.img ]; then
+		truncate --size 2G /usbhd.img
+	fi
+}
+
+bridge()
+{
+	bootroot=build/boot-images/grub/efi-source
+	case $1 in
+	net) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/boot/grub2/pxeboot.img -device virtio-net-pci,netdev=net0";;
+	net-efi) echo "-netdev user,id=net0,tftp=$bootroot,bootfile=/EFI/BOOT/BOOTX64.EFI -device virtio-net-pci,netdev=net0";;
+	*)	if [ -n "`ifconfig |grep -e br0`" ]; then
+		#	echo "-netdev bridge,id=br0,br=br0 -device virtio-net,netdev=br0"
+			echo "-netdev bridge,id=n1 -device virtio-net,netdev=n1"
+		fi
+	;;
+	esac
+}
+
+wrap_bios()
+{
+        if [ ! -e build/boot-images/grub ]; then
+                echo "$IMAGE not found?"
+                echo "Did you build an image."
+                exit 1
+        fi
+        export AGREE=true
+        rm thinstation.img
+        mkmbrdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o /build/boot-images/grub/efi-source -l thinstation.img:10g
+}
+
+wrap_efi()
+{
+        if [ ! -e build/boot-images/grub ]; then
+                echo "$IMAGE not found?"
+                echo "Did you build an image."
+                exit 1
+        fi
+        export AGREE=true
+        rm thinstation.img
+        mkgptdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o /build/boot-images/grub/efi-source -l thinstation.img:10g
+}
+
+setup_qemu $@
+
+case $1 in
+        hd)
+		wrap_bios && \
+                $QEMU $STANDARD_MACHINE $HDD --boot c
+                echo "Exit code $?"
+	;;
+	hd-efi)
+		wrap_efi && \
+		$QEMU $STANDARD_MACHINE $EFI $HDD --boot c
+		echo "Exit code $?"
+	;;
+	net)
+		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/boot/grub2/pxeboot.img
+		echo "Exit code $?"
+	;;
+        net-efi)
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,romfile="$EFI_VIRTIO_ROM" -netdev user,id=n1,tftp=/build/boot-images/grub/efi-source,bootfile=/EFI/BOOT/BOOTX64.EFI $EFI
+		echo "Exit code $?"
+	;;
+        cd)
+		confirm_iso grub && \
+                $QEMU $STANDARD_MACHINE $CDROM --boot d
+                echo "Exit code $?"
+	;;
+	cd-efi)
+		confirm_iso grub && \
+		confirm_usb_hd && \
+		$QEMU $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
+		echo "Exit code $?"
+        ;;
+	image)
+                confirm_hd && \
+                confirm_iso grub && \
+                $QEMU $STANDARD_MACHINE $HDD $CDROM --boot d,menu=on
+                echo "Exit code $?"
+	;;
+	image-efi)
+		confirm_hd && \
+		confirm_iso grub && \
+		$QEMU $STANDARD_MACHINE $HDD $CDROM $EFI --boot c,menu=on
+		echo "Exit code $?"
+	;;
+	cd-image)
+		confirm_iso grub
+		HDD="-drive file=$ISO,index=0,media=disk,format=raw"
+		$QEMU $STANDARD_MACHINE $HDD --boot c,menu=on
+		echo "Exit code $?"
+	;;
+	cd-image-efi)
+		confirm_iso grub
+		HDD="-drive file=$ISO,index=0,media=disk,format=raw"
+		$QEMU $STANDARD_MACHINE $HDD $EFI --boot c,menu=on
+		echo "Exit code $?"
+	;;
+esac
+cd "$start"
+ | head -1)"
+        fi
 #        NETWORK=`bridge $1`
 #       QEMU=qemu-system-i386
         QEMU=qemu-system-x86_64
