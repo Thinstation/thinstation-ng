@@ -265,3 +265,126 @@ build-gitlab-ee:
   after_script:
     - sudo umount build-gitlab-ee || true
     - sudo rm -rf build-gitlab-ee
+
+test-ipxe-sibling-config:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      set -Eeuo pipefail
+
+      work="$CI_PROJECT_DIR/ipxe-sibling-test"
+      rm -rf "$work"
+      mkdir -p "$work/tftp/nested/boot" "$work/src"
+
+      sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core
+
+      git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
+
+      cat > "$work/bios-bootstrap.ipxe" <<'EOF'
+      #!ipxe
+      echo TSIPXE_BIOS_BOOTSTRAP
+      echo cwuri=${cwuri}
+      echo cwduri=${cwduri}
+      echo filename=${filename}
+      echo next-server=${next-server}
+      chain autoexec.ipxe || goto failed
+      exit
+      :failed
+      echo TSIPXE_BIOS_CHAIN_FAILED
+      sleep 2
+      exit 1
+      EOF
+
+      make -C "$work/src/ipxe/src" -j"$(nproc)" bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
+      cp "$work/src/ipxe/src/bin/undionly.kpxe" "$work/tftp/nested/undionly.kpxe"
+
+      mkdir -p "$work/f45"
+      dnf download --destdir "$work/f45" --releasever=45 --repo=fedora ipxe-bootimgs-x86
+      rpm2cpio "$work"/f45/ipxe-bootimgs-x86-*.rpm | (cd "$work/f45" && cpio -idm --quiet)
+      uefi_image="$(find "$work/f45" -type f \( -name 'ipxe-snponly-x86_64.efi' -o -name 'ipxe-x86_64.efi' \) | head -1)"
+      test -n "$uefi_image"
+      cp "$uefi_image" "$work/tftp/nested/ipxe.efi"
+
+      cat > "$work/tftp/nested/autoexec.ipxe" <<'EOF'
+      #!ipxe
+      echo TSIPXE_AUTOEXEC
+      echo cwuri=${cwuri}
+      echo cwduri=${cwduri}
+      echo filename=${filename}
+      echo next-server=${next-server}
+      chain thinstation.ipxe || goto failed
+      exit
+      :failed
+      echo TSIPXE_AUTOEXEC_CHAIN_FAILED
+      sleep 2
+      exit 1
+      EOF
+
+      cat > "$work/tftp/nested/thinstation.ipxe" <<'EOF'
+      #!ipxe
+      echo TSIPXE_SIBLING_CONFIG_OK
+      echo config-cwuri=${cwuri}
+      echo config-cwduri=${cwduri}
+      sleep 2
+      exit
+      EOF
+
+      run_bios() {
+        timeout 45 qemu-system-x86_64 \
+          -accel kvm -machine q35 -m 512 -smp 1 -boot n \
+          -device e1000,netdev=n1 \
+          -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/undionly.kpxe \
+          -display none -monitor none -serial stdio -no-reboot \
+          2>&1 | tee "$work/bios.log" || true
+      }
+
+      run_uefi() {
+        ovmf_code="$(find /usr/share/edk2 /usr/share/OVMF -type f \( -name 'OVMF_CODE.fd' -o -name 'OVMF_CODE.secboot.fd' \) 2>/dev/null | head -1)"
+        test -n "$ovmf_code"
+        timeout 60 qemu-system-x86_64 \
+          -accel kvm -machine q35 -m 512 -smp 1 -boot n \
+          -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
+          -device e1000,netdev=n1 \
+          -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/ipxe.efi \
+          -display none -monitor none -serial stdio -no-reboot \
+          2>&1 | tee "$work/uefi.log" || true
+      }
+
+      run_bios
+      run_uefi
+
+      echo "=== BIOS path result ==="
+      grep -E 'TSIPXE_|cwuri=|cwduri=|filename=|next-server=' "$work/bios.log" || true
+      echo "=== UEFI path result ==="
+      grep -E 'TSIPXE_|cwuri=|cwduri=|filename=|next-server=' "$work/uefi.log" || true
+
+      grep -q 'TSIPXE_SIBLING_CONFIG_OK' "$work/bios.log" || {
+        echo "BIOS did not reach nested sibling config" >&2
+        exit 1
+      }
+      grep -q 'TSIPXE_AUTOEXEC' "$work/uefi.log" || {
+        echo "UEFI did not auto-load nested autoexec.ipxe" >&2
+        exit 1
+      }
+      grep -q 'TSIPXE_SIBLING_CONFIG_OK' "$work/uefi.log" || {
+        echo "UEFI autoexec did not chain nested sibling config" >&2
+        exit 1
+      }
+
+  artifacts:
+    when: always
+    paths:
+      - ipxe-sibling-test/bios.log
+      - ipxe-sibling-test/uefi.log
+      - ipxe-sibling-test/bios-bootstrap.ipxe
+      - ipxe-sibling-test/tftp/nested/autoexec.ipxe
+      - ipxe-sibling-test/tftp/nested/thinstation.ipxe
+    expire_in: 14 days
+
