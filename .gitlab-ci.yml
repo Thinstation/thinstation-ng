@@ -292,7 +292,8 @@ test-ipxe-image-layout:
     - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/ipxe.efi
     - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/autoexec.ipxe
     - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/snponly.efi
-    - test -L ts/build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi
+    - test -f ts/build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi
     - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/shimx64.efi
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/BOOTX64.EFI
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/grubx64.efi
