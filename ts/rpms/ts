@@ -1,3 +1,5 @@
 busybox
 busybox-shared
 gtkdialog
+ipxe-bootimgs-x86
+ipxe-secureboot-x86
