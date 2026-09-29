@@ -2,6 +2,6 @@
 
 set boot_url http://${next-server}
 set BOOT_IMAGE /boot/vmlinuz
-kernel ${boot_url}${BOOT_IMAGE} BOOT_IMAGE=${BOOT_IMAGE} $KERNEL_PARAMETERS boot_device=${boot_url}
+kernel ${boot_url}${BOOT_IMAGE} BOOT_IMAGE=${BOOT_IMAGE} $KERNEL_PARAMETERS boot_device=http
 initrd ${boot_url}/boot/initrd
 boot
