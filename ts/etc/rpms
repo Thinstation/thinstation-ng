@@ -646,6 +646,8 @@ iptables-libs
 iptables-nft
 iptstate
 iputils
+ipxe-bootimgs-x86
+ipxe-secureboot-x86
 ipxe-roms-qemu
 irqbalance
 iscsi-initiator-utils

@@ -1,7 +1,8 @@
 default:
   hooks:
     pre_get_sources_script:
-      - sudo umount "$CI_PROJECT_DIR/build-tiny-networkmanager" 2>/dev/null || true
+      - sudo umount "$CI_PROJECT_DIR/build-tiny-networkmanager" 2>/dev/null || sudo umount -l "$CI_PROJECT_DIR/build-tiny-networkmanager" 2>/dev/null || true
+      - sudo umount "$CI_PROJECT_DIR/build-grub-network-benchmark" 2>/dev/null || sudo umount -l "$CI_PROJECT_DIR/build-grub-network-benchmark" 2>/dev/null || true
 
 variables:
   BUILD_NPM:
@@ -265,3 +266,60 @@ build-gitlab-ee:
   after_script:
     - sudo umount build-gitlab-ee || true
     - sudo rm -rf build-gitlab-ee
+
+
+test-ipxe-image-layout:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+  script:
+    - sudo rm -rf build-ipxe-image-layout
+    - sudo mkdir build-ipxe-image-layout
+    - sudo mount -t tmpfs -o size=16G tmpfs build-ipxe-image-layout
+    - sudo chown gitlab-runner:gitlab-runner build-ipxe-image-layout
+    - ln -s "$CI_PROJECT_DIR/.git" build-ipxe-image-layout/.git
+    - cd build-ipxe-image-layout
+    - git checkout -f "$CI_COMMIT_SHA"
+    - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" ./setup-chroot -i
+    - sudo ./setup-chroot -e cp -a /build/conf/tiny/* /build/.
+    - sudo ./setup-chroot -e stb
+    - test -s ts/build/boot-images/grub/efi-source/undionly.kpxe
+    - test -s ts/build/boot-images/grub/efi-source/ipxe.efi
+    - test -s ts/build/boot-images/grub/efi-source/autoexec.ipxe
+    - test -s ts/build/boot-images/grub/efi-source/snponly.efi
+    - test -L ts/build/boot-images/grub/efi-source/snponly-shim.efi
+    - test -s ts/build/boot-images/grub/efi-source/shimx64.efi
+    - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/BOOTX64.EFI
+    - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/grubx64.efi
+    - grep -F 'boot_device=${boot_url}' ts/build/boot-images/grub/efi-source/autoexec.ipxe
+    - find ts/build/boot-images/grub/efi-source -maxdepth 2 -type f -o -type l | sort
+  after_script:
+    - sudo umount build-ipxe-image-layout || true
+    - sudo rm -rf build-ipxe-image-layout
+
+test-ipxe-sibling-config:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+  script:
+    - sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
+    - bash ts/build/tests/test-ipxe-sibling-config.sh
+  artifacts:
+    when: always
+    paths:
+      - ipxe-sibling-test/bios.log
+      - ipxe-sibling-test/uefi.log
+      - ipxe-sibling-test/bios.pcap
+      - ipxe-sibling-test/bios.packets
+      - ipxe-sibling-test/bios-bootstrap.ipxe
+    expire_in: 14 days
