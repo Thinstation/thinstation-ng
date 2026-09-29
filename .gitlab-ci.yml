@@ -283,5 +283,9 @@ test-ipxe-sibling-config:
   artifacts:
     when: always
     paths:
-      - ipxe-sibling-test/
+      - ipxe-sibling-test/bios.log
+      - ipxe-sibling-test/uefi.log
+      - ipxe-sibling-test/bios.pcap
+      - ipxe-sibling-test/bios.packets
+      - ipxe-sibling-test/bios-bootstrap.ipxe
     expire_in: 14 days

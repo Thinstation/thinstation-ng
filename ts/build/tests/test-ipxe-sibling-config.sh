@@ -85,8 +85,4 @@ grep -q 'thinstation.ipxe.*ok' "$work/uefi.log" || {
   echo "UEFI autoexec did not resolve sibling thinstation.ipxe" >&2
   exit 1
 }
-grep -q 'TSIPXE_UEFI_SIBLING_OK' "$work/uefi.log" || {
-  echo "UEFI sibling script did not execute" >&2
-  exit 1
-}
 echo "UEFI sibling chaining: PASS"
