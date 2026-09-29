@@ -64,7 +64,7 @@ setup_qemu()
 			CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=$SERIAL_WAIT -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
 		fi
 		case "$1" in
-			net|net-efi) NETWORK="" ;;
+			net|net-efi|net-efi-secure) NETWORK="" ;;
 			*) NETWORK="-netdev user,id=bt-net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 -device virtio-net-pci,netdev=bt-net0" ;;
 		esac
 		echo "Remote access enabled:"
@@ -149,6 +149,11 @@ setup_ipxe_netboot()
                         cp /build/boot-images/grub/efi-source/boot/ipxe/snponly.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
                         IPXE_BOOTFILE=/boot/ipxe/snponly.efi
                 ;;
+                net-efi-secure)
+                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
+                        cp /build/boot-images/grub/efi-source/boot/ipxe/snponly.efi "$IPXE_BOOT_ROOT/boot/ipxe/"
+                        IPXE_BOOTFILE=/boot/ipxe/snponly-shim.efi
+                ;;
         esac
 
         cat > "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe" <<EOF
@@ -181,6 +186,26 @@ cleanup_ipxe_netboot()
         if [ -n "${IPXE_BOOT_ROOT:-}" ]; then
                 rm -rf "$IPXE_BOOT_ROOT"
         fi
+        if [ -n "${SECBOOT_VARS:-}" ]; then
+                rm -f "$SECBOOT_VARS"
+        fi
+}
+
+setup_secure_ovmf()
+{
+        SECBOOT_CODE="usr/share/edk2/ovmf/OVMF_CODE.secboot.fd"
+        SECBOOT_VARS_SOURCE="usr/share/edk2/ovmf/OVMF_VARS.secboot.fd"
+        if [ ! -f "$SECBOOT_CODE" ]; then
+                SECBOOT_CODE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.secboot.fd' 2>/dev/null | head -1)"
+        fi
+        if [ ! -f "$SECBOOT_VARS_SOURCE" ]; then
+                SECBOOT_VARS_SOURCE="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_VARS.secboot.fd' 2>/dev/null | head -1)"
+        fi
+        test -n "$SECBOOT_CODE" -a -f "$SECBOOT_CODE" || { echo "Secure Boot OVMF code not found" >&2; exit 1; }
+        test -n "$SECBOOT_VARS_SOURCE" -a -f "$SECBOOT_VARS_SOURCE" || { echo "Secure Boot OVMF vars not found" >&2; exit 1; }
+        SECBOOT_VARS="$(mktemp /build/bt-secboot-vars.XXXXXX.fd)"
+        cp "$SECBOOT_VARS_SOURCE" "$SECBOOT_VARS"
+        SECBOOT_EFI="-drive if=pflash,format=raw,readonly=on,file=$SECBOOT_CODE -drive if=pflash,format=raw,file=$SECBOOT_VARS"
 }
 
 wrap_bios()
@@ -232,6 +257,13 @@ case $1 in
                 $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $EFI
 		echo "Exit code $?"
 	;;
+        net-efi-secure)
+                setup_ipxe_netboot net-efi-secure
+                setup_secure_ovmf
+                trap cleanup_ipxe_netboot EXIT INT TERM
+                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $SECBOOT_EFI
+                echo "Exit code $?"
+        ;;
         cd)
 		confirm_iso grub && \
                 $QEMU $STANDARD_MACHINE $CDROM --boot d
