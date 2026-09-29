@@ -88,37 +88,9 @@ grep -q 'thinstation.ipxe.*ok' "$work/uefi.log" || {
 echo "UEFI sibling chaining: PASS"
 
 
-# Fedora OVMF does not expose a usable built-in PXE path for virtio-net in
-# this configuration.  Attach Fedora's iPXE EFI option ROM explicitly.
-efi_virtio_rom="$(rpm -ql ipxe-roms-qemu | grep '/efi-virtio\\.rom
-timeout 30 qemu-system-x86_64 \
-  -accel kvm -machine q35 -m 512 -smp 1 -boot n \
-  -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
-  -device virtio-net-pci,netdev=n2,romfile="$efi_virtio_rom" \
-  -netdev user,id=n2,tftp="$work/tftp",bootfile=/nested/BOOTX64.EFI \
-  -object filter-dump,id=dump2,netdev=n2,file="$work/uefi-pxe.pcap" \
-  -display none -monitor none -serial stdio -no-reboot \
-  >"$work/uefi-pxe.log" 2>&1 || true
-
-strings "$work/uefi-pxe.pcap" > "$work/uefi-pxe.strings"
-
-grep -q 'nested/BOOTX64.EFI' "$work/uefi-pxe.strings" || {
-  echo "UEFI PXE did not request nested/BOOTX64.EFI over virtio-net" >&2
-  exit 1
-}
-grep -q 'nested/autoexec.ipxe' "$work/uefi-pxe.strings" || {
-  echo "Network-booted UEFI iPXE did not request sibling nested/autoexec.ipxe" >&2
-  exit 1
-}
-grep -q 'nested/thinstation.ipxe' "$work/uefi-pxe.strings" || {
-  echo "Network-booted UEFI autoexec did not request sibling nested/thinstation.ipxe" >&2
-  exit 1
-}
-echo "UEFI PXE sibling chaining: PASS"
- | head -1)"
-test -n "$efi_virtio_rom"
-test -s "$efi_virtio_rom"
-echo "Using UEFI virtio option ROM: $efi_virtio_rom"
+# Exercise OVMF's built-in virtio-net EFI PXE stack.  This is the same
+# network device used by "bt net-efi", so a passing test verifies that the
+# firmware can DHCP/TFTP BOOTX64.EFI without relying on an external EFI NIC ROM.
 cp "$uefi_image" "$work/tftp/nested/BOOTX64.EFI"
 
 timeout 30 qemu-system-x86_64 \
