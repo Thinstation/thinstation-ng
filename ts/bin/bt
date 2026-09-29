@@ -6,7 +6,15 @@ self_path="$(dirname "$0")/../.."
 cd "$self_path"
 #set -e
 
-BT_STATE_DIR="${BT_STATE_DIR:-/build/bt-vms}"
+if [ -n "${BT_STATE_DIR:-}" ]; then
+        :
+elif [ -d /build ] && [ -w /build ]; then
+        BT_STATE_DIR=/build/bt-vms
+elif [ -d "$self_path/ts/build" ] && [ -w "$self_path/ts/build" ]; then
+        BT_STATE_DIR="$self_path/ts/build/bt-vms"
+else
+        BT_STATE_DIR="${TMPDIR:-/tmp}/bt-vms-${UID:-0}"
+fi
 BT_NAME="${BT_NAME:-}"
 BT_MEMORY="${BT_MEMORY:-8192}"
 BT_CPUS="${BT_CPUS:-}"
@@ -116,13 +124,17 @@ ssh_vm()
 
 stop_vm()
 {
-        local n=$1 p
+        local n=$1 p helper vars
         p=$(state_get "$n" pid); [ -n "$p" ] || { echo "No PID recorded for $n" >&2; exit 1; }
         if pid_running "$p"; then
                 kill "$p"
                 for _ in 1 2 3 4 5; do pid_running "$p" || break; sleep 1; done
                 pid_running "$p" && kill -9 "$p"
         fi
+        helper=$(state_get "$n" http_pid)
+        pid_running "$helper" && kill "$helper" 2>/dev/null || true
+        vars=$(state_get "$n" secboot_vars)
+        [ -n "$vars" ] && rm -f "$vars"
         echo "$n stopped"
 }
 
@@ -346,10 +358,12 @@ setup_ipxe_netboot()
                 cat /build/bt-ipxe-http.log >&2 || true
                 exit 1
         }
+        [ -n "${BT_STATE_PATH:-}" ] && state_put http_pid "$IPXE_HTTP_PID"
 }
 
 cleanup_ipxe_netboot()
 {
+        $BT_DETACH && return 0
         if [ -n "${IPXE_HTTP_PID:-}" ]; then
                 kill "$IPXE_HTTP_PID" 2>/dev/null || true
                 wait "$IPXE_HTTP_PID" 2>/dev/null || true
@@ -359,6 +373,10 @@ cleanup_ipxe_netboot()
 cleanup_secure_ovmf()
 {
         if [ -n "${SECBOOT_VARS:-}" ]; then
+                if $BT_DETACH; then
+                        [ -n "${BT_STATE_PATH:-}" ] && state_put secboot_vars "$SECBOOT_VARS"
+                        return 0
+                fi
                 rm -f "$SECBOOT_VARS"
         fi
 }
@@ -377,6 +395,7 @@ setup_secure_ovmf()
         test -n "$SECBOOT_VARS_SOURCE" -a -f "$SECBOOT_VARS_SOURCE" || { echo "Secure Boot OVMF vars not found" >&2; exit 1; }
         SECBOOT_VARS="$(mktemp /build/bt-secboot-vars.XXXXXX.fd)"
         cp "$SECBOOT_VARS_SOURCE" "$SECBOOT_VARS"
+        [ -n "${BT_STATE_PATH:-}" ] && state_put secboot_vars "$SECBOOT_VARS"
         SECBOOT_EFI="-drive if=pflash,format=raw,readonly=on,file=$SECBOOT_CODE -drive if=pflash,format=raw,file=$SECBOOT_VARS"
 }
 
