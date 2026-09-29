@@ -267,6 +267,7 @@ build-gitlab-ee:
     - sudo umount build-gitlab-ee || true
     - sudo rm -rf build-gitlab-ee
 
+
 test-ipxe-sibling-config:
   stage: build
   tags:
@@ -277,136 +278,10 @@ test-ipxe-sibling-config:
       when: on_success
     - when: never
   script:
-    - |
-      set -Eeuo pipefail
-
-      work="$CI_PROJECT_DIR/ipxe-sibling-test"
-      rm -rf "$work"
-      mkdir -p "$work/tftp/nested/boot" "$work/src"
-
-      sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
-
-      git clone --depth 1 --branch v2.0.0 https://github.com/ipxe/ipxe.git "$work/src/ipxe"
-
-      cat > "$work/bios-bootstrap.ipxe" <<'EOF'
-      #!ipxe
-      echo TSIPXE_BIOS_BOOTSTRAP
-      echo cwuri=${cwuri}
-      echo cwduri=${cwduri}
-      echo filename=${filename}
-      echo next-server=${next-server}
-      chain autoexec.ipxe || goto failed
-      exit
-      :failed
-      echo TSIPXE_BIOS_CHAIN_FAILED
-      sleep 2
-      exit 1
-      EOF
-
-      make -C "$work/src/ipxe/src" -j"$(nproc)" NO_WERROR=1 bin/undionly.kpxe EMBED="$work/bios-bootstrap.ipxe"
-      cp "$work/src/ipxe/src/bin/undionly.kpxe" "$work/tftp/nested/undionly.kpxe"
-
-      mkdir -p "$work/f45"
-      dnf download --destdir "$work/f45" --releasever=45 --repo=fedora ipxe-bootimgs-x86
-      rpm2cpio "$work"/f45/ipxe-bootimgs-x86-*.rpm | (cd "$work/f45" && cpio -idm --quiet)
-      uefi_image="$(find "$work/f45" -type f \( -name 'ipxe-snponly-x86_64.efi' -o -name 'ipxe-x86_64.efi' \) | head -1)"
-      test -n "$uefi_image"
-      cp "$uefi_image" "$work/tftp/nested/ipxe.efi"
-
-      cat > "$work/tftp/nested/autoexec.ipxe" <<'EOF'
-      #!ipxe
-      echo TSIPXE_AUTOEXEC
-      echo cwuri=${cwuri}
-      echo cwduri=${cwduri}
-      echo filename=${filename}
-      echo next-server=${next-server}
-      chain thinstation.ipxe || goto failed
-      exit
-      :failed
-      echo TSIPXE_AUTOEXEC_CHAIN_FAILED
-      sleep 2
-      exit 1
-      EOF
-
-      cat > "$work/tftp/nested/thinstation.ipxe" <<'EOF'
-      #!ipxe
-      echo TSIPXE_SIBLING_CONFIG_OK
-      echo config-cwuri=${cwuri}
-      echo config-cwduri=${cwduri}
-      sleep 2
-      exit
-      EOF
-
-      run_bios() {
-        timeout 30 qemu-system-x86_64 \
-          -accel kvm -machine q35 -m 512 -smp 1 -boot n \
-          -device e1000,netdev=n1 \
-          -netdev user,id=n1,tftp="$work/tftp",bootfile=/nested/undionly.kpxe \
-          -object filter-dump,id=dump1,netdev=n1,file="$work/bios.pcap" \
-          -display none -monitor none -serial stdio -no-reboot \
-          2>&1 | tee "$work/bios.log" || true
-      }
-
-      run_uefi() {
-        ovmf_code="$(find /usr/share/edk2 /usr/share/OVMF -type f -name 'OVMF_CODE.fd' 2>/dev/null | head -1)"
-        test -n "$ovmf_code"
-
-        mkdir -p "$work/esp/EFI/BOOT"
-        cp "$work/tftp/nested/ipxe.efi" "$work/esp/EFI/BOOT/BOOTX64.EFI"
-
-        printf '%s\n' '#!ipxe' 'chain thinstation.ipxe || exit 1' > "$work/esp/EFI/BOOT/autoexec.ipxe"
-        printf '%s\n' '#!ipxe' 'dhcp' 'chain tftp://10.0.2.2/nested/uefi-success.ipxe || exit 1' > "$work/esp/EFI/BOOT/thinstation.ipxe"
-        printf '%s\n' '#!ipxe' 'exit' > "$work/tftp/nested/uefi-success.ipxe"
-
-        timeout 25 qemu-system-x86_64 \
-          -accel kvm -machine q35 -m 512 -smp 1 \
-          -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
-          -drive format=raw,file=fat:rw:"$work/esp" \
-          -device e1000,netdev=n1 \
-          -netdev user,id=n1,tftp="$work/tftp" \
-          -object filter-dump,id=dump1,netdev=n1,file="$work/uefi.pcap" \
-          -display none -monitor none -serial stdio -no-reboot \
-          2>&1 | tee "$work/uefi.log" || true
-      }
-
-      run_bios
-      run_uefi
-
-      tcpdump -nn -vvv -r "$work/bios.pcap" > "$work/bios.packets" 2>&1 || true
-      tcpdump -nn -vvv -r "$work/uefi.pcap" > "$work/uefi.packets" 2>&1 || true
-
-      echo "=== BIOS TFTP requests ==="
-      grep -E 'RRQ|undionly|autoexec|thinstation' "$work/bios.packets" || true
-      echo "=== UEFI TFTP requests ==="
-      grep -E 'RRQ|uefi-success|autoexec|thinstation' "$work/uefi.packets" || true
-
-      strings "$work/bios.pcap" > "$work/bios.strings"
-      strings "$work/uefi.pcap" > "$work/uefi.strings"
-
-      grep -q 'nested/autoexec.ipxe' "$work/bios.strings" || {
-        echo "BIOS did not request sibling nested/autoexec.ipxe" >&2
-        exit 1
-      }
-      grep -q 'nested/thinstation.ipxe' "$work/bios.strings" || {
-        echo "BIOS autoexec did not request sibling nested/thinstation.ipxe" >&2
-        exit 1
-      }
-      grep -q 'nested/uefi-success.ipxe' "$work/uefi.strings" || {
-        echo "UEFI did not execute sibling autoexec.ipxe -> thinstation.ipxe chain" >&2
-        exit 1
-      }
-
+    - sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
+    - bash ts/build/tests/test-ipxe-sibling-config.sh
   artifacts:
     when: always
     paths:
-      - ipxe-sibling-test/bios.log
-      - ipxe-sibling-test/uefi.log
-      - ipxe-sibling-test/bios-bootstrap.ipxe
-      - ipxe-sibling-test/bios.pcap
-      - ipxe-sibling-test/uefi.pcap
-      - ipxe-sibling-test/bios.packets
-      - ipxe-sibling-test/uefi.packets
-      - ipxe-sibling-test/tftp/nested/autoexec.ipxe
-      - ipxe-sibling-test/tftp/nested/thinstation.ipxe
+      - ipxe-sibling-test/
     expire_in: 14 days
-
