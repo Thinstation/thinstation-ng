@@ -1,10 +1,10 @@
 #!/bin/sh
 #repackage
 
-mkdir -p ./packages/alltimezone/lib64
-mkdir -p ./packages/alltimezone/lib64/xml/iso-codes
-cp -a /usr/share/zoneinfo ./packages/alltimezone/lib64/.
-cp -a /usr/share/xml/iso-codes/* ./packages/alltimezone/lib64/xml/iso-codes/.
+mkdir -p ./packages/alltimezone/usr/share
+mkdir -p ./packages/alltimezone/usr/share/xml/iso-codes
+cp -a /usr/share/zoneinfo ./packages/alltimezone/usr/share/.
+cp -a /usr/share/xml/iso-codes/* ./packages/alltimezone/usr/share/xml/iso-codes/.
 
 returnval=$?
 

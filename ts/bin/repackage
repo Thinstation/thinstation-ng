@@ -219,24 +219,19 @@ redirect_sbin()
 
 redirect_shared()
 {
-	for share_dir in share usr/share usr/local/share ; do
+	# Preserve architecture-independent data in canonical /usr/share.
+	mkdir -p $pkgpath/usr/share
+	for share_dir in share usr/local/share ; do
 		if [ -d $pkgpath/$share_dir ] && [ -n "`ls -A $pkgpath/$share_dir`" ]; then
-#			if [ -d $pkgpath/$share_dir/dbus-1 ] && [ -n "`ls -A $pkgpath/$share_dir/dbus-1`" ]; then
-#				mkdir -p $pkgpath/etc/dbus-1
-#				cp -a $pkgpath/$share_dir/dbus-1/* $pkgpath/etc/dbus-1
-#				rm -rf $pkgpath/$share_dir/dbus-1
-#			fi
-			for shared_object in `ls --color=never $pkgpath/$share_dir` ; do
-				mkdir -p $pkgpath/lib64
-				cp -a $pkgpath/$share_dir/$shared_object $pkgpath/lib64/.
-				rm -rf $pkgpath/$share_dir/$shared_object
-			done
-		fi
-		if [ -d $pkgpath/$share_dir ] ; then
-			rmdir $pkgpath/$share_dir
+			cp -a $pkgpath/$share_dir/. $pkgpath/usr/share/.
+			rm -rf $pkgpath/$share_dir
 		fi
 	done
+	if [ -d $pkgpath/usr/share ] && [ -z "`ls -A $pkgpath/usr/share`" ]; then
+		rmdir $pkgpath/usr/share
+	fi
 }
+
 
 move_run()
 {
@@ -261,6 +256,9 @@ extra_dirs()
 		fi
 		if [ -d $pkgpath/usr/local/$extra_dir ] ; then
 			rm -rf $pkgpath/usr/local/$extra_dir
+		fi
+		if [ -d $pkgpath/usr/share/$extra_dir ] ; then
+			rm -rf $pkgpath/usr/share/$extra_dir
 		fi
 		if [ -d $pkgpath/lib64/$extra_dir ] ; then
 			rm -rf $pkgpath/lib64/$extra_dir

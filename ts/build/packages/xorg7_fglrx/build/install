@@ -60,8 +60,6 @@ rm -rf $INSTALLDIR/lib/modules/fglrx # done with kernel source
 rm -rf $INSTALLDIR/usr/share/man # man pages aren't usable
 rm -rf $INSTALLDIR/usr/{include,src} # no compilers in runtime
 rm -rf $INSTALLDIR/usr/lib/fglrx # scripts for swapping libGL
-mv $INSTALLDIR/usr/share/* $INSTALLDIR/lib
-rmdir $INSTALLDIR/usr/share
 
 mkdir -p $INSTALLDIR/lib/xorg
 mv $INSTALLDIR/usr/X11R6/bin/* $INSTALLDIR/usr/bin

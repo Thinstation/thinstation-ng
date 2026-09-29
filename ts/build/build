@@ -517,10 +517,11 @@ usrmerge_tree()
 {
 	echo -e "\tNormalizing runtime tree to usr-merge"
 
-	mkdir -p usr usr/lib64
+	mkdir -p usr usr/lib64 usr/share
 	merge_root_into_usr bin usr/bin
 	merge_root_into_usr sbin usr/sbin
 	merge_root_into_usr libexec usr/libexec
+	merge_root_into_usr share usr/share
 
 	# ThinStation historically has one combined vendor/library namespace in
 	# lib64. Preserve that ABI while moving the canonical tree under /usr.
@@ -539,11 +540,9 @@ usrmerge_tree()
 
 	# Preserve ThinStation's historical aliases, but point them at the
 	# canonical usr-merged tree where applicable.
-	rm -f usr/icons usr/share usr/etc usr/local share
+	rm -f usr/icons usr/etc usr/local
 	ln -sf /etc usr/etc
-	ln -sf /usr/lib64 usr/share
-	ln -sf /usr/lib64 share
-	ln -sf /usr/lib64/icons usr/icons
+	ln -sf /usr/share/icons usr/icons
 	ln -sf /usr usr/local
 }
 
@@ -1375,14 +1374,14 @@ for po_file in ./packages/base/build/locale/*.po; do
 	[ -f "$po_file" ] || continue
 	locale_name="${po_file##*/}"
 	locale_name="${locale_name%.po}"
-	locale_dir="./tmp-tree/lib64/locale/$locale_name/LC_MESSAGES"
+	locale_dir="./tmp-tree/usr/share/locale/$locale_name/LC_MESSAGES"
 	mkdir -p "$locale_dir"
 	msgfmt --check "$po_file" -o "$locale_dir/thinstation.mo"
 done
 
-# Generate .desktop menu entries from /lib64/menu definition files
+# Generate .desktop menu entries from /usr/share/menu definition files
 echo -e "\nGenerating .desktop menu entries\n"
-if [ -e ./tmp-tree/lib64/menu ]; then
+if [ -e ./tmp-tree/usr/share/menu ]; then
 	/ts/bin/make-desktop-entries ./tmp-tree
 fi
 
@@ -1616,7 +1615,7 @@ if [ "$TIME_ZONE" == "" ]; then
 	TIME_ZONE=UTC
 fi
 echo -e "\nSetting Zone Info File to $TIME_ZONE"
-tzpath=./tmp-tree/lib64/zoneinfo/$TIME_ZONE
+tzpath=./tmp-tree/usr/share/zoneinfo/$TIME_ZONE
 if [ ! -d ${tzpath%/*} ]; then
 	mkdir -p ${tzpath%/*}
 fi
@@ -1777,10 +1776,6 @@ filesystem_fixups()
                         cp -a ./py-tmp/usr/lib64/* ./py-tmp/lib64/.
                         rm -rf ./py-tmp/usr/lib64
                 fi
-		if [ -e ./py-tmp/usr/share ]; then
-			cp -a ./py-tmp/usr/share/* ./py-tmp/lib64/.
-			rm -rf ./py-tmp/usr/share
-		fi
 		cp -a ./py-tmp/usr/* ./py-tmp/.
 		rm -rf ./py-tmp/usr
 		cp -a ./py-tmp/* ./tmp-tree/.
@@ -1830,13 +1825,13 @@ filesystem_fixups()
 #	done
 	if [ ! -e ./tmp-tree/etc/xserverrc ] ;then
 		echo -e "\tRemoving Extra Font Files"
-		rm -rf ./tmp-tree/lib64/X11/fonts
-		rm -rf ./tmp-tree/lib64/X11
+		rm -rf ./tmp-tree/usr/share/X11/fonts
+		rm -rf ./tmp-tree/usr/share/X11
 		rm -rf ./tmp-tree/lib64/keymaps
 		rm -f ./tmp-tree/etc/background.jpg
 	else
 		echo -e "\tRunning mkfontdir and mkfontscale"
-		for fontdir in `find ./tmp-tree/lib64/X11/fonts -mindepth 1 -type d`; do
+		for fontdir in `find ./tmp-tree/usr/share/X11/fonts -mindepth 1 -type d`; do
 			if [ ! -e $fontdir/fonts.scale ]; then
 				mkfontscale $fontdir
 			fi

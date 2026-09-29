@@ -2,4 +2,4 @@
 /lib64/kbd/
 !/lib64/kbd/keymaps/
 !/lib64/kbd/keymaps/**
-/lib64/X11/
+/usr/share/X11/

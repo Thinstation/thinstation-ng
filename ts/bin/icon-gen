@@ -6,8 +6,8 @@ else
 	theme=$2
 fi
 reslist="256 128 64 48 32 24 22 16"
-workdir=/build/packages/$1/lib64/icons/$theme
-pixdir=/build/packages/$1/lib64/pixmaps
+workdir=/build/packages/$1/usr/share/icons/$theme
+pixdir=/build/packages/$1/usr/share/pixmaps
 iconlist=`find $workdir/scalable -type f -name \*.svg`
 
 for source in $iconlist; do

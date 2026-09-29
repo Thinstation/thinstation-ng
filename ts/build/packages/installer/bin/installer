@@ -147,7 +147,7 @@ x_warn()
 readme()
 {
 	#zenity --title "Install to HD" --text-info --html --no-interaction --width 750 --height 480 --filename=/README.html
-	yad --picture --filename=/README.png --button="Abort:1" --button="Continue:0" --title="Install to HD" --window-icon=/lib64/icons/hicolor/scalable/apps/installer.svg --width 750 --height 480
+	yad --picture --filename=/README.png --button="Abort:1" --button="Continue:0" --title="Install to HD" --window-icon=/usr/share/icons/hicolor/scalable/apps/installer.svg --width 750 --height 480
 	if [ $? -gt 0 ] ; then
 		exit 1
 	fi

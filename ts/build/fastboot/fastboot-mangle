@@ -24,6 +24,7 @@ BIN_DIR=$USR_DIR/bin
 SBIN_DIR=$USR_DIR/sbin
 LIB_DIR=$USR_DIR/lib
 LIB64_DIR=$USR_DIR/lib64
+SHARE_DIR=$USR_DIR/share
 
 FASTLIB_NEED=$WORK_DIR/fastlibneed
 FASTLIB_KEEP=$WORK_DIR/fastlib.keep
@@ -35,7 +36,7 @@ mkdir -p "$WORK_DIR"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 echo "FASTBOOT=$FASTBOOT_MODE" >> etc/thinstation.env
-mkdir -p "$BIN_DIR" "$SBIN_DIR" "$LIB_DIR" "$LIB64_DIR"
+mkdir -p "$BIN_DIR" "$SBIN_DIR" "$LIB_DIR" "$LIB64_DIR" "$SHARE_DIR"
 cp --remove-destination /bin/mount "$BIN_DIR/."
 
 read_list()
@@ -246,24 +247,24 @@ prune_early_fonts()
 {
 	local path
 
-	if [ -d "$LIB64_DIR/fonts/dejavu-sans-fonts" ]; then
-		for path in "$LIB64_DIR"/fonts/dejavu-sans-fonts/*; do
+	if [ -d "$SHARE_DIR/fonts/dejavu-sans-fonts" ]; then
+		for path in "$SHARE_DIR"/fonts/dejavu-sans-fonts/*; do
 			[ -e "$path" ] || continue
 			[ "${path##*/}" = "DejaVuSans-Bold.ttf" ] && continue
 			rm -rf "$path"
 		done
 	fi
 
-	if [ -d "$LIB64_DIR/fonts" ]; then
-		for path in "$LIB64_DIR"/fonts/*; do
+	if [ -d "$SHARE_DIR/fonts" ]; then
+		for path in "$SHARE_DIR"/fonts/*; do
 			[ -e "$path" ] || continue
 			[ "${path##*/}" = "dejavu-sans-fonts" ] && continue
 			rm -rf "$path"
 		done
 	fi
 
-	if [ -d "$LIB64_DIR/fontconfig/conf.avail" ]; then
-		for path in "$LIB64_DIR"/fontconfig/conf.avail/*; do
+	if [ -d "$SHARE_DIR/fontconfig/conf.avail" ]; then
+		for path in "$SHARE_DIR"/fontconfig/conf.avail/*; do
 			[ -e "$path" ] || continue
 			[ "${path##*/}" = "57-dejavu-sans-fonts.conf" ] && continue
 			rm -rf "$path"
@@ -295,10 +296,25 @@ prune_early_libraries()
 	prune_early_fonts
 }
 
+prune_early_share()
+{
+	local item name
+	for item in "$SHARE_DIR"/*; do
+		[ -e "$item" ] || [ -L "$item" ] || continue
+		name=${item##*/}
+		is_listed "$name" "$FASTBOOT_DIR/lib-boot" && continue
+		case "$name" in
+			fonts|fontconfig) continue ;;
+		esac
+		rm -rf "$item"
+	done
+}
+
 prune_early_usr()
 {
 	prune_early_binaries
 	prune_early_libraries
+	prune_early_share
 
 	cd ..
 	echo -e "\tRe-Linking BusyBox\n"
