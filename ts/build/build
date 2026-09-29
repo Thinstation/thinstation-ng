@@ -2250,20 +2250,21 @@ wrap_efi()
 		done
 		sys_copy /usr/share/grub/unicode.pf2 $ESP/boot/grub2/fonts/unicode.pf2
 
-		# iPXE coexists with GRUB at the boot-image root. BIOS uses a
+		# Keep the iPXE loader set together under /boot/ipxe. BIOS uses a
 		# ThinStation build of undionly.kpxe with a generic embedded
 		# "chain autoexec.ipxe" bootstrap. UEFI remains Fedora-built and
 		# discovers autoexec.ipxe beside the loader.
+		mkdir -p $ESP/boot/ipxe
 		if [ -e /usr/share/ipxe/undionly.kpxe ] && [ -e /usr/share/ipxe/ipxe-snponly-x86_64.efi ]; then
-			sys_copy /usr/share/ipxe/undionly.kpxe $ESP/undionly.kpxe
-			sys_copy /usr/share/ipxe/ipxe-snponly-x86_64.efi $ESP/ipxe.efi
-			sys_copy boot-images/templates/ipxe/$ts_grubtheme/autoexec.ipxe $ESP/autoexec.ipxe
-			sed -i -e "s/\$KERNEL_PARAMETERS/$KERNEL_PARAMETERS/g" $ESP/autoexec.ipxe
+			sys_copy /usr/share/ipxe/undionly.kpxe $ESP/boot/ipxe/undionly.kpxe
+			sys_copy /usr/share/ipxe/ipxe-snponly-x86_64.efi $ESP/boot/ipxe/ipxe.efi
+			sys_copy boot-images/templates/ipxe/$ts_grubtheme/autoexec.ipxe $ESP/boot/ipxe/autoexec.ipxe
+			sed -i -e "s/\$KERNEL_PARAMETERS/$KERNEL_PARAMETERS/g" $ESP/boot/ipxe/autoexec.ipxe
 		fi
 		if [ -e /usr/share/ipxe/secureboot/snponly.efi ] && [ -e /usr/share/ipxe/secureboot/snponly-shim.efi ]; then
-			sys_copy /usr/share/ipxe/secureboot/snponly.efi $ESP/snponly.efi
-			sys_copy /usr/share/ipxe/secureboot/snponly-shim.efi $ESP/snponly-shim.efi
-			sys_copy /usr/share/ipxe/secureboot/shimx64.efi $ESP/shimx64.efi
+			sys_copy /usr/share/ipxe/secureboot/snponly.efi $ESP/boot/ipxe/snponly.efi
+			sys_copy /usr/share/ipxe/secureboot/snponly-shim.efi $ESP/boot/ipxe/snponly-shim.efi
+			sys_copy /usr/share/ipxe/secureboot/shimx64.efi $ESP/boot/ipxe/shimx64.efi
 		fi
 
 		if is_enabled $ts_earlymicrocode ; then

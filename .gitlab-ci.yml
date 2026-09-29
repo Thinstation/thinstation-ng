@@ -288,16 +288,16 @@ test-ipxe-image-layout:
     - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" ./setup-chroot -i
     - sudo ./setup-chroot -e cp -a /build/conf/tiny/* /build/.
     - sudo ./setup-chroot -e stb
-    - test -s ts/build/boot-images/grub/efi-source/undionly.kpxe
-    - test -s ts/build/boot-images/grub/efi-source/ipxe.efi
-    - test -s ts/build/boot-images/grub/efi-source/autoexec.ipxe
-    - test -s ts/build/boot-images/grub/efi-source/snponly.efi
-    - test -L ts/build/boot-images/grub/efi-source/snponly-shim.efi
-    - test -s ts/build/boot-images/grub/efi-source/shimx64.efi
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/undionly.kpxe
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/ipxe.efi
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/autoexec.ipxe
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/snponly.efi
+    - test -L ts/build/boot-images/grub/efi-source/boot/ipxe/snponly-shim.efi
+    - test -s ts/build/boot-images/grub/efi-source/boot/ipxe/shimx64.efi
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/BOOTX64.EFI
     - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/grubx64.efi
-    - grep -F 'boot_device=${boot_url}' ts/build/boot-images/grub/efi-source/autoexec.ipxe
-    - find ts/build/boot-images/grub/efi-source -maxdepth 2 -type f -o -type l | sort
+    - grep -F 'boot_device=${boot_url}' ts/build/boot-images/grub/efi-source/boot/ipxe/autoexec.ipxe
+    - find ts/build/boot-images/grub/efi-source -maxdepth 3 \( -type f -o -type l \) | sort
   after_script:
     - sudo umount build-ipxe-image-layout || true
     - sudo rm -rf build-ipxe-image-layout
