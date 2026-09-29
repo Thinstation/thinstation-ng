@@ -4,7 +4,9 @@ create_wind()
 {
 	printf "\n\tCreating fast clean cache for $i"
 	echo "#`md5sum .dna`" > $cache/wind_cache/$i.turbo
-        update -c -d $i >> $cache/wind_cache/$i.turbo
+        update -c -d $i |
+        sed -e 's/^rm /rm -f /' |
+        sort -u >> $cache/wind_cache/$i.turbo
         . $cache/wind_cache/$i.turbo
 	errata=true
 }
