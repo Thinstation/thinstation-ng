@@ -354,21 +354,9 @@ test-ipxe-sibling-config:
         mkdir -p "$work/esp/EFI/BOOT"
         cp "$work/tftp/nested/ipxe.efi" "$work/esp/EFI/BOOT/BOOTX64.EFI"
 
-        cat > "$work/esp/EFI/BOOT/autoexec.ipxe" <<'EOF'
-        #!ipxe
-        chain thinstation.ipxe || exit 1
-        EOF
-
-        cat > "$work/esp/EFI/BOOT/thinstation.ipxe" <<'EOF'
-        #!ipxe
-        dhcp
-        chain tftp://10.0.2.2/nested/uefi-success.ipxe || exit 1
-        EOF
-
-        cat > "$work/tftp/nested/uefi-success.ipxe" <<'EOF'
-        #!ipxe
-        exit
-        EOF
+        printf '%s\n' '#!ipxe' 'chain thinstation.ipxe || exit 1' > "$work/esp/EFI/BOOT/autoexec.ipxe"
+        printf '%s\n' '#!ipxe' 'dhcp' 'chain tftp://10.0.2.2/nested/uefi-success.ipxe || exit 1' > "$work/esp/EFI/BOOT/thinstation.ipxe"
+        printf '%s\n' '#!ipxe' 'exit' > "$work/tftp/nested/uefi-success.ipxe"
 
         timeout 25 qemu-system-x86_64 \
           -accel kvm -machine q35 -m 512 -smp 1 \
