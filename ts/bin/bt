@@ -162,8 +162,14 @@ set boot_url http://${next-server}:$IPXE_HTTP_PORT
 set BOOT_IMAGE /boot/vmlinuz
 kernel ${boot_url}${BOOT_IMAGE} BOOT_IMAGE=${BOOT_IMAGE} selinux=0 console=tty1 boot_device=${boot_url}
 initrd ${boot_url}/boot/initrd
-boot
 EOF
+        if [ "$1" = "net-efi-secure" ]; then
+                # Use Fedora's signed shim as iPXE's verification provider.
+                # The Fedora-signed kernel is then accepted while the initrd
+                # remains ordinary data consumed by that trusted kernel.
+                echo "shim ${boot_url}/EFI/BOOT/BOOTX64.EFI" >> "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe"
+        fi
+        echo "boot" >> "$IPXE_BOOT_ROOT/boot/ipxe/autoexec.ipxe"
 
         python3 -m http.server "$IPXE_HTTP_PORT" --bind 0.0.0.0 \
                 --directory /build/boot-images/grub/efi-source \
