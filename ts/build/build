@@ -520,6 +520,7 @@ usrmerge_tree()
 	mkdir -p usr usr/lib64
 	merge_root_into_usr bin usr/bin
 	merge_root_into_usr sbin usr/sbin
+	merge_root_into_usr libexec usr/libexec
 
 	# ThinStation historically has one combined vendor/library namespace in
 	# lib64. Preserve that ABI while moving the canonical tree under /usr.
@@ -538,14 +539,13 @@ usrmerge_tree()
 
 	# Preserve ThinStation's historical aliases, but point them at the
 	# canonical usr-merged tree where applicable.
-	rm -f usr/icons usr/X11R7 usr/share usr/etc usr/local share usr/libexec
-	ln -sf /usr/libexec usr/libexec
+	rm -f usr/icons usr/X11R7 usr/share usr/etc usr/local share
 	ln -sf /etc usr/etc
 	ln -sf /usr/lib64 usr/share
 	ln -sf /usr/lib64 share
 	ln -sf / usr/X11R7
 	ln -sf /usr/lib64/icons usr/icons
-	ln -sf / usr/local
+	ln -sf /usr usr/local
 }
 
 make_initrd()

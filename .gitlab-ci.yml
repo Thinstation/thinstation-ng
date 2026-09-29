@@ -358,6 +358,9 @@ test-usr-merge-prototype:
           test "$(readlink ts/build/tmp-tree/lib)" = "usr/lib64"
           test "$(readlink ts/build/tmp-tree/lib64)" = "usr/lib64"
           test "$(readlink ts/build/tmp-tree/usr/lib)" = "lib64"
+          test "$(readlink ts/build/tmp-tree/libexec)" = "usr/libexec"
+          test -d ts/build/tmp-tree/usr/libexec
+          test "$(readlink ts/build/tmp-tree/usr/local)" = "/usr"
           test -x ts/build/tmp-tree/usr/bin/systemctl
           test -d ts/build/tmp-tree/usr/lib64
       }
