@@ -354,18 +354,26 @@ test-usr-merge-prototype:
       check_layout() {
           test "$(readlink ts/build/tmp-tree/bin)" = "usr/bin"
           test "$(readlink ts/build/tmp-tree/sbin)" = "usr/sbin"
-          test "$(readlink ts/build/tmp-tree/lib)" = "usr/lib"
+          test "$(readlink ts/build/tmp-tree/lib)" = "usr/lib64"
           test "$(readlink ts/build/tmp-tree/lib64)" = "usr/lib64"
+          test "$(readlink ts/build/tmp-tree/usr/lib)" = "lib64"
           test -x ts/build/tmp-tree/usr/bin/systemctl
           test -d ts/build/tmp-tree/usr/lib64
       }
 
       boot_and_check() {
           mode="$1"
+          expect_squash="$2"
           serial="/build/usr-merge-${mode}.serial"
           rm -f "ts/build/usr-merge-${mode}.serial" ts/build/bt-ipxe-http.log
-          sudo env BT_SERIAL_FILE="$serial" timeout 70 ./setup-chroot -e ts/bin/bt net-efi --remote || true
-          grep -E 'Decompressing vendor tree directly to /|Mounting (copied )?root-relative vendor tree and binding /usr' "ts/build/usr-merge-${mode}.serial"
+          sudo sed -i 's/console=tty1/console=ttyS0 console=tty1/' ts/build/boot-images/grub/efi-source/boot/ipxe/autoexec.ipxe
+          sudo env BT_SERIAL_FILE="$serial" timeout 55 ./setup-chroot -e ts/bin/bt net-efi --remote || true
+          grep -F 'login:' "ts/build/usr-merge-${mode}.serial"
+          if [[ "$expect_squash" == "yes" ]]; then
+              grep -F 'GET /boot/lib.squash' ts/build/bt-ipxe-http.log
+          else
+              ! grep -F 'GET /boot/lib.squash' ts/build/bt-ipxe-http.log
+          fi
       }
 
       echo "=== lotsofmem ==="
@@ -376,14 +384,14 @@ test-usr-merge-prototype:
       test -x ts/build/usr-squash-check/usr/bin/systemctl
       test -d ts/build/usr-squash-check/usr/lib64
       cp ts/build/build.log ts/build/usr-merge-lotsofmem-build.log
-      boot_and_check lotsofmem
+      boot_and_check lotsofmem yes
 
       echo "=== mounted fastboot ==="
       sudo sed -i 's/^param fastboot[[:space:]].*/param fastboot       true/' ts/build/build.conf
       sudo ./setup-chroot -e stb
       check_layout
       cp ts/build/build.log ts/build/usr-merge-fastboot-build.log
-      boot_and_check fastboot
+      boot_and_check fastboot yes
 
       echo "=== non-fastboot ==="
       sudo sed -i 's/^param fastboot[[:space:]].*/param fastboot       false/' ts/build/build.conf
@@ -391,6 +399,7 @@ test-usr-merge-prototype:
       check_layout
       test ! -e ts/build/boot-images/initrd/lib.squash
       cp ts/build/build.log ts/build/usr-merge-nofastboot-build.log
+      boot_and_check nofastboot no
   artifacts:
     when: always
     paths:
