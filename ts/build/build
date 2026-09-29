@@ -1795,10 +1795,10 @@ filesystem_fixups()
 		sed -i "s/\$XTERM_CMD/$XTERM_CMD/g" ./tmp-tree/etc/icewm/toolbar
 		sed -i "s/\$XTERM_CMD/$XTERM_CMD/g" ./tmp-tree/etc/icewm/keys
 	fi
-	if [ -e ./tmp-tree/lib64/gconv ] ; then
+	if [ -e ./tmp-tree/usr/lib64/gconv ] ; then
 		echo -e "\tBuilding Charmap Cache"
-		for i in `ls ./tmp-tree/lib64/gconv --color=never |cut -d . -f1`; do
-			cat /usr/lib64/gconv/gconv-modules|grep -e "$i" >>./tmp-tree/lib64/gconv/gconv-modules
+		for i in `ls ./tmp-tree/usr/lib64/gconv --color=never |cut -d . -f1`; do
+			cat /usr/lib64/gconv/gconv-modules|grep -e "$i" >>./tmp-tree/usr/lib64/gconv/gconv-modules
 		done
         cp -H `which iconvconfig` ./tmp-tree/bin/.
         chroot ./tmp-tree /bin/iconvconfig
