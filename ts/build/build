@@ -517,11 +517,24 @@ usrmerge_tree()
 {
 	echo -e "\tNormalizing runtime tree to usr-merge"
 
-	mkdir -p usr
+	mkdir -p usr usr/lib64
 	merge_root_into_usr bin usr/bin
 	merge_root_into_usr sbin usr/sbin
-	merge_root_into_usr lib usr/lib
+
+	# ThinStation historically has one combined vendor/library namespace in
+	# lib64. Preserve that ABI while moving the canonical tree under /usr.
+	if [ -d usr/lib ] && [ ! -L usr/lib ]; then
+		cp -a --remove-destination usr/lib/. usr/lib64/
+		rm -rf usr/lib
+	else
+		rm -f usr/lib
+	fi
+	merge_root_into_usr lib usr/lib64
 	merge_root_into_usr lib64 usr/lib64
+	rm -f lib
+	ln -s usr/lib64 lib
+	rm -f usr/lib
+	ln -s lib64 usr/lib
 
 	# Preserve ThinStation's historical aliases, but point them at the
 	# canonical usr-merged tree where applicable.
