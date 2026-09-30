@@ -1,4 +1,4 @@
-#8f4f36585cb3172516d5c4472aead9c6  .dna
+#abf3bc54d313d682e72e7410c7e1122c  .dna
 
-mkdir -p /ts/build/packages/xorg7-vmware/lib64/xorg/modules/drivers
-ln /usr/lib64/xorg/modules/drivers/vmware_drv.so /ts/build/packages/xorg7-vmware/lib64/xorg/modules/drivers/vmware_drv.so
+mkdir -p /ts/build/packages/xorg7-vmware/usr/lib64/xorg/modules/drivers
+ln /usr/lib64/xorg/modules/drivers/vmware_drv.so /ts/build/packages/xorg7-vmware/usr/lib64/xorg/modules/drivers/vmware_drv.so

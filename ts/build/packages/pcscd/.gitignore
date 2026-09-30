@@ -1,5 +1,5 @@
 /lib64/
 /etc/
-/bin/
-/sbin/
+/usr/bin/
+/usr/sbin/
 /build/scripts/

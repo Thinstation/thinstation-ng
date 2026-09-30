@@ -1,26 +1,192 @@
 #!/bin/bash
-set -x
+[ "${BT_DEBUG:-0}" = "1" ] && set -x
 start=$PWD
 self="$0"
 self_path="$(dirname "$0")/../.."
 cd "$self_path"
 #set -e
 
+if [ -n "${BT_STATE_DIR:-}" ]; then
+        :
+elif [ -d /build ] && [ -w /build ]; then
+        BT_STATE_DIR=/build/bt-vms
+elif [ -d "$self_path/ts/build" ] && [ -w "$self_path/ts/build" ]; then
+        BT_STATE_DIR="$self_path/ts/build/bt-vms"
+else
+        BT_STATE_DIR="${TMPDIR:-/tmp}/bt-vms-${UID:-0}"
+fi
+BT_NAME="${BT_NAME:-}"
+BT_MEMORY="${BT_MEMORY:-8192}"
+BT_CPUS="${BT_CPUS:-}"
+BT_DETACH=false
+REMOTE_ACCESS=false
+BT_QEMU_EXTRA=()
+
+usage()
+{
+        cat <<'EOF'
+Usage:
+  bt MODE [options]
+  bt list
+  bt status NAME
+  bt attach NAME
+  bt monitor NAME
+  bt ssh NAME [ssh args...]
+  bt stop NAME
+
+Modes:
+  hd  cd  net
+  hd-efi  cd-efi  net-efi
+  hd-efi-secure  cd-efi-secure  net-efi-secure
+
+Options:
+  -m, --memory SIZE       Guest RAM (default 8192; QEMU values such as 4G work)
+  -c, --cpus N           Guest vCPU count (default half of host CPUs)
+  -n, --name NAME        Name VM and publish reconnectable state
+      --headless          Disable display and expose serial/monitor/SSH
+      --remote            Alias for --headless
+  -d, --detach            Background VM; implies --headless and auto-names if needed
+      --serial-port PORT  Serial TCP port
+      --monitor-port PORT QEMU monitor TCP port
+      --ssh-port PORT     Host-forwarded guest SSH port
+      --serial-file PATH  Write serial output to a file instead of TCP
+      --pcap PATH         Capture network traffic
+      --qemu-arg ARG      Append one QEMU argument; may be repeated
+      --debug             Trace bt itself
+  -h, --help              Show help
+
+Examples:
+  bt net-efi
+  bt net-efi-secure --memory 4G --cpus 2
+  bt hd-efi --detach --name smoke
+  bt attach smoke
+  bt monitor smoke
+  bt ssh smoke
+  bt stop smoke
+EOF
+}
+
+state_path() { printf '%s/%s' "$BT_STATE_DIR" "$1"; }
+state_get() { local f="$(state_path "$1")/$2"; [ -r "$f" ] && cat "$f"; }
+state_put() { [ -n "${BT_STATE_PATH:-}" ] && printf '%s\n' "$2" > "$BT_STATE_PATH/$1"; }
+pid_running() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+
+list_vms()
+{
+        local d n p m st
+        mkdir -p "$BT_STATE_DIR"
+        printf '%-24s %-10s %-8s %s\n' NAME STATUS PID MODE
+        for d in "$BT_STATE_DIR"/*; do
+                [ -d "$d" ] || continue
+                n=${d##*/}; p=$(cat "$d/pid" 2>/dev/null || true); m=$(cat "$d/mode" 2>/dev/null || true)
+                st=stopped; pid_running "$p" && st=running
+                printf '%-24s %-10s %-8s %s\n' "$n" "$st" "${p:--}" "$m"
+        done
+}
+
+show_status()
+{
+        local n=$1 p k v
+        [ -d "$(state_path "$n")" ] || { echo "Unknown bt VM: $n" >&2; exit 1; }
+        p=$(state_get "$n" pid)
+        echo "name: $n"; if pid_running "$p"; then echo "status: running"; else echo "status: stopped"; fi
+        for k in mode pid memory cpus serial monitor ssh serial_file pcap; do
+                v=$(state_get "$n" "$k"); [ -n "$v" ] && echo "$k: $v"
+        done
+}
+
+attach_serial()
+{
+        local n=$1 p f
+        f=$(state_get "$n" serial_file)
+        if [ -n "$f" ]; then echo "Following serial log: $f"; exec tail -n +1 -f "$f"; fi
+        p=$(state_get "$n" serial); [ -n "$p" ] || { echo "No serial endpoint for $n" >&2; exit 1; }
+        echo "Serial 127.0.0.1:$p (Ctrl-C detaches)"
+        command -v socat >/dev/null 2>&1 && exec socat STDIO,raw,echo=0 TCP:127.0.0.1:"$p"
+        exec nc 127.0.0.1 "$p"
+}
+
+attach_monitor()
+{
+        local n=$1 p
+        p=$(state_get "$n" monitor); [ -n "$p" ] || { echo "No monitor endpoint for $n" >&2; exit 1; }
+        echo "QEMU monitor 127.0.0.1:$p (Ctrl-C detaches)"
+        command -v socat >/dev/null 2>&1 && exec socat STDIO,raw,echo=0 TCP:127.0.0.1:"$p"
+        exec nc 127.0.0.1 "$p"
+}
+
+ssh_vm()
+{
+        local n=$1 p; shift
+        p=$(state_get "$n" ssh); [ -n "$p" ] || { echo "No SSH forward for $n" >&2; exit 1; }
+        exec ssh -p "$p" "$@" root@127.0.0.1
+}
+
+stop_vm()
+{
+        local n=$1 p helper vars
+        p=$(state_get "$n" pid); [ -n "$p" ] || { echo "No PID recorded for $n" >&2; exit 1; }
+        if pid_running "$p"; then
+                kill "$p"
+                for _ in 1 2 3 4 5; do pid_running "$p" || break; sleep 1; done
+                pid_running "$p" && kill -9 "$p"
+        fi
+        helper=$(state_get "$n" http_pid)
+        pid_running "$helper" && kill "$helper" 2>/dev/null || true
+        vars=$(state_get "$n" secboot_vars)
+        [ -n "$vars" ] && rm -f "$vars"
+        echo "$n stopped"
+}
+
+port_free() { ! ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1$"; }
+next_free_port() { local p=$1; while ! port_free "$p"; do p=$((p+1)); done; echo "$p"; }
+
+case "${1:-}" in
+        -h|--help|help|'') usage; exit 0 ;;
+        list) list_vms; exit 0 ;;
+        status) [ -n "${2:-}" ] || { usage >&2; exit 2; }; show_status "$2"; exit 0 ;;
+        attach) [ -n "${2:-}" ] || { usage >&2; exit 2; }; attach_serial "$2"; exit 0 ;;
+        monitor) [ -n "${2:-}" ] || { usage >&2; exit 2; }; attach_monitor "$2"; exit 0 ;;
+        ssh) [ -n "${2:-}" ] || { usage >&2; exit 2; }; n=$2; shift 2; ssh_vm "$n" "$@" ;;
+        stop) [ -n "${2:-}" ] || { usage >&2; exit 2; }; stop_vm "$2"; exit 0 ;;
+esac
+
+MODE=$1
+shift
+while [ $# -gt 0 ]; do
+        case "$1" in
+                -m|--memory) BT_MEMORY=$2; shift 2 ;;
+                -c|--cpus) BT_CPUS=$2; shift 2 ;;
+                -n|--name) BT_NAME=$2; shift 2 ;;
+                --headless|--remote|--access) REMOTE_ACCESS=true; shift ;;
+                -d|--detach) BT_DETACH=true; REMOTE_ACCESS=true; shift ;;
+                --serial-port) BT_SERIAL_PORT=$2; shift 2 ;;
+                --monitor-port) BT_MONITOR_PORT=$2; shift 2 ;;
+                --ssh-port) BT_SSH_PORT=$2; shift 2 ;;
+                --serial-file) BT_SERIAL_FILE=$2; shift 2 ;;
+                --pcap) BT_PCAP_FILE=$2; shift 2 ;;
+                --qemu-arg) BT_QEMU_EXTRA+=("$2"); shift 2 ;;
+                --debug) set -x; shift ;;
+                -h|--help) usage; exit 0 ;;
+                *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+        esac
+done
+
+if $BT_DETACH && [ -z "$BT_NAME" ]; then
+        BT_NAME="${MODE}-$(date +%Y%m%d-%H%M%S)"
+fi
+
 setup_qemu()
 {
-	REMOTE_ACCESS=false
-	for arg in "$@"; do
-		case "$arg" in
-			--remote|--access) REMOTE_ACCESS=true ;;
-		esac
-	done
-
 	pipewirecontext="`find /run/user -name pipewire-0 -printf '%h\n'`"
 	if [ -n "$pipewirecontext" ]; then
 		export XDG_RUNTIME_DIR="$pipewirecontext"
 	fi
-        procs=`nproc`
-        let procs=procs/2
+        procs=${BT_CPUS:-$(nproc)}
+        if [ -z "${BT_CPUS:-}" ]; then
+                let procs=procs/2
+                [ "$procs" -lt 1 ] && procs=1
+        fi
         HD=thinstation.img
         SHARED_FOLDER="-virtfs local,path=/,mount_tag=host0,security_model=mapped,id=host0,multidevs=remap"
         HDD="-drive file=$HD,index=0,media=disk,format=raw"
@@ -34,7 +200,7 @@ setup_qemu()
 #       SOUND="-device AC97"
 	SOUND="-audiodev pipewire,id=pw -device AC97,audiodev=pw"
         CPU="-cpu host -machine q35 -smp cores=$procs,threads=1,sockets=1"
-        MEMORY="-m 8192"
+        MEMORY="-m $BT_MEMORY"
         # Modern edk2 NetworkPkg requires EFI_RNG_PROTOCOL for DHCP/PXE
         # after the CVE-2023-45237 hardening.  Expose a virtio RNG device.
         RNG="-object rng-random,filename=/dev/urandom,id=RNG -device virtio-rng-pci,rng=RNG"
@@ -50,31 +216,23 @@ setup_qemu()
 #       QEMU=qemu-system-i386
         QEMU=qemu-system-x86_64
 
+	NET_HOSTFWD=""
 	if $REMOTE_ACCESS; then
-		# Headless mode for automated diagnostics.
 		SOUND=""
 		VGA="-display none"
-		SERIAL_PORT="${BT_SERIAL_PORT:-4444}"
-		MONITOR_PORT="${BT_MONITOR_PORT:-4445}"
-		SSH_PORT="${BT_SSH_PORT:-2222}"
+		SERIAL_PORT="${BT_SERIAL_PORT:-$(next_free_port 4444)}"
+		MONITOR_PORT="${BT_MONITOR_PORT:-$(next_free_port 4445)}"
+		SSH_PORT="${BT_SSH_PORT:-$(next_free_port 2222)}"
 		SERIAL_WAIT="${BT_SERIAL_WAIT:-off}"
 		if [ -n "${BT_SERIAL_FILE:-}" ]; then
-			CONSOLE="-serial file:$BT_SERIAL_FILE -monitor none"
+			CONSOLE="-serial file:$BT_SERIAL_FILE -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
 		else
 			CONSOLE="-serial tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=$SERIAL_WAIT -monitor tcp:127.0.0.1:$MONITOR_PORT,server=on,wait=off"
 		fi
 		case "$1" in
-			net|net-efi|net-efi-secure) NETWORK="" ;;
+			net|net-efi|net-efi-secure) NETWORK=""; NET_HOSTFWD=",hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22" ;;
 			*) NETWORK="-netdev user,id=bt-net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 -device virtio-net-pci,netdev=bt-net0" ;;
 		esac
-		echo "Remote access enabled:"
-		if [ -n "${BT_SERIAL_FILE:-}" ]; then
-			echo "  serial:  $BT_SERIAL_FILE"
-		else
-			echo "  serial:  127.0.0.1:$SERIAL_PORT"
-			echo "  monitor: 127.0.0.1:$MONITOR_PORT"
-		fi
-		[ -n "$NETWORK" ] && echo "  ssh:     127.0.0.1:$SSH_PORT -> guest:22"
 	else
 		CONSOLE="-serial stdio"
 	fi
@@ -84,6 +242,46 @@ setup_qemu()
         PCAP=""
         if [ -n "${BT_PCAP_FILE:-}" ]; then
                 PCAP="-object filter-dump,id=bt-dump,netdev=n1,file=$BT_PCAP_FILE"
+        fi
+        BT_STATE_PATH=""
+        if [ -n "$BT_NAME" ]; then
+                BT_STATE_PATH="$BT_STATE_DIR/$BT_NAME"
+                mkdir -p "$BT_STATE_PATH"
+                state_put mode "$MODE"
+                state_put memory "$BT_MEMORY"
+                state_put cpus "$procs"
+                $REMOTE_ACCESS && state_put monitor "$MONITOR_PORT"
+                $REMOTE_ACCESS && state_put ssh "$SSH_PORT"
+                if [ -n "${BT_SERIAL_FILE:-}" ]; then state_put serial_file "$BT_SERIAL_FILE"; elif $REMOTE_ACCESS; then state_put serial "$SERIAL_PORT"; fi
+                [ -n "${BT_PCAP_FILE:-}" ] && state_put pcap "$BT_PCAP_FILE"
+        fi
+}
+
+run_qemu()
+{
+        local pidfile="" rc
+        if [ -n "${BT_STATE_PATH:-}" ]; then
+                pidfile="$BT_STATE_PATH/pid"
+                rm -f "$pidfile"
+                state_put command "$QEMU $*"
+        fi
+        if $BT_DETACH; then
+                [ -n "$pidfile" ] || { echo "Detached bt VMs require a name" >&2; return 2; }
+                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}" -daemonize -pidfile "$pidfile"
+                rc=$?
+                if [ "$rc" -eq 0 ]; then
+                        echo "Started $BT_NAME (PID $(cat "$pidfile" 2>/dev/null))"
+                        show_status "$BT_NAME"
+                        echo "Attach:  bt attach $BT_NAME"
+                        echo "Monitor: bt monitor $BT_NAME"
+                        echo "Stop:    bt stop $BT_NAME"
+                fi
+                return "$rc"
+        fi
+        if [ -n "$pidfile" ]; then
+                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}" -pidfile "$pidfile"
+        else
+                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}"
         fi
 }
 
@@ -160,10 +358,12 @@ setup_ipxe_netboot()
                 cat /build/bt-ipxe-http.log >&2 || true
                 exit 1
         }
+        [ -n "${BT_STATE_PATH:-}" ] && state_put http_pid "$IPXE_HTTP_PID"
 }
 
 cleanup_ipxe_netboot()
 {
+        $BT_DETACH && return 0
         if [ -n "${IPXE_HTTP_PID:-}" ]; then
                 kill "$IPXE_HTTP_PID" 2>/dev/null || true
                 wait "$IPXE_HTTP_PID" 2>/dev/null || true
@@ -173,6 +373,10 @@ cleanup_ipxe_netboot()
 cleanup_secure_ovmf()
 {
         if [ -n "${SECBOOT_VARS:-}" ]; then
+                if $BT_DETACH; then
+                        [ -n "${BT_STATE_PATH:-}" ] && state_put secboot_vars "$SECBOOT_VARS"
+                        return 0
+                fi
                 rm -f "$SECBOOT_VARS"
         fi
 }
@@ -191,6 +395,7 @@ setup_secure_ovmf()
         test -n "$SECBOOT_VARS_SOURCE" -a -f "$SECBOOT_VARS_SOURCE" || { echo "Secure Boot OVMF vars not found" >&2; exit 1; }
         SECBOOT_VARS="$(mktemp /build/bt-secboot-vars.XXXXXX.fd)"
         cp "$SECBOOT_VARS_SOURCE" "$SECBOOT_VARS"
+        [ -n "${BT_STATE_PATH:-}" ] && state_put secboot_vars "$SECBOOT_VARS"
         SECBOOT_EFI="-drive if=pflash,format=raw,readonly=on,file=$SECBOOT_CODE -drive if=pflash,format=raw,file=$SECBOOT_VARS"
 }
 
@@ -218,54 +423,54 @@ wrap_efi()
         mkgptdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o /build/boot-images/grub/efi-source -l thinstation.img:10g
 }
 
-setup_qemu $@
+setup_qemu "$MODE"
 
-case $1 in
+case "$MODE" in
         hd)
 		wrap_bios && \
-                $QEMU $STANDARD_MACHINE $HDD --boot c
+                run_qemu $STANDARD_MACHINE $HDD --boot c
                 echo "Exit code $?"
 	;;
 	hd-efi)
 		wrap_efi && \
-		$QEMU $STANDARD_MACHINE $EFI $HDD --boot c
+		run_qemu $STANDARD_MACHINE $EFI $HDD --boot c
 		echo "Exit code $?"
 	;;
 	hd-efi-secure)
                 setup_secure_ovmf
                 trap cleanup_secure_ovmf EXIT INT TERM
 		wrap_efi && \
-                $QEMU $STANDARD_MACHINE $SECBOOT_EFI $HDD --boot c
+                run_qemu $STANDARD_MACHINE $SECBOOT_EFI $HDD --boot c
                 echo "Exit code $?"
         ;;
 	net)
                 setup_ipxe_netboot net
                 trap cleanup_ipxe_netboot EXIT INT TERM
-		$QEMU $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP
+		run_qemu $NET_MACHINE -boot n -device e1000,netdev=n1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE$NET_HOSTFWD $PCAP
 		echo "Exit code $?"
 	;;
         net-efi)
                 setup_ipxe_netboot net-efi
                 trap cleanup_ipxe_netboot EXIT INT TERM
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $EFI
+                run_qemu $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE$NET_HOSTFWD $PCAP $EFI
 		echo "Exit code $?"
 	;;
         net-efi-secure)
                 setup_ipxe_netboot net-efi-secure
                 setup_secure_ovmf
                 trap 'cleanup_ipxe_netboot; cleanup_secure_ovmf' EXIT INT TERM
-                $QEMU $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE $PCAP $SECBOOT_EFI
+                run_qemu $NET_MACHINE -boot n -device virtio-net-pci,netdev=n1,bootindex=1 -netdev user,id=n1,tftp=$IPXE_BOOT_ROOT,bootfile=$IPXE_BOOTFILE$NET_HOSTFWD $PCAP $SECBOOT_EFI
                 echo "Exit code $?"
         ;;
         cd)
 		confirm_iso grub && \
-                $QEMU $STANDARD_MACHINE $CDROM --boot d
+                run_qemu $STANDARD_MACHINE $CDROM --boot d
                 echo "Exit code $?"
 	;;
 	cd-efi)
 		confirm_iso grub && \
 		confirm_usb_hd && \
-		$QEMU $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
+		run_qemu $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
 		echo "Exit code $?"
         ;;
 	cd-efi-secure)
@@ -273,32 +478,38 @@ case $1 in
                 trap cleanup_secure_ovmf EXIT INT TERM
 		confirm_iso grub && \
 		confirm_usb_hd && \
-                $QEMU $STANDARD_MACHINE $CDROM $USBHD $SECBOOT_EFI --boot d
+                run_qemu $STANDARD_MACHINE $CDROM $USBHD $SECBOOT_EFI --boot d
                 echo "Exit code $?"
         ;;
 	image)
                 confirm_hd && \
                 confirm_iso grub && \
-                $QEMU $STANDARD_MACHINE $HDD $CDROM --boot d,menu=on
+                run_qemu $STANDARD_MACHINE $HDD $CDROM --boot d,menu=on
                 echo "Exit code $?"
 	;;
 	image-efi)
 		confirm_hd && \
 		confirm_iso grub && \
-		$QEMU $STANDARD_MACHINE $HDD $CDROM $EFI --boot c,menu=on
+		run_qemu $STANDARD_MACHINE $HDD $CDROM $EFI --boot c,menu=on
 		echo "Exit code $?"
 	;;
 	cd-image)
 		confirm_iso grub
 		HDD="-drive file=$ISO,index=0,media=disk,format=raw"
-		$QEMU $STANDARD_MACHINE $HDD --boot c,menu=on
+		run_qemu $STANDARD_MACHINE $HDD --boot c,menu=on
 		echo "Exit code $?"
 	;;
 	cd-image-efi)
 		confirm_iso grub
 		HDD="-drive file=$ISO,index=0,media=disk,format=raw"
-		$QEMU $STANDARD_MACHINE $HDD $EFI --boot c,menu=on
+		run_qemu $STANDARD_MACHINE $HDD $EFI --boot c,menu=on
 		echo "Exit code $?"
 	;;
+        *)
+                echo "Unknown bt mode: $MODE" >&2
+                usage >&2
+                exit 2
+        ;;
 esac
 cd "$start"
+

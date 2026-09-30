@@ -361,7 +361,7 @@ fi
 log "Starting Docker and loading ISO images"
 systemctl start containerd
 systemctl start docker
-/sbin/docker-iso-update
+/usr/bin/docker-iso-update
 
 log "Starting compose stacks"
 shopt -s nullglob

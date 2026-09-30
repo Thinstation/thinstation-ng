@@ -1,2 +1,2 @@
 ,dependencies,0,0,,0,,,,,,,,,
-xorg-x11-drv-vmware,vmware_drv.so,0,0,lib64/xorg/modules/drivers,1,,,,,,,,,
+xorg-x11-drv-vmware,vmware_drv.so,0,0,usr/lib64/xorg/modules/drivers,1,,,,,,,,,

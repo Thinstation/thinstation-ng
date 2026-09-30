@@ -7,7 +7,7 @@ export DROP_DIRS="lib64/rpm"
 export CREATE_EMPTY_DIRS=""
 repackage -e
 
-ln -sf org.fedoraproject.FirewallD1.server.policy.choice /build/packages/firewalld/lib64/polkit-1/actions/org.fedoraproject.FirewallD1.policy
+ln -sf org.fedoraproject.FirewallD1.server.policy.choice /build/packages/firewalld/usr/share/polkit-1/actions/org.fedoraproject.FirewallD1.policy
 returnval=$?
 
 exit $returnval

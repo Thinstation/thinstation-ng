@@ -1,10 +1,10 @@
-#acb5decbcf112d5b3e654361c1baddb0  .dna
+#1d579d7a71e4bbddf14f4e083b301050  .dna
 
-mkdir -p /ts/build/packages/xorg7-intel/lib64
-mkdir -p /ts/build/packages/xorg7-intel/lib64/vulkan/icd.d
-mkdir -p /ts/build/packages/xorg7-intel/lib64/xorg/modules/drivers
-ln /usr/lib64/libvulkan_intel.so /ts/build/packages/xorg7-intel/lib64/libvulkan_intel.so
-ln /usr/lib64/libvulkan_intel_hasvk.so /ts/build/packages/xorg7-intel/lib64/libvulkan_intel_hasvk.so
-ln /usr/lib64/xorg/modules/drivers/intel_drv.so /ts/build/packages/xorg7-intel/lib64/xorg/modules/drivers/intel_drv.so
-ln /usr/share/vulkan/icd.d/intel_hasvk_icd.x86_64.json /ts/build/packages/xorg7-intel/lib64/vulkan/icd.d/intel_hasvk_icd.x86_64.json
-ln /usr/share/vulkan/icd.d/intel_icd.x86_64.json /ts/build/packages/xorg7-intel/lib64/vulkan/icd.d/intel_icd.x86_64.json
+mkdir -p /ts/build/packages/xorg7-intel/usr/lib64
+mkdir -p /ts/build/packages/xorg7-intel/usr/lib64/xorg/modules/drivers
+mkdir -p /ts/build/packages/xorg7-intel/usr/share/vulkan/icd.d
+ln /usr/lib64/libvulkan_intel.so /ts/build/packages/xorg7-intel/usr/lib64/libvulkan_intel.so
+ln /usr/lib64/libvulkan_intel_hasvk.so /ts/build/packages/xorg7-intel/usr/lib64/libvulkan_intel_hasvk.so
+ln /usr/lib64/xorg/modules/drivers/intel_drv.so /ts/build/packages/xorg7-intel/usr/lib64/xorg/modules/drivers/intel_drv.so
+ln /usr/share/vulkan/icd.d/intel_hasvk_icd.x86_64.json /ts/build/packages/xorg7-intel/usr/share/vulkan/icd.d/intel_hasvk_icd.x86_64.json
+ln /usr/share/vulkan/icd.d/intel_icd.x86_64.json /ts/build/packages/xorg7-intel/usr/share/vulkan/icd.d/intel_icd.x86_64.json

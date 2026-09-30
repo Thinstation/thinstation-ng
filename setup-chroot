@@ -13,7 +13,7 @@ state_checks()
 	fi
 	export TARGET_ARCH
 	validate_cross_arch
-	test ! -d var/cache/dnf && ts/bin/install_chroot
+	test ! -x bin/bash && ts/bin/install_chroot
 }
 
 help()

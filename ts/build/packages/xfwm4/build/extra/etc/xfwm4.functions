@@ -95,7 +95,7 @@ xfconf_settings()
 	else
 		xfconf-query -c xfce4-desktop -p /desktop-icons/single-click -t bool -s false -n
 	fi
-	if [ ! -e /lib64/applications/thunar.desktop ]; then
+	if [ ! -e /usr/share/applications/thunar.desktop ]; then
 		xfconf-query -c xfce4-desktop -p /desktop-icons/file-icons/show-filesystem -t bool -s false -n
 		xfconf-query -c xfce4-desktop -p /desktop-icons/file-icons/show-home -t bool -s false -n
 		xfconf-query -c xfce4-desktop -p /desktop-icons/file-icons/show-trash -t bool -s false -n
@@ -233,7 +233,7 @@ xfconf_settings()
 		xfconf-query -c xfwm4 -p /general/use_compositing -t bool -s false -n
 	fi
 	if [ -n "$XFWM4_THEME" ] && [ "$XFWM4_THEME" != "ALL" ]; then
-		if [ -e /lib64/themes/$XFWM4_THEME/xfwm4/themerc ]; then
+		if [ -e /usr/share/themes/$XFWM4_THEME/xfwm4/themerc ]; then
 			xfconf-query -c xfwm4 -p /general/theme -t string -s $XFWM4_THEME -n
 		fi
 	fi
@@ -310,8 +310,8 @@ wm_menu()
 	rm -f $HOME/.config/xfce4/desktop/*
 	if [ "`make_caps $ICONMODE`" == "AUTO" ]; then
 		rm -rf /tmp/typelist
-		if [ -d /lib64/menu ]; then
-			for desktop in /lib64/menu/*.desktop; do
+		if [ -d /usr/share/menu ]; then
+			for desktop in /usr/share/menu/*.desktop; do
 				[ -f "$desktop" ] || continue
 				nomenu=$(grep "^X-TS-NoMenu=" "$desktop" | cut -d= -f2)
 				nodesktop=$(grep "^X-TS-NoDesktop=" "$desktop" | cut -d= -f2)

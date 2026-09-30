@@ -1,4 +1,4 @@
-/bin/
-!/bin/devcmd
-!/bin/dnsmasq_gui
-/sbin/
+/usr/bin/
+!/usr/bin/devcmd
+!/usr/bin/dnsmasq_gui
+/usr/sbin/

@@ -1,4 +1,3 @@
-#f1d9c4d6854ce841cf85f6d1ded2dd36  .dna
-rm /ts/build/packages/rngd/bin/rngd
-rm -f /ts/build/packages/rngd/sbin/rngd
+#51fb4aaf6afb323f703b0510691652d0  .dna
 
+rm -f /ts/build/packages/rngd/usr/bin/rngd

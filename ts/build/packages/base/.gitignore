@@ -1,11 +1,11 @@
-/bin/
-!/bin/checklogs
-!/bin/lsb_release
-!/bin/pkg
-!/bin/shutdown
-!/bin/unused
-!/bin/update-initrd
-!/bin/used
+/usr/bin/
+!/usr/bin/checklogs
+!/usr/bin/lsb_release
+!/usr/bin/pkg
+!/usr/bin/shutdown
+!/usr/bin/unused
+!/usr/bin/update-initrd
+!/usr/bin/used
 
 
 /etc/pam.d/
@@ -22,12 +22,9 @@
 !/etc/security/namespace.d/
 !/etc/security/namespace.d/.gitignore
 
-/lib64/security/
-!/lib64/security/pam_hooks.so
+/usr/lib64/security/
+!/usr/lib64/security/pam_hooks.so
 /lib64/ld-linux-*
 
-/sbin/
-!/sbin/session
-!/sbin/shutdown
 
-/lib64/locale/
+/usr/share/locale/

@@ -3,9 +3,9 @@
 
 export PACKAGE=base-nss
 export pkgdir=/build/packages/$PACKAGE
-mkdir -p $pkgdir/lib64
-cp /lib64/libnss_dns.so.* $pkgdir/lib64/
-cp /lib64/libnss_files.so.* $pkgdir/lib64/
+mkdir -p $pkgdir/usr/lib64
+cp /usr/lib64/libnss_dns.so.* $pkgdir/usr/lib64/
+cp /usr/lib64/libnss_files.so.* $pkgdir/usr/lib64/
 touch $pkgdir/build/installed
 
 returnval=$?

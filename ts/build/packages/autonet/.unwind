@@ -1,4 +1,4 @@
-#5a77e7d66eb5cbeb3185480358915d7e  .dna
+#ba00c09cbe8359d8533e364dd2463dbe  .dna
 
-mkdir -p /ts/build/packages/autonet/sbin
-ln /usr/sbin/ifconfig /ts/build/packages/autonet/sbin/ifconfig
+mkdir -p /ts/build/packages/autonet/usr/bin
+ln /usr/bin/ifconfig /ts/build/packages/autonet/usr/bin/ifconfig

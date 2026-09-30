@@ -1,7 +1,7 @@
-#180214583bb7e0b2678f83a8803a7142  .dna
-rm /ts/build/packages/sssd/build/extra/bin/su
-rm /ts/build/packages/sssd/build/extra/bin/id
-rm /ts/build/packages/sssd/build/extra/bin/chown
-rm /ts/build/packages/sssd/build/extra/bin/chgrp
-rm /ts/build/packages/sssd/build/extra/bin/ls
+#f66ad54f6cae4fd087e7b754998fefc3  .dna
 
+rm -f /ts/build/packages/sssd/build/extra/usr/bin/chgrp
+rm -f /ts/build/packages/sssd/build/extra/usr/bin/chown
+rm -f /ts/build/packages/sssd/build/extra/usr/bin/id
+rm -f /ts/build/packages/sssd/build/extra/usr/bin/ls
+rm -f /ts/build/packages/sssd/build/extra/usr/bin/su

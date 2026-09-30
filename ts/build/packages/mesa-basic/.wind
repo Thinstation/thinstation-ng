@@ -1,5 +1,5 @@
-#15a0447a45434de439d9b89c193b42ef  .dna
-rm /ts/build/packages/mesa-basic/lib64/dri/libdril_dri.so
-rm -f /ts/build/packages/mesa-basic/lib64/dri/kms_swrast_dri.so
-rm -f /ts/build/packages/mesa-basic/lib64/dri/swrast_dri.so
+#06e09845495e7f9241aad6781d96638a  .dna
 
+rm -f /ts/build/packages/mesa-basic/usr/lib64/dri/kms_swrast_dri.so
+rm -f /ts/build/packages/mesa-basic/usr/lib64/dri/libdril_dri.so
+rm -f /ts/build/packages/mesa-basic/usr/lib64/dri/swrast_dri.so

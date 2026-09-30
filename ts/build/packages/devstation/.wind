@@ -1,13 +1,12 @@
-#c51affcab9457a71d0ac1583a3271262  .dna
-rm /ts/build/packages/devstation/bin/diff
-rm /ts/build/packages/devstation/bin/chage
-rm /ts/build/packages/devstation/sbin/chpasswd
-rm /ts/build/packages/devstation/sbin/groupmod
-rm /ts/build/packages/devstation/sbin/usermod
-rm /ts/build/packages/devstation/bin/useradd
-rm -f /ts/build/packages/devstation/sbin/useradd
-rm /ts/build/packages/devstation/sbin/groupadd
-rm /ts/build/packages/devstation/sbin/userdel
-rm /ts/build/packages/devstation/sbin/groupdel
-rm /ts/build/packages/devstation/sbin/chgpasswd
+#ce709b8fae333ae1ccdbc01c395cae67  .dna
 
+rm -f /ts/build/packages/devstation/usr/bin/chage
+rm -f /ts/build/packages/devstation/usr/bin/chgpasswd
+rm -f /ts/build/packages/devstation/usr/bin/chpasswd
+rm -f /ts/build/packages/devstation/usr/bin/diff
+rm -f /ts/build/packages/devstation/usr/bin/groupadd
+rm -f /ts/build/packages/devstation/usr/bin/groupdel
+rm -f /ts/build/packages/devstation/usr/bin/groupmod
+rm -f /ts/build/packages/devstation/usr/bin/useradd
+rm -f /ts/build/packages/devstation/usr/bin/userdel
+rm -f /ts/build/packages/devstation/usr/bin/usermod

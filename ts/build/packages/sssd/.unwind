@@ -1,8 +1,8 @@
-#180214583bb7e0b2678f83a8803a7142  .dna
+#f66ad54f6cae4fd087e7b754998fefc3  .dna
 
-mkdir -p /ts/build/packages/sssd/build/extra/bin
-ln /usr/bin/chgrp /ts/build/packages/sssd/build/extra/bin/chgrp
-ln /usr/bin/chown /ts/build/packages/sssd/build/extra/bin/chown
-ln /usr/bin/id /ts/build/packages/sssd/build/extra/bin/id
-ln /usr/bin/ls /ts/build/packages/sssd/build/extra/bin/ls
-ln /usr/bin/su /ts/build/packages/sssd/build/extra/bin/su
+mkdir -p /ts/build/packages/sssd/build/extra/usr/bin
+ln /usr/bin/chgrp /ts/build/packages/sssd/build/extra/usr/bin/chgrp
+ln /usr/bin/chown /ts/build/packages/sssd/build/extra/usr/bin/chown
+ln /usr/bin/id /ts/build/packages/sssd/build/extra/usr/bin/id
+ln /usr/bin/ls /ts/build/packages/sssd/build/extra/usr/bin/ls
+ln /usr/bin/su /ts/build/packages/sssd/build/extra/usr/bin/su

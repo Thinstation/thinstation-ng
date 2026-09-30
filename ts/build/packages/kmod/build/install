@@ -2,13 +2,9 @@
 
 export PACKAGE=kmod
 export PORTS=$PACKAGE
-export DROP_DIRS="lib64/doc"
+export DROP_DIRS="usr/lib64/doc"
 repackage -e
 
-mkdir /ts/build/packages/kmod/sbin -p
-for link in depmod  insmod  lsmod  modinfo  modprobe  rmmod; do
-	ln -sf /bin/kmod /ts/build/packages/kmod/sbin/$link
-done
 returnval=$?
 
 exit $returnval

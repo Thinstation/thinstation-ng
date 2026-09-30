@@ -1,9 +1,9 @@
-/bin/
+/usr/bin/
 /opt/
 /etc/
 /lib/
 /var/
 /build/installed
 /build/license
-/build/extra/bin/logger
-/sbin/
+/build/extra/usr/bin/logger
+/usr/sbin/

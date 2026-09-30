@@ -187,55 +187,37 @@ preserve_empty_working()
 	done
 }
 
-shallow_usr()
+canonicalize_usr()
 {
-	for usr_dir in usr usr/local ; do
-		for essential_dir in sbin bin lib lib64 etc var libexec; do
-			if [ -d $pkgpath/$usr_dir/$essential_dir ] && [ -n "`ls -A $pkgpath/$usr_dir/$essential_dir`" ]; then
-				if [ "$essential_dir" == "lib" ] ; then
-					mkdir -p $pkgpath/${essential_dir}64
-					cp -a $pkgpath/$usr_dir/$essential_dir/* $pkgpath/${essential_dir}64/.
-				else
-					mkdir -p $pkgpath/${essential_dir}
-					cp -a $pkgpath/$usr_dir/$essential_dir $pkgpath/.
-				fi
-				rm -rf $pkgpath/$usr_dir/$essential_dir
-				if [ -z "`ls -A $pkgpath/$usr_dir`" ]; then
-					rmdir $pkgpath/$usr_dir
-				fi
-			fi
-		done
-	done
-}
+    # Normalize package payload into the usr-merged layout.
+    merge_tree()
+    {
+        local src="$1" dst="$2"
+        if [ -d "$src" ] && [ -n "$(ls -A "$src")" ]; then
+            mkdir -p "$dst"
+            cp -a "$src"/. "$dst"/.
+            rm -rf "$src"
+        fi
+    }
 
-redirect_sbin()
-{
-	if [ -e $pkgpath/sbin ] && [ -n "`ls -A $pkgpath/sbin`" ]; then
-		mkdir -p $pkgpath/bin
-		cp -a $pkgpath/sbin/* $pkgpath/bin
-		rm -rf $pkgpath/sbin
-	fi
-}
+    merge_tree "$pkgpath/bin" "$pkgpath/usr/bin"
+    merge_tree "$pkgpath/sbin" "$pkgpath/usr/bin"
 
-redirect_shared()
-{
-	for share_dir in share usr/share usr/local/share ; do
-		if [ -d $pkgpath/$share_dir ] && [ -n "`ls -A $pkgpath/$share_dir`" ]; then
-#			if [ -d $pkgpath/$share_dir/dbus-1 ] && [ -n "`ls -A $pkgpath/$share_dir/dbus-1`" ]; then
-#				mkdir -p $pkgpath/etc/dbus-1
-#				cp -a $pkgpath/$share_dir/dbus-1/* $pkgpath/etc/dbus-1
-#				rm -rf $pkgpath/$share_dir/dbus-1
-#			fi
-			for shared_object in `ls --color=never $pkgpath/$share_dir` ; do
-				mkdir -p $pkgpath/lib64
-				cp -a $pkgpath/$share_dir/$shared_object $pkgpath/lib64/.
-				rm -rf $pkgpath/$share_dir/$shared_object
-			done
-		fi
-		if [ -d $pkgpath/$share_dir ] ; then
-			rmdir $pkgpath/$share_dir
-		fi
-	done
+    # Modern merged-bin layout has one executable namespace. Do not let
+    # upstream RPMs reintroduce /usr/sbin into ThinStation packages.
+    if [ -L "$pkgpath/usr/sbin" ]; then
+        rm -f "$pkgpath/usr/sbin"
+    elif [ -d "$pkgpath/usr/sbin" ]; then
+        merge_tree "$pkgpath/usr/sbin" "$pkgpath/usr/bin"
+    fi
+
+    merge_tree "$pkgpath/lib" "$pkgpath/usr/lib64"
+    merge_tree "$pkgpath/lib64" "$pkgpath/usr/lib64"
+    merge_tree "$pkgpath/libexec" "$pkgpath/usr/libexec"
+    merge_tree "$pkgpath/share" "$pkgpath/usr/share"
+
+    merge_tree "$pkgpath/usr/lib" "$pkgpath/usr/lib64"
+
 }
 
 move_run()
@@ -248,7 +230,7 @@ move_run()
 
 extra_dirs()
 {
-	extra_dirs="man pkgconfig aclocal gtk-doc help vala gir-1.0 bash-completion cmake omf"
+	extra_dirs="man doc docs info pkgconfig aclocal gtk-doc help vala gir-1.0 bash-completion cmake omf examples example samples tests test testing demos demo benchmarks benchmark"
 	if [ "$package" != "python" ] ; then
 		extra_dirs="$extra_dirs include"
 	fi
@@ -262,15 +244,19 @@ extra_dirs()
 		if [ -d $pkgpath/usr/local/$extra_dir ] ; then
 			rm -rf $pkgpath/usr/local/$extra_dir
 		fi
-		if [ -d $pkgpath/lib64/$extra_dir ] ; then
-			rm -rf $pkgpath/lib64/$extra_dir
+		if [ -d $pkgpath/usr/share/$extra_dir ] ; then
+			rm -rf $pkgpath/usr/share/$extra_dir
+		fi
+		if [ -d $pkgpath/usr/lib64/$extra_dir ] ; then
+			rm -rf $pkgpath/usr/lib64/$extra_dir
 		fi
 	done
-	for  include in include local/include ; do
+	for include in include ; do
 		if [ -d $pkgpath/usr/$include ] ; then
-			cp -a $pkgpath/usr/$include/* $pkgpath/lib64/.
+			mkdir -p $pkgpath/usr/lib64
+			cp -a $pkgpath/usr/$include/* $pkgpath/usr/lib64/.
 			rm -rf $pkgpath/usr/$include
-			ln -sf /lib64 $pkgpath/usr/$include
+			ln -sf /usr/lib64 $pkgpath/usr/$include
 		fi
 	done
 }
@@ -279,6 +265,11 @@ extra_files()
 {
 	find $pkgpath -name *.a -delete
 	find $pkgpath -name *.la -delete
+
+	# The runtime dynamic linker consumes /etc/ld.so.cache.  The auxiliary
+	# ldconfig cache is only an optimization for future ldconfig runs and is
+	# not required in the immutable ThinStation image.
+	rm -f $pkgpath/var/cache/ldconfig/aux-cache
 }
 
 remove_empty()
@@ -310,7 +301,41 @@ cut_bloat()
 		find $INSTALLDIR -type l -name $bloat -delete
 	done
 	for bloat in $DROP_DIRS; do
-		rm -rf $INSTALLDIR/$bloat
+		# DROP_DIRS predates usr-merge. Accept legacy flattened paths and
+		# remove their canonical /usr equivalents as well.
+		rel=`echo "$bloat" | sed -e "s|^/||"`
+		case "$rel" in
+			bin) rm -rf "$INSTALLDIR/bin" "$INSTALLDIR/usr/bin" ;;
+			bin/*)
+				x=`echo "$rel" | sed -e "s|^bin/||"`
+				rm -rf "$INSTALLDIR/bin/$x" "$INSTALLDIR/usr/bin/$x"
+				;;
+			sbin) rm -rf "$INSTALLDIR/sbin" "$INSTALLDIR/usr/sbin" ;;
+			sbin/*)
+				x=`echo "$rel" | sed -e "s|^sbin/||"`
+				rm -rf "$INSTALLDIR/sbin/$x" "$INSTALLDIR/usr/sbin/$x"
+				;;
+			share) rm -rf "$INSTALLDIR/share" "$INSTALLDIR/usr/share" ;;
+			share/*)
+				x=`echo "$rel" | sed -e "s|^share/||"`
+				rm -rf "$INSTALLDIR/share/$x" "$INSTALLDIR/usr/share/$x"
+				;;
+			libexec) rm -rf "$INSTALLDIR/libexec" "$INSTALLDIR/usr/libexec" ;;
+			libexec/*)
+				x=`echo "$rel" | sed -e "s|^libexec/||"`
+				rm -rf "$INSTALLDIR/libexec/$x" "$INSTALLDIR/usr/libexec/$x"
+				;;
+			lib|lib64)
+				rm -rf "$INSTALLDIR/lib" "$INSTALLDIR/lib64" "$INSTALLDIR/usr/lib" "$INSTALLDIR/usr/lib64"
+				;;
+			lib/*|lib64/*)
+				x=`echo "$rel" | sed -e "s|^lib64/||" -e "s|^lib/||"`
+				rm -rf "$INSTALLDIR/lib/$x" "$INSTALLDIR/lib64/$x" "$INSTALLDIR/usr/lib64/$x" "$INSTALLDIR/usr/share/$x"
+				;;
+			*)
+				rm -rf "$INSTALLDIR/$rel" 				       "$INSTALLDIR/usr/$rel" 				       "$INSTALLDIR/usr/share/$rel" 				       "$INSTALLDIR/usr/lib64/$rel"
+				;;
+		esac
 	done
 }
 
@@ -359,12 +384,12 @@ from_env()
 
 reduce_libs()
 {
-	if [ -e $pkgpath/lib64 ]; then
-		for link in `find $pkgpath/lib64 -mindepth 1 -maxdepth 1 -type l \
+	if [ -e $pkgpath/usr/lib64 ]; then
+		for link in `find $pkgpath/usr/lib64 -mindepth 1 -maxdepth 1 -type l \
 		| grep -E 'lib64/lib' \
 		| grep -E '\.so' | sort -u`; do
 			# Normalize the link
-			linkdest=`readlink $link | sed -e 's,\.\./\.\./lib64/,,' -e 's,^/lib64/,,'`
+			linkdest=`readlink $link | sed -e 's,\.\./\.\./usr/lib64/,,' -e 's,\.\./\.\./lib64/,,' -e 's,^/usr/lib64/,,' -e 's,^/lib64/,,'`
 			linkdir=`dirname $link`
 			# If the link is to another directory, leave it alone
 			if [ `echo $linkdest | grep -E '/'` ]; then
@@ -388,7 +413,7 @@ reduce_libs()
 				rm $link
 			fi
 		done
-		for lib in `find $pkgpath/lib64 -mindepth 1 -maxdepth 1 -type f \
+		for lib in `find $pkgpath/usr/lib64 -mindepth 1 -maxdepth 1 -type f \
 		| grep -E 'lib64/lib' \
 		| grep -E '\.so' |sort -u`; do
 			# Ignore TCL/TK, it doesn't ever declare an SONAME
@@ -411,8 +436,8 @@ reduce_libs()
 
 remove_libs()
 {
-	if [ -e $pkgpath/lib64 ]; then
-		find $pkgpath/lib64 -mindepth 1 -maxdepth 1 -name lib\*.so\* -delete
+	if [ -e $pkgpath/usr/lib64 ]; then
+		find $pkgpath/usr/lib64 -mindepth 1 -maxdepth 1 -name lib\*.so\* -delete
 	fi
 }
 
@@ -421,8 +446,7 @@ main()
 	package_path
 	extract_archive
 	preserve_empty_working
-	shallow_usr
-	redirect_shared
+	canonicalize_usr
 	move_run
 	extra_dirs
 	extra_files

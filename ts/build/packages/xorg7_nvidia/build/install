@@ -20,18 +20,18 @@ cd NVIDIA-Linux-x86_64-$version
 
 mkdir -p $INSTALLDIR/lib/licenses/nvidia
   mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/LICENSE $INSTALLDIR/lib/licenses/nvidia/.
-mkdir -p $INSTALLDIR/lib/icons/hicolor/48x48/apps
-  mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/nvidia-settings.png $INSTALLDIR/lib/icons/hicolor/48x48/apps/.
+mkdir -p $INSTALLDIR/usr/share/icons/hicolor/48x48/apps
+  mv $INSTALLDIR/share/doc/NVIDIA_GLX-1.0/nvidia-settings.png $INSTALLDIR/usr/share/icons/hicolor/48x48/apps/.
 rm -rf $INSTALLDIR/share
 
 #mkdir -p $INSTALLDIR/lib/applications
 #  mv /usr/local/share/applications/nvidia-settings.desktop		$INSTALLDIR/lib/applications
 mkdir -p $INSTALLDIR/etc/X11
   mv /usr/share/X11/xorg.conf.d/nvidia-drm-outputclass.conf		$INSTALLDIR/etc/X11
-mkdir -p $INSTALLDIR/lib/glvnd/egl_vendor.d
-  mv /usr/share/glvnd/egl_vendor.d/10_nvidia.json			$INSTALLDIR/lib/glvnd/egl_vendor.d
-mkdir -p $INSTALLDIR/lib/egl/egl_external_platform.d
-  mv /usr/share/egl/egl_external_platform.d/10_nvidia_wayland.json	$INSTALLDIR/lib/egl/egl_external_platform.d
+mkdir -p $INSTALLDIR/usr/share/glvnd/egl_vendor.d
+  mv /usr/share/glvnd/egl_vendor.d/10_nvidia.json			$INSTALLDIR/usr/share/glvnd/egl_vendor.d
+mkdir -p $INSTALLDIR/usr/share/egl/egl_external_platform.d
+  mv /usr/share/egl/egl_external_platform.d/10_nvidia_wayland.json	$INSTALLDIR/usr/share/egl/egl_external_platform.d
 
 for link in `find $INSTALLDIR/lib -mindepth 1 -maxdepth 1 -type l | grep -E '\.so' | sort -u`; do
 	# Normalize the link

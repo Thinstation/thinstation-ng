@@ -1,6 +1,6 @@
-/bin/
+/usr/bin/
 /etc/
 /lib/
-/libexec/
+/usr/libexec/
 /build/installed
-/build/extra/bin/
+/build/extra/usr/bin/

@@ -1,6 +1,6 @@
-/bin/
+/usr/bin/
 /etc/
 /lib/
 /var/
 /build/installed
-/build/extra/lib64/
+/build/extra/usr/lib64/

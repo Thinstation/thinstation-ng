@@ -1,8 +1,8 @@
-/bin/
-!/bin/setres
+/usr/bin/
+!/usr/bin/setres
 
 /etc/pam.d/
 /lib64/
-!/lib64/X11/locale/
-!/lib64/X11/locale/**
-/libexec/
+!/usr/share/X11/locale/
+!/usr/share/X11/locale/**
+/usr/libexec/

@@ -1,3 +1,3 @@
-#b7ac926eb5debf6f0937b2649bd24c0e  .dna
-rm /ts/build/packages/sshd/bin/dropbear
+#243932ceb1d38943cb14250fccc8c181  .dna
 
+rm -f /ts/build/packages/sshd/usr/bin/dropbear

@@ -1,5 +1,4 @@
-#114780f2db5e3b5a38746e3be806809e  .dna
-rm /ts/build/packages/ica/build/extra/bin/useradd
-rm -f /ts/build/packages/ica/sbin/useradd
-rm /ts/build/packages/ica/build/extra/bin/logger
+#9af7389131d6d0b2c4fe6bc01ce81ddf  .dna
 
+rm -f /ts/build/packages/ica/build/extra/usr/bin/logger
+rm -f /ts/build/packages/ica/build/extra/usr/bin/useradd

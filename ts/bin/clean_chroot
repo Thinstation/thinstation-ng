@@ -8,7 +8,9 @@ create_wind()
 	pkg=$1
 	printf "\n\tCreating fast clean cache for $pkg"
 	echo "#`md5sum .dna`" > .wind
-        update -c -d $pkg >> .wind
+        update -c -d $pkg |
+        awk '{ if ($1=="rm" && $2!="-f") sub(/^rm /,"rm -f "); print }' |
+        sort -u >> .wind
         . .wind
 	errata=true
 }

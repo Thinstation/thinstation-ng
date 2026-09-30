@@ -1,15 +1,13 @@
-#c51affcab9457a71d0ac1583a3271262  .dna
+#ce709b8fae333ae1ccdbc01c395cae67  .dna
 
-mkdir -p /ts/build/packages/devstation/bin
-mkdir -p /ts/build/packages/devstation/sbin
-ln /usr/bin/chage /ts/build/packages/devstation/bin/chage
-ln /usr/bin/chgpasswd /ts/build/packages/devstation/sbin/chgpasswd
-ln /usr/bin/chpasswd /ts/build/packages/devstation/sbin/chpasswd
-ln /usr/bin/diff /ts/build/packages/devstation/bin/diff
-ln /usr/bin/groupadd /ts/build/packages/devstation/sbin/groupadd
-ln /usr/bin/groupdel /ts/build/packages/devstation/sbin/groupdel
-ln /usr/bin/groupmod /ts/build/packages/devstation/sbin/groupmod
-ln /usr/bin/useradd /ts/build/packages/devstation/bin/useradd
-ln /usr/bin/userdel /ts/build/packages/devstation/sbin/userdel
-ln /usr/bin/usermod /ts/build/packages/devstation/sbin/usermod
-ln -sf /bin/useradd /ts/build/packages/devstation/sbin/useradd
+mkdir -p /ts/build/packages/devstation/usr/bin
+ln /usr/bin/chage /ts/build/packages/devstation/usr/bin/chage
+ln /usr/bin/chgpasswd /ts/build/packages/devstation/usr/bin/chgpasswd
+ln /usr/bin/chpasswd /ts/build/packages/devstation/usr/bin/chpasswd
+ln /usr/bin/diff /ts/build/packages/devstation/usr/bin/diff
+ln /usr/bin/groupadd /ts/build/packages/devstation/usr/bin/groupadd
+ln /usr/bin/groupdel /ts/build/packages/devstation/usr/bin/groupdel
+ln /usr/bin/groupmod /ts/build/packages/devstation/usr/bin/groupmod
+ln /usr/bin/useradd /ts/build/packages/devstation/usr/bin/useradd
+ln /usr/bin/userdel /ts/build/packages/devstation/usr/bin/userdel
+ln /usr/bin/usermod /ts/build/packages/devstation/usr/bin/usermod

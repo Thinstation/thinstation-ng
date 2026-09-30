@@ -28,7 +28,10 @@ while read type title screen position workspace autostart custom icon server opt
 	fi
 done
 
-. $TS_RUNTIME
+# Runtime state is sourced by unprivileged package/session launchers.
+# Keep it world-readable regardless of which early service created it.
+chmod 644 "$TS_RUNTIME"
+. "$TS_RUNTIME"
 
 #Now read the sessions for real and create our session script.
 (cat $WKDIR/session) |

@@ -1,11 +1,11 @@
-/bin/
+/usr/bin/
 /build/installed
 /etc/
 /lib/
-/libexec/
-/sbin/
+/usr/libexec/
+/usr/sbin/
 /var/
-/build/extra/bin/
+/build/extra/usr/bin/
 /build/extra/etc/libnl/
 /run/
 /lib64/

@@ -50,7 +50,9 @@ do_mounts()
 	if ! mounted run ; then mount --bind /run run ; fi
 	if [ -e fastboot ]; then
 		if [ -e ../boot-images/initrd/lib.squash ]; then
-			mount ../boot-images/initrd/lib.squash lib64
+			mkdir -p fastboot-root
+			mount ../boot-images/initrd/lib.squash fastboot-root
+			mount --bind fastboot-root/usr usr
 		fi
 	fi
 	if [ -e /run/pcscd ]; then

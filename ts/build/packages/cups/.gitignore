@@ -1,8 +1,8 @@
-/bin/
+/usr/bin/
 /build/installed
 /etc/
 /lib/
-/sbin/
+/usr/sbin/
 /var/
 /build/extra/
 !/build/extra/etc/

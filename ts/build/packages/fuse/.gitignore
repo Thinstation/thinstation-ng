@@ -1,9 +1,9 @@
-/bin/
+/usr/bin/
 /etc/
 /lib/
-/sbin/
+/usr/sbin/
 /build/installed
 /lib64/
-/bin/
+/usr/bin/
 /etc/
-/sbin/
+/usr/sbin/

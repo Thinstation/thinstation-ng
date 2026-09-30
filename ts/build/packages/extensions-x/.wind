@@ -1,9 +1,9 @@
-#b08f9d94b12149a960b7cc0dcda4d866  .dna
-rm /ts/build/packages/extensions-x/lib64/X11/app-defaults/XFontSel
-rm /ts/build/packages/extensions-x/bin/xfontsel
-rm /ts/build/packages/extensions-x/bin/xev
-rm /ts/build/packages/extensions-x/bin/setxkbmap
-rm /ts/build/packages/extensions-x/bin/xdpyinfo
-rm /ts/build/packages/extensions-x/bin/glxgears
-rm /ts/build/packages/extensions-x/bin/glxinfo
+#356696c55b359ee920da199b2ccf959a  .dna
 
+rm -f /ts/build/packages/extensions-x/usr/bin/glxgears
+rm -f /ts/build/packages/extensions-x/usr/bin/glxinfo
+rm -f /ts/build/packages/extensions-x/usr/bin/setxkbmap
+rm -f /ts/build/packages/extensions-x/usr/bin/xdpyinfo
+rm -f /ts/build/packages/extensions-x/usr/bin/xev
+rm -f /ts/build/packages/extensions-x/usr/bin/xfontsel
+rm -f /ts/build/packages/extensions-x/usr/share/X11/app-defaults/XFontSel

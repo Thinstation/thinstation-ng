@@ -35,6 +35,19 @@ dnf_makecache()
 	dnf makecache "${dnf_common_opts[@]}" "$@"
 }
 
+import_trusted_rpm_keys()
+{
+	local key
+
+	[ -d "$ROOT/ts/keys" ] || return 0
+
+	for key in "$ROOT"/ts/keys/*.asc "$ROOT"/ts/keys/*.gpg; do
+		[ -f "$key" ] || continue
+		echo "Importing trusted RPM key: ${key#$ROOT/}"
+		rpm --root "$ROOT" --import "$key"
+	done
+}
+
 read_port_list()
 {
 	grep -v '^[[:space:]]*#' "$1" | sed ':a;N;$!ba;s/\n/ /g'
@@ -134,6 +147,7 @@ stage1()
 	fi
 
 	ROOT=$PWD
+	preserve_host_repo_overrides
 	dnf_install \
 		--installroot="$ROOT" \
 		"${host_config[@]}" \
@@ -145,7 +159,6 @@ stage1()
 		$other_ports \
 		$extra_ports
 
-	preserve_host_repo_overrides
 	cd "$ROOT" || return 1
 	touch "$ROOT/dostage2"
 }
@@ -154,9 +167,11 @@ stage2()
 {
 	local procs
 
+	ROOT=/
+	import_trusted_rpm_keys
 	cp -a /ts/repos/* /etc/yum.repos.d/.
+	import_trusted_rpm_keys
 	dnf_makecache
-#	dnf_install $system_ports
 	dnf_install --allowerasing $ts_ports #$other_ports
 
 	for Root in $TSWRKNG $XTRWRKNG; do
@@ -195,6 +210,13 @@ unwind_package()
 
 	if [ -e .unwind ]; then
 		if grep -e "#" .unwind | cut -d "#" -f2 | md5sum -c --quiet; then
+			# Replaying an install cache must be idempotent. Remove only the
+			# .dna-managed payload first, preserving manual package content.
+			if [ -e .wind ] && grep -e "#" .wind | cut -d "#" -f2 | md5sum -c --quiet; then
+				. .wind
+			else
+				update -c "$pkg"
+			fi
 			. .unwind
 		else
 			update "$pkg"

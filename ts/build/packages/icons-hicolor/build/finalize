@@ -2,9 +2,9 @@
 
 if [ -n "$ICONS_THEME" ]; then
 	:
-elif [ -e /lib/icons/Adwaita ]; then
+elif [ -e /usr/share/icons/Adwaita ]; then
 	ICONS_THEME=/Adwaita
-elif [ -e /lib/icons/gnome ]; then
+elif [ -e /usr/share/icons/gnome ]; then
 	ICONS_THEME=gnome
 else 
 	ICONS_THEME=hicolor
@@ -22,19 +22,19 @@ echo "gtk-icon-theme-name = $ICONS_THEME" >> /etc/gtk-3.0/settings.ini
 
 if [ -n "$ICONS_CUT_SIZES" ]; then
 	for size in $ICONS_CUT_SIZES; do
-		for theme in `ls /lib/icons`; do
-			if [ -e /lib/icons/$theme/$size ]; then
-				rm -rf /lib/icons/$theme/$size
+		for theme in `ls /usr/share/icons`; do
+			if [ -e /usr/share/icons/$theme/$size ]; then
+				rm -rf /usr/share/icons/$theme/$size
 			fi
 		done
 	done
 fi
 
 echo -e "\tCaching icons"
-for icontheme in `ls --color=never /lib/icons`; do
-	if [ -d /lib/icons/$icontheme ]; then
-		rm -f /lib/icons/$icontheme/icon-theme.cache
-		/bin/gtk-update-icon-cache -i /lib/icons/$icontheme 2>/dev/null
+for icontheme in `ls --color=never /usr/share/icons`; do
+	if [ -d /usr/share/icons/$icontheme ]; then
+		rm -f /usr/share/icons/$icontheme/icon-theme.cache
+		/bin/gtk-update-icon-cache -i /usr/share/icons/$icontheme 2>/dev/null
 	fi
 done
-rm /bin/gtk-update-icon-cache
+rm /usr/bin/gtk-update-icon-cache

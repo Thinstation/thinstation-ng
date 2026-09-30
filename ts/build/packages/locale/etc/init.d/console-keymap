@@ -5,11 +5,11 @@
 #set -x
 #exec </dev/null >/var/log/console-keymap.log  2>&1
 
-        if [ -d /lib/locale ] ; then
-		if [ -z "$LOCALE" ] || [ -n "$LOCALE" ] && [ ! -e /lib/locale/${LOCALE}_locale ]; then
-                	LOCALE=`find /lib/locale -mindepth 1 -maxdepth 1|grep -e _locale |tail -n 1`
-		elif [ -e /lib/locale/${LOCALE}_locale ]; then
-			LOCALE=/lib/locale/${LOCALE}_locale
+        if [ -d /usr/share/locale ] ; then
+		if [ -z "$LOCALE" ] || [ -n "$LOCALE" ] && [ ! -e /usr/share/locale/${LOCALE}_locale ]; then
+		LOCALE=`find /usr/share/locale -mindepth 1 -maxdepth 1|grep -e _locale |tail -n 1`
+		elif [ -e /usr/share/locale/${LOCALE}_locale ]; then
+			LOCALE=/usr/share/locale/${LOCALE}_locale
 		fi
         fi
         if [ -e $LOCALE ] && [ "$LOCALE" != "" ]; then
@@ -23,15 +23,15 @@
 		echo_log "\nNotice!, no locale found. You should really choose a locale in build.conf even if you are in the US"
 		echo_log "Continuing boot with default C locale"
         fi
-	if [ -e /lib/kbd/keymaps/$CONSOLE_KEYBOARD ] && [ "$CONSOLE_KEYBOARD" != "" ] ; then
-#		loadkeys /lib/kbd/keymaps/$CONSOLE_KEYBOARD
+	if [ -e /usr/lib64/kbd/keymaps/$CONSOLE_KEYBOARD ] && [ "$CONSOLE_KEYBOARD" != "" ] ; then
+#		loadkeys /usr/lib64/kbd/keymaps/$CONSOLE_KEYBOARD
 		echo "KEYMAP=\"`basename $CONSOLE_KEYBOARD .map.gz`\"" > /etc/vconsole.conf
 	else
 		echo_log "\nNotice!, no keymap found"
 		echo_log "Continuing boot with default BIOS keymap"
 	fi
-        if [ -e /lib/kbd/consolefonts/$CONSOLE_FONT ] && [ "$CONSOLE_FONT" != "" ] ; then
-#                setfont /lib/kbd/consolefonts/$CONSOLE_FONT
+        if [ -e /usr/lib64/kbd/consolefonts/$CONSOLE_FONT ] && [ "$CONSOLE_FONT" != "" ] ; then
+#                setfont /usr/lib64/kbd/consolefonts/$CONSOLE_FONT
 		echo "FONT=\"`basename $CONSOLE_FONT .psfu.gz`\"" >> /etc/vconsole.conf
 		if [ -n "$DEBUG_BOOT" ]; then
 	                echo "Loading console font: $CONSOLE_FONT" >> $LOGFILE

@@ -38,7 +38,7 @@ if is_enabled $FREERDP_SELECT_SERVER; then
         done
 
 export MAIN_DIALOG='
-<window title="FreeRDP Server Selection" decorated="true" width-request="325" height-request="213" allow-grow="false" allow-shrink="false" skip_taskbar_hint="true" image-name="/lib/icons/hicolor/32x32/apps/freerdp.png">
+<window title="FreeRDP Server Selection" decorated="true" width-request="325" height-request="213" allow-grow="false" allow-shrink="false" skip_taskbar_hint="true" image-name="/usr/share/icons/hicolor/32x32/apps/freerdp.png">
   <vbox>
     <list selected-row="0">
       <variable>SELECTED_SERVER</variable>

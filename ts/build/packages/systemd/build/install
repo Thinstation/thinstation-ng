@@ -14,22 +14,22 @@ export DROP_FILES="	etc.conf \
 			init"
 
 export DROP_DIRS="	etc/kernel \
-			lib64/dnf5 \
-			lib64/kernel "
+			dnf5 \
+			kernel "
 
 repackage -e
 returnval=$?
 
-mkdir -p ./packages/$PACKAGE/sbin
+mkdir -p /build/packages/$PACKAGE/usr/bin
 for i in runlevel reboot poweroff halt telinit; do
-	ln -sf /bin/systemctl ./packages/$PACKAGE/bin/$i
+	ln -sf /usr/bin/systemctl /build/packages/$PACKAGE/usr/bin/$i
 	let returnval=returnval+$?
 done
 #for link in init sbin/init ; do
-#	ln -sf /lib64/systemd/systemd ./packages/$PACKAGE/$link
+#	ln -sf /usr/lib64/systemd/systemd ./packages/$PACKAGE/$link
 #	let returnval=returnval+$?
 #done
 
-ln -sf libudev.so.1 ./packages/$PACKAGE/lib64/libudev.so.0
+ln -sf libudev.so.1 /build/packages/$PACKAGE/usr/lib64/libudev.so.0
 
 exit $returnval

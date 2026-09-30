@@ -17,7 +17,7 @@ if is_enabled $LIGHTDM_BANNER; then
 	cp /build/$BANNER_SRC /etc/banner.svg
 
 	sed -i -e '/^autologin/d'		$LDM_CONF
-	sed -i 's|^#\?greeter-setup-script=.*|greeter-setup-script=/sbin/lightdm-banner|' $LDM_CONF
+	sed -i 's|^#\?greeter-setup-script=.*|greeter-setup-script=/usr/bin/lightdm-banner|' $LDM_CONF
 
 	sed -i -e '/^background/d'		$LDMG_CONF
 	echo "theme-name = Adwaita"             >> $LDMG_CONF
@@ -25,6 +25,6 @@ if is_enabled $LIGHTDM_BANNER; then
 	echo "position = 50%,center 80%,center" >> $LDMG_CONF
 	echo "screensaver-timeout = 60"		>> $LDMG_CONF
 	echo "user-background = false"		>> $LDMG_CONF
-	echo "default-user-image = /lib64/icons/hicolor/128x128/apps/ThinStation.png" >> $LDMG_CONF
+	echo "default-user-image = /usr/share/icons/hicolor/128x128/apps/ThinStation.png" >> $LDMG_CONF
 
 fi

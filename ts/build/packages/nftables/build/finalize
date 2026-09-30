@@ -9,5 +9,5 @@ update-alternatives --set ebtables /usr/bin/ebtables-nft
 update-alternatives --set arptables /usr/bin/arptables-nft
 
 for name in ip{,6}tables{,-save,-restore} ebtables{,-save,-restore} arptables{,-save,-restore}; do
-    test -h /sbin || ln -s /bin/$name /sbin/$name 2>/dev/null || :
+    test -h /usr/sbin || ln -s /usr/bin/$name /usr/sbin/$name 2>/dev/null || :
 done

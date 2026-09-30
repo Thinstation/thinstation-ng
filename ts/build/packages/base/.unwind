@@ -1,13 +1,12 @@
-#d11545a9cf1a5a2d2d0c68f125f35994  .dna
+#8c600a1984e0434a340e4562108356bd  .dna
 
-mkdir -p /ts/build/packages/base/bin
 mkdir -p /ts/build/packages/base/etc
 mkdir -p /ts/build/packages/base/etc/authselect
 mkdir -p /ts/build/packages/base/etc/pam.d
 mkdir -p /ts/build/packages/base/etc/security
-mkdir -p /ts/build/packages/base/lib64
-mkdir -p /ts/build/packages/base/lib64/security
-mkdir -p /ts/build/packages/base/sbin
+mkdir -p /ts/build/packages/base/usr/bin
+mkdir -p /ts/build/packages/base/usr/lib64
+mkdir -p /ts/build/packages/base/usr/lib64/security
 ln /etc/adjtime /ts/build/packages/base/etc/adjtime
 ln /etc/authselect/authselect.conf /ts/build/packages/base/etc/authselect/authselect.conf
 ln /etc/authselect/dconf-db /ts/build/packages/base/etc/authselect/dconf-db
@@ -43,87 +42,52 @@ ln /etc/security/pwquality.conf /ts/build/packages/base/etc/security/pwquality.c
 ln /etc/security/sepermit.conf /ts/build/packages/base/etc/security/sepermit.conf
 ln /etc/security/time.conf /ts/build/packages/base/etc/security/time.conf
 ln /etc/shells /ts/build/packages/base/etc/shells
-ln /usr/bin/agetty /ts/build/packages/base/sbin/agetty
-ln /usr/bin/blkid /ts/build/packages/base/bin/blkid
-ln /usr/bin/find /ts/build/packages/base/bin/find
-ln /usr/bin/getcap /ts/build/packages/base/sbin/getcap
-ln /usr/bin/getent /ts/build/packages/base/bin/getent
-ln /usr/bin/grpconv /ts/build/packages/base/sbin/grpconv
-ln /usr/bin/ldconfig /ts/build/packages/base/sbin/ldconfig
-ln /usr/bin/login /ts/build/packages/base/bin/login
-ln /usr/bin/lspci /ts/build/packages/base/bin/lspci
-ln /usr/bin/mount /ts/build/packages/base/bin/mount
-ln /usr/bin/ps /ts/build/packages/base/bin/ps
-ln /usr/bin/pwconv /ts/build/packages/base/sbin/pwconv
-ln /usr/bin/setcap /ts/build/packages/base/sbin/setcap
-ln /usr/bin/swapon /ts/build/packages/base/bin/swapon
-ln /usr/bin/unix_chkpwd /ts/build/packages/base/bin/unix_chkpwd
-ln /usr/bin/unix_chkpwd /ts/build/packages/base/sbin/unix_chkpwd
-ln /usr/bin/vmtouch /ts/build/packages/base/bin/vmtouch
-ln /usr/lib64/ld-linux-x86-64.so.2 /ts/build/packages/base/lib64/ld-linux-x86-64.so.2
-ln /usr/lib64/security/pam_access.so /ts/build/packages/base/lib64/security/pam_access.so
-ln /usr/lib64/security/pam_deny.so /ts/build/packages/base/lib64/security/pam_deny.so
-ln /usr/lib64/security/pam_env.so /ts/build/packages/base/lib64/security/pam_env.so
-ln /usr/lib64/security/pam_faildelay.so /ts/build/packages/base/lib64/security/pam_faildelay.so
-ln /usr/lib64/security/pam_keyinit.so /ts/build/packages/base/lib64/security/pam_keyinit.so
-ln /usr/lib64/security/pam_limits.so /ts/build/packages/base/lib64/security/pam_limits.so
-ln /usr/lib64/security/pam_localuser.so /ts/build/packages/base/lib64/security/pam_localuser.so
-ln /usr/lib64/security/pam_loginuid.so /ts/build/packages/base/lib64/security/pam_loginuid.so
-ln /usr/lib64/security/pam_namespace.so /ts/build/packages/base/lib64/security/pam_namespace.so
-ln /usr/lib64/security/pam_nologin.so /ts/build/packages/base/lib64/security/pam_nologin.so
-ln /usr/lib64/security/pam_permit.so /ts/build/packages/base/lib64/security/pam_permit.so
-ln /usr/lib64/security/pam_pwquality.so /ts/build/packages/base/lib64/security/pam_pwquality.so
-ln /usr/lib64/security/pam_rootok.so /ts/build/packages/base/lib64/security/pam_rootok.so
-ln /usr/lib64/security/pam_securetty.so /ts/build/packages/base/lib64/security/pam_securetty.so
-ln /usr/lib64/security/pam_selinux.so /ts/build/packages/base/lib64/security/pam_selinux.so
-ln /usr/lib64/security/pam_sepermit.so /ts/build/packages/base/lib64/security/pam_sepermit.so
-ln /usr/lib64/security/pam_shells.so /ts/build/packages/base/lib64/security/pam_shells.so
-ln /usr/lib64/security/pam_succeed_if.so /ts/build/packages/base/lib64/security/pam_succeed_if.so
-ln /usr/lib64/security/pam_umask.so /ts/build/packages/base/lib64/security/pam_umask.so
-ln /usr/lib64/security/pam_unix.so /ts/build/packages/base/lib64/security/pam_unix.so
-ln /usr/lib64/security/pam_usertype.so /ts/build/packages/base/lib64/security/pam_usertype.so
-ln /usr/lib64/security/pam_warn.so /ts/build/packages/base/lib64/security/pam_warn.so
-ln /usr/lib64/security/pam_wheel.so /ts/build/packages/base/lib64/security/pam_wheel.so
-ln /usr/lib64/security/pam_xauth.so /ts/build/packages/base/lib64/security/pam_xauth.so
-ln -sf /bin/blkid /ts/build/packages/base/sbin/blkid
-ln -sf /bin/swapon /ts/build/packages/base/sbin/swapon
+ln /usr/bin/agetty /ts/build/packages/base/usr/bin/agetty
+ln /usr/bin/blkid /ts/build/packages/base/usr/bin/blkid
+ln /usr/bin/find /ts/build/packages/base/usr/bin/find
+ln /usr/bin/getcap /ts/build/packages/base/usr/bin/getcap
+ln /usr/bin/getent /ts/build/packages/base/usr/bin/getent
+ln /usr/bin/grpconv /ts/build/packages/base/usr/bin/grpconv
+ln /usr/bin/ldconfig /ts/build/packages/base/usr/bin/ldconfig
+ln /usr/bin/login /ts/build/packages/base/usr/bin/login
+ln /usr/bin/lspci /ts/build/packages/base/usr/bin/lspci
+ln /usr/bin/mount /ts/build/packages/base/usr/bin/mount
+ln /usr/bin/ps /ts/build/packages/base/usr/bin/ps
+ln /usr/bin/pwconv /ts/build/packages/base/usr/bin/pwconv
+ln /usr/bin/setcap /ts/build/packages/base/usr/bin/setcap
+ln /usr/bin/swapon /ts/build/packages/base/usr/bin/swapon
+ln /usr/bin/true /ts/build/packages/base/usr/bin/true
+ln /usr/bin/unix_chkpwd /ts/build/packages/base/usr/bin/unix_chkpwd
+ln /usr/bin/vmtouch /ts/build/packages/base/usr/bin/vmtouch
+ln /usr/lib64/ld-linux-x86-64.so.2 /ts/build/packages/base/usr/lib64/ld-linux-x86-64.so.2
+ln /usr/lib64/security/pam_access.so /ts/build/packages/base/usr/lib64/security/pam_access.so
+ln /usr/lib64/security/pam_deny.so /ts/build/packages/base/usr/lib64/security/pam_deny.so
+ln /usr/lib64/security/pam_env.so /ts/build/packages/base/usr/lib64/security/pam_env.so
+ln /usr/lib64/security/pam_faildelay.so /ts/build/packages/base/usr/lib64/security/pam_faildelay.so
+ln /usr/lib64/security/pam_keyinit.so /ts/build/packages/base/usr/lib64/security/pam_keyinit.so
+ln /usr/lib64/security/pam_limits.so /ts/build/packages/base/usr/lib64/security/pam_limits.so
+ln /usr/lib64/security/pam_localuser.so /ts/build/packages/base/usr/lib64/security/pam_localuser.so
+ln /usr/lib64/security/pam_loginuid.so /ts/build/packages/base/usr/lib64/security/pam_loginuid.so
+ln /usr/lib64/security/pam_namespace.so /ts/build/packages/base/usr/lib64/security/pam_namespace.so
+ln /usr/lib64/security/pam_nologin.so /ts/build/packages/base/usr/lib64/security/pam_nologin.so
+ln /usr/lib64/security/pam_permit.so /ts/build/packages/base/usr/lib64/security/pam_permit.so
+ln /usr/lib64/security/pam_pwquality.so /ts/build/packages/base/usr/lib64/security/pam_pwquality.so
+ln /usr/lib64/security/pam_rootok.so /ts/build/packages/base/usr/lib64/security/pam_rootok.so
+ln /usr/lib64/security/pam_securetty.so /ts/build/packages/base/usr/lib64/security/pam_securetty.so
+ln /usr/lib64/security/pam_selinux.so /ts/build/packages/base/usr/lib64/security/pam_selinux.so
+ln /usr/lib64/security/pam_sepermit.so /ts/build/packages/base/usr/lib64/security/pam_sepermit.so
+ln /usr/lib64/security/pam_shells.so /ts/build/packages/base/usr/lib64/security/pam_shells.so
+ln /usr/lib64/security/pam_succeed_if.so /ts/build/packages/base/usr/lib64/security/pam_succeed_if.so
+ln /usr/lib64/security/pam_umask.so /ts/build/packages/base/usr/lib64/security/pam_umask.so
+ln /usr/lib64/security/pam_unix.so /ts/build/packages/base/usr/lib64/security/pam_unix.so
+ln /usr/lib64/security/pam_usertype.so /ts/build/packages/base/usr/lib64/security/pam_usertype.so
+ln /usr/lib64/security/pam_warn.so /ts/build/packages/base/usr/lib64/security/pam_warn.so
+ln /usr/lib64/security/pam_wheel.so /ts/build/packages/base/usr/lib64/security/pam_wheel.so
+ln /usr/lib64/security/pam_xauth.so /ts/build/packages/base/usr/lib64/security/pam_xauth.so
 ln -sf /etc/authselect/fingerprint-auth /ts/build/packages/base/etc/pam.d/fingerprint-auth
 ln -sf /etc/authselect/password-auth /ts/build/packages/base/etc/pam.d/password-auth
 ln -sf /etc/authselect/postlogin /ts/build/packages/base/etc/pam.d/postlogin
 ln -sf /etc/authselect/smartcard-auth /ts/build/packages/base/etc/pam.d/smartcard-auth
 ln -sf /etc/authselect/system-auth /ts/build/packages/base/etc/pam.d/system-auth
-ln -sf pam_sepermit.so /ts/build/packages/base/lib64/security/pam_selinux_permit.so
+ln -sf pam_sepermit.so /ts/build/packages/base/usr/lib64/security/pam_selinux_permit.so
 touch /ts/build/packages/base/etc/pam_debug
-
-mkdir -p /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/fr.po -o /ts/build/packages/base/lib64/locale/fr/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/cs/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/cs.po -o /ts/build/packages/base/lib64/locale/cs/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/da/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/da.po -o /ts/build/packages/base/lib64/locale/da/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/de/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/de.po -o /ts/build/packages/base/lib64/locale/de/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/es/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/es.po -o /ts/build/packages/base/lib64/locale/es/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/fi/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/fi.po -o /ts/build/packages/base/lib64/locale/fi/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/hr/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/hr.po -o /ts/build/packages/base/lib64/locale/hr/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/hu/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/hu.po -o /ts/build/packages/base/lib64/locale/hu/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/it/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/it.po -o /ts/build/packages/base/lib64/locale/it/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/ja/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/ja.po -o /ts/build/packages/base/lib64/locale/ja/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/nb/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/nb.po -o /ts/build/packages/base/lib64/locale/nb/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/nl/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/nl.po -o /ts/build/packages/base/lib64/locale/nl/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/pt/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/pt.po -o /ts/build/packages/base/lib64/locale/pt/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/ru/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/ru.po -o /ts/build/packages/base/lib64/locale/ru/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/sv/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/sv.po -o /ts/build/packages/base/lib64/locale/sv/LC_MESSAGES/thinstation.mo
-mkdir -p /ts/build/packages/base/lib64/locale/tr/LC_MESSAGES/
-msgfmt /ts/build/packages/base/build/locale/tr.po -o /ts/build/packages/base/lib64/locale/tr/LC_MESSAGES/thinstation.mo

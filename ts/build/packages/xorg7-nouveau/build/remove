@@ -1,3 +1,3 @@
-rm -rf /ts/build/packages/xorg7-nouveau/lib64
+rm -rf /ts/build/packages/xorg7-nouveau/usr/lib64
 rm -f /ts/build/packages/xorg7-nouveau/build/installed
 
