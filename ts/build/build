@@ -1888,10 +1888,10 @@ filesystem_fixups()
 	echo -e "\tLinking BusyBox\n"
 	chroot ./tmp-tree /bin/busybox.shared --install -s
 
-	if [ -e ./tmp-tree/lib64/libcrypto.so.1.1 ]; then
+	if [ -e ./tmp-tree/usr/lib64/libcrypto.so.1.1 ]; then
 		cp -a /usr/lib64/.libcrypto.so.1.1.hmac ./tmp-tree/lib64
 	fi
-	if [ -e ./tmp-tree/lib64/libssl.so.1.1 ]; then
+	if [ -e ./tmp-tree/usr/lib64/libssl.so.1.1 ]; then
 		cp -a /usr/lib64/.libssl.so.1.1.hmac ./tmp-tree/lib64
 	fi
         if echo "$ts_kernelcmdline" |grep -q -e 'fips=1'; then

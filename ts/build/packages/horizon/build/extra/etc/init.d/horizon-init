@@ -22,8 +22,8 @@ if ! pkg_initialized $PACKAGE; then
 	done
 
 	if [ -n "$PKCS11_MODULE" ] && [ -e "$PKCS11_MODULE" ]; then
-		mkdir -p /lib64/omnissa/horizon/pkcs11
-		ln -s $PKCS11_MODULE /lib64/omnissa/horizon/pkcs11/
+		mkdir -p /usr/lib64/omnissa/horizon/pkcs11
+		ln -s $PKCS11_MODULE /usr/lib64/omnissa/horizon/pkcs11/
 	fi
 
 	if [ -z "$HORIZON_AUTOCONNECT" ]; then HORIZON_AUTOCONNECT="TRUE"; fi

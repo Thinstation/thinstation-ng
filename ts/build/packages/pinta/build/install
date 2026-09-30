@@ -9,7 +9,7 @@ repackage -e
 
 returnval=$?
 
-ln -sf libmono-native.so.0 /build/packages/pinta/lib64/libmono-native.so
+ln -sf libmono-native.so.0 /build/packages/pinta/usr/lib64/libmono-native.so
 
 exit $returnval
 

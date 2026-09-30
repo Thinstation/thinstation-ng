@@ -14,8 +14,8 @@ export DROP_FILES="	etc.conf \
 			init"
 
 export DROP_DIRS="	etc/kernel \
-			lib64/dnf5 \
-			lib64/kernel "
+			usr/lib64/dnf5 \
+			usr/lib64/kernel "
 
 repackage -e
 returnval=$?
@@ -30,6 +30,6 @@ done
 #	let returnval=returnval+$?
 #done
 
-ln -sf libudev.so.1 ./packages/$PACKAGE/lib64/libudev.so.0
+ln -sf libudev.so.1 ./packages/$PACKAGE/usr/lib64/libudev.so.0
 
 exit $returnval

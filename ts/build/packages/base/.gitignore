@@ -22,8 +22,8 @@
 !/etc/security/namespace.d/
 !/etc/security/namespace.d/.gitignore
 
-/lib64/security/
-!/lib64/security/pam_hooks.so
+/usr/lib64/security/
+!/usr/lib64/security/pam_hooks.so
 /lib64/ld-linux-*
 
 /sbin/
