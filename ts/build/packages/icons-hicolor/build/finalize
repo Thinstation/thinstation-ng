@@ -37,4 +37,4 @@ for icontheme in `ls --color=never /usr/share/icons`; do
 		/bin/gtk-update-icon-cache -i /usr/share/icons/$icontheme 2>/dev/null
 	fi
 done
-rm /bin/gtk-update-icon-cache
+rm /usr/bin/gtk-update-icon-cache

@@ -1,5 +1,5 @@
 /etc/
-/sbin/
+/usr/sbin/
 /build/installed
 /var/
 /lib64/

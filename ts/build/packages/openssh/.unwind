@@ -1,3 +1,4 @@
 #05a3968bb466ac1fe9178af831ec951c  .dna
-mkdir -p /root/usrshare-migrate/ts/build/packages/openssh/build/extra/usr/lib64/security
-ln /usr/lib64/security/pam_motd.so /root/usrshare-migrate/ts/build/packages/openssh/build/extra/usr/lib64/security/pam_motd.so
+
+mkdir -p /ts/build/packages/openssh/build/extra/usr/lib64/security
+ln /usr/lib64/security/pam_motd.so /ts/build/packages/openssh/build/extra/usr/lib64/security/pam_motd.so

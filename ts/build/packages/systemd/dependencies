@@ -1,4 +1,5 @@
 base
 dbus
+less
 #pam
 #selinux-policy

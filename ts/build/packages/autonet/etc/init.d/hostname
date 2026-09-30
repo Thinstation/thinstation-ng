@@ -19,5 +19,5 @@ done
 
 if [ -n "$NET_DEVICE" ] ; then
 	. /run/log/net/$NET_DEVICE
-	hostnamectl set-hostname $CLIENT_NAME
+	hostnamectl set-hostname --transient "$CLIENT_NAME"
 fi

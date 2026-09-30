@@ -1,5 +1,5 @@
-/bin/
+/usr/bin/
 /build/installed
 /etc/
 /lib/
-/libexec/
+/usr/libexec/

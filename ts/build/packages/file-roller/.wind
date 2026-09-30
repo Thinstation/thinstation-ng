@@ -1,5 +1,5 @@
-#6eaa45359a2a9388dc454d253fa3533d  .dna
+#27b5b84aa825a9db7756bbe6db10fb8b  .dna
 
-rm -f /ts/build/packages/file-roller/build/extra/bin/tar
-rm -f /ts/build/packages/file-roller/build/extra/bin/unzip
-rm -f /ts/build/packages/file-roller/build/extra/bin/zip
+rm -f /ts/build/packages/file-roller/build/extra/usr/bin/tar
+rm -f /ts/build/packages/file-roller/build/extra/usr/bin/unzip
+rm -f /ts/build/packages/file-roller/build/extra/usr/bin/zip

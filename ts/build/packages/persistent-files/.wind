@@ -1,3 +1,3 @@
-#4ac2a504e6c684bd0402deb1c12d8e35  .dna
+#1fe9806ad42c3d327334f554c326c79f  .dna
 
-rm -f /ts/build/packages/persistent-files/bin/inotifywait
+rm -f /ts/build/packages/persistent-files/usr/bin/inotifywait

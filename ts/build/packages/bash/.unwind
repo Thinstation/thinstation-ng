@@ -1,4 +1,4 @@
-#c231a68487f0e188f28e7ccb5aa58174  .dna
+#0535e6ff49bd0047b37c20d7df6e9057  .dna
 
-mkdir -p /ts/build/packages/bash/bin
-ln /usr/bin/bash /ts/build/packages/bash/bin/bash
+mkdir -p /ts/build/packages/bash/usr/bin
+ln /usr/bin/bash /ts/build/packages/bash/usr/bin/bash

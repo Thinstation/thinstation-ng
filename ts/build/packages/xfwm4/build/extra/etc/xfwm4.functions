@@ -233,7 +233,7 @@ xfconf_settings()
 		xfconf-query -c xfwm4 -p /general/use_compositing -t bool -s false -n
 	fi
 	if [ -n "$XFWM4_THEME" ] && [ "$XFWM4_THEME" != "ALL" ]; then
-		if [ -e /lib64/themes/$XFWM4_THEME/xfwm4/themerc ]; then
+		if [ -e /usr/share/themes/$XFWM4_THEME/xfwm4/themerc ]; then
 			xfconf-query -c xfwm4 -p /general/theme -t string -s $XFWM4_THEME -n
 		fi
 	fi

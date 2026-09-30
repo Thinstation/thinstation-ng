@@ -1,5 +1,5 @@
-#7673914bfa07a1a52f1dc5b08d69a147  .dna
+#f330e470b9de0f73c27e3e328a2da0a1  .dna
 
-rm -f /ts/build/packages/locale/bin/loadkeys
-rm -f /ts/build/packages/locale/bin/locale
-rm -f /ts/build/packages/locale/bin/setfont
+rm -f /ts/build/packages/locale/usr/bin/loadkeys
+rm -f /ts/build/packages/locale/usr/bin/locale
+rm -f /ts/build/packages/locale/usr/bin/setfont

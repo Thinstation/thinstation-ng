@@ -1,19 +1,19 @@
-#fd8f579ef2489bcf6e262719a9da8d65  .dna
+#bff84c54a7cefb1f402dacd9e8294112  .dna
 
-rm -f /ts/build/packages/extensions/bin/bzip2
-rm -f /ts/build/packages/extensions/bin/grep
-rm -f /ts/build/packages/extensions/bin/gzip
-rm -f /ts/build/packages/extensions/bin/ifconfig
-rm -f /ts/build/packages/extensions/bin/ldconfig
-rm -f /ts/build/packages/extensions/bin/ldd
-rm -f /ts/build/packages/extensions/bin/lsusb
-rm -f /ts/build/packages/extensions/bin/nano
-rm -f /ts/build/packages/extensions/bin/setpci
-rm -f /ts/build/packages/extensions/bin/setserial
-rm -f /ts/build/packages/extensions/bin/strace
-rm -f /ts/build/packages/extensions/bin/umount
-rm -f /ts/build/packages/extensions/bin/usb-devices
-rm -f /ts/build/packages/extensions/sbin/chroot
+rm -f /ts/build/packages/extensions/usr/bin/bzip2
+rm -f /ts/build/packages/extensions/usr/bin/chroot
+rm -f /ts/build/packages/extensions/usr/bin/grep
+rm -f /ts/build/packages/extensions/usr/bin/gzip
+rm -f /ts/build/packages/extensions/usr/bin/ifconfig
+rm -f /ts/build/packages/extensions/usr/bin/ldconfig
+rm -f /ts/build/packages/extensions/usr/bin/ldd
+rm -f /ts/build/packages/extensions/usr/bin/lsusb
+rm -f /ts/build/packages/extensions/usr/bin/nano
+rm -f /ts/build/packages/extensions/usr/bin/setpci
+rm -f /ts/build/packages/extensions/usr/bin/setserial
+rm -f /ts/build/packages/extensions/usr/bin/strace
+rm -f /ts/build/packages/extensions/usr/bin/umount
+rm -f /ts/build/packages/extensions/usr/bin/usb-devices
 rm -f /ts/build/packages/extensions/usr/share/terminfo/a/ansi
 rm -f /ts/build/packages/extensions/usr/share/terminfo/d/dumb
 rm -f /ts/build/packages/extensions/usr/share/terminfo/l/linux

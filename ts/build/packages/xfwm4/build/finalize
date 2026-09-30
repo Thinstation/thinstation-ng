@@ -18,7 +18,7 @@ if [ "$XFWM4_THEME" != "ALL" ]; then
 		XFWM4_THEME=Default
 	fi
 	if [ -e /usr/share/themes/$XFWM4_THEME/xfwm4/themerc ]; then
-		for theme in `find /usr/share/themes -name themerc |cut -d "/" -f4`; do
+		for theme in `find /usr/share/themes -name themerc |cut -d "/" -f5`; do
 			if [ "$theme" != "$XFWM4_THEME" ]; then
 				rm -rf /usr/share/themes/$theme/xfwm4
 				if [ -z "`ls -A /usr/share/themes/$theme`" ]; then
@@ -34,7 +34,7 @@ if [ -d /usr/share/mime/packages ]; then
 	update-mime-database /usr/share/mime
 fi
 if is_enabled $XFWM4_KIOSK; then
-	rm -f /bin/xfce4-panel
+	rm -f /usr/bin/xfce4-panel
 	sed -e '/DONT_VT_SWITCH_STATE/d'	-i /etc/thinstation.defaults
 	sed -e '/DONT_ZAP_STATE/d'		-i /etc/thinstation.defaults
 	echo 'DONT_VT_SWITCH_STATE=true'	>> /etc/thinstation.defaults

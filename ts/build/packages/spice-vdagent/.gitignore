@@ -1,6 +1,6 @@
-/bin/
+/usr/bin/
 /etc/
 /lib64/
 /run/
-/sbin/
+/usr/sbin/
 /build/scripts/

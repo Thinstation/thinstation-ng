@@ -1,8 +1,8 @@
-/bin/
+/usr/bin/
 /etc/
 /lib/
-/libexec/
-/sbin/
+/usr/libexec/
+/usr/sbin/
 /var/
 /build/installed
 /lib64/

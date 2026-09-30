@@ -5,7 +5,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/sbin/docker-iso-update
+ExecStart=/usr/bin/docker-iso-update
 RemainAfterExit=yes
 
 [Install]

@@ -2,12 +2,12 @@
 systemd-sysusers
 systemd-tmpfiles --create
 
-rm -rf /lib64/doc
+rm -rf /usr/share/doc
 
 dbus-uuidgen > /etc/machine-id
 chmod 0444 /etc/machine-id
 
-sed -i '/session[[:space:]]\+include[[:space:]]\+system-auth/a session    optional     pam_hooks.so /sbin/session $PAM_USER' /etc/pam.d/login
+sed -i '/session[[:space:]]\+include[[:space:]]\+system-auth/a session    optional     pam_hooks.so /usr/bin/session $PAM_USER' /etc/pam.d/login
 
 for var in $(compgen -v | grep '^MOUNT_'); do
     mount="${!var}"
@@ -64,10 +64,10 @@ if [ -e /etc/pam.d/login ]; then
         sed -i -e "s/user = root/user = $TSUSER/g" /etc/pam.d/login
 fi
 
-if [ "`readlink /bin/su`" == "/bin/busybox" ]; then
-	chmod u+s /bin/busybox
+if [ "`readlink /usr/bin/su`" == "/bin/busybox" ]; then
+	chmod u+s /usr/bin/busybox
 else
-	chmod u+s /bin/su
+	chmod u+s /usr/bin/su
 fi
 chmod 640 /etc/securetty
 chmod 1777 /var/tmp
@@ -129,14 +129,22 @@ chmod 644 /etc/busybox.conf
 # Privileged helpers must be owned by root before enabling setuid. Build
 # workspaces may be owned by an unprivileged runner account, and cp -a keeps
 # that numeric ownership in the assembled tree.
-chmod u-s /bin/busybox.shared /bin/su /sbin/unix_chkpwd 2>/dev/null || true
-chown root:root /bin/busybox.shared /bin/su /sbin/unix_chkpwd 2>/dev/null || true
-chmod u+s /bin/busybox.shared /bin/su
-chmod u+s /sbin/unix_chkpwd
+#
+# Do not make the shared BusyBox multicall binary setuid.  Doing so makes every
+# applet (including harmless commands such as true) a setuid executable.  The
+# systemd halt/poweroff/reboot frontends provide the privileged power actions.
+chmod u-s /usr/bin/busybox.shared /usr/bin/su /usr/bin/unix_chkpwd 2>/dev/null || true
+chown root:root /usr/bin/busybox.shared /usr/bin/su /usr/bin/unix_chkpwd 2>/dev/null || true
+chmod 755 /usr/bin/busybox.shared
+chmod u+s /usr/bin/su /usr/bin/unix_chkpwd
 
-/sbin/pwconv
+for powercmd in halt poweroff reboot; do
+    ln -sf /usr/bin/systemctl /usr/bin/$powercmd
+done
+
+/usr/bin/pwconv
 	wait
-/sbin/grpconv
+/usr/bin/grpconv
 	wait
 chmod 000 /etc/shadow
 chmod 000 /etc/gshadow

@@ -185,18 +185,28 @@ lib_in_path()
 	for lpath in `cat lpaths.tmp` $filepath; do
 		if [ -e ./tmp-tree$lpath/$1 ] \
 		|| [ -e $pkgname$lpath/$1 ] \
-		|| [ -e ./tmp-tree/lib64/*/$1 ] \
-		|| [ -e $pkgname/lib64/*/$1 ] \
-		|| [ -e ./tmp-tree/libexec/$1 ] \
-		|| [ -e ./tmp-tree/libexec/*/$1 ] \
-		|| [ -e $pkgname/libexec/$1 ] \
-		|| [ -e $pkgname/libexec/*/$1 ]; then
+		|| [ -e ./tmp-tree/usr/lib64/*/$1 ] \
+		|| [ -e $pkgname/usr/lib64/*/$1 ] \
+		|| [ -e ./tmp-tree/usr/libexec/$1 ] \
+		|| [ -e ./tmp-tree/usr/libexec/*/$1 ] \
+		|| [ -e $pkgname/usr/libexec/$1 ] \
+		|| [ -e $pkgname/usr/libexec/*/$1 ]; then
 			return 0
 		fi
 	done
-	if [ "`echo $filepath |sed -e 's|/|/\n|g' |grep -c '/'`" -gt "2" ]; then
-		likely_rpath=`echo $filepath |cut -d '/' -f1-3`
-		if [ -n "`find  $pkgname$likely_rpath -name $1`" ]; then
+	# Preserve the pre-usr-merge rpath depth semantics. /usr is only the
+	# canonical prefix now; it must not count as an extra path component.
+	rpath_source=$filepath
+	rpath_prefix=""
+	case "$rpath_source" in
+		/usr/*)
+			rpath_source="${rpath_source#/usr}"
+			rpath_prefix="/usr"
+			;;
+	esac
+	if [ "`echo $rpath_source |sed -e 's|/|/\n|g' |grep -c '/'`" -gt "2" ]; then
+		likely_rpath="$rpath_prefix`echo $rpath_source |cut -d '/' -f1-3`"
+		if [ -n "`find $pkgname$likely_rpath -name $1 2>/dev/null`" ]; then
 			return 0
 		fi
 	fi
@@ -212,7 +222,7 @@ calculate_lib_dependencies()
 	|while read libfile; do
 		filepath=`dirname $filename | sed -e "s,$pkgname,,"`
 		export filepath
-		if ! lib_in_path $libfile && [ ! -e $pkgname/lib64/$libfile ]; then
+		if ! lib_in_path $libfile && [ ! -e $pkgname/usr/lib64/$libfile ]; then
 			if [ "$DISPLAYED" != "TRUE" ]; then
 				echo "Adding library dependencies for `basename $filename`"
 				DISPLAYED=TRUE
@@ -220,18 +230,17 @@ calculate_lib_dependencies()
 			libsource="`find /usr/lib /usr/lib64 -name $libfile |grep -v vmware |tail -n1`"
 			if [ -n "$libsource" ] && [ -e $libsource ]; then
 				echo -e "\t\t\t$libfile"
-				if [ ! -e $pkgname/lib64 ]; then
-					mkdir -p $pkgname/lib64
-				fi
 				linkdest=`readlink $libsource`
 				if [ -n "$linkdest" ]; then
-					[ ! -e $pkgname/lib64/$libfile ] \
-					&& $cputil `dirname $libsource`/$linkdest ./tmp-tree/lib64/$libfile 2>/dev/null \
-					&& echo "$pkgname/lib64/$libfile" >> liblist.added
+					[ ! -e $pkgname/usr/lib64/$libfile ] \
+					&& mkdir -p $pkgname/usr/lib64 \
+					&& $cputil `dirname $libsource`/$linkdest $pkgname/usr/lib64/$libfile 2>/dev/null \
+					&& echo "$pkgname/usr/lib64/$libfile" >> liblist.added
 				else
-					[ ! -e $pkgname/lib64/$libfile ] \
-					&& $cputil $libsource ./tmp-tree/lib64/$libfile 2>/dev/null \
-					&& echo "$pkgname/lib64/$libfile" >> liblist.added
+					[ ! -e $pkgname/usr/lib64/$libfile ] \
+					&& mkdir -p $pkgname/usr/lib64 \
+					&& $cputil $libsource $pkgname/usr/lib64/$libfile 2>/dev/null \
+					&& echo "$pkgname/usr/lib64/$libfile" >> liblist.added
 				fi
 			else
 				echo "Could not find $libfile !"
@@ -244,6 +253,7 @@ export -f calculate_lib_dependencies
 lib_dependencies()
 {
 	echo -e "\nAdding Library Dependencies\n"
+	mkdir -p ./tmp-tree/usr/lib64
 
 	if [ -e ./tmp-tree/etc/ld.so.conf ]; then
 		cat ./tmp-tree/etc/ld.so.conf |grep -v include > lpaths.tmp
@@ -312,7 +322,7 @@ copy_module()
 		src=/lib/modules/$2/$rpath/$requested
 	fi
 
-	local dest=$3/lib/modules/$2/$rpath
+	local dest=$3/usr/lib64/modules/$2/$rpath
 	if [ ! -e "$src" ]; then
 		if grep /lib/modules/$2/modules.builtin -e "${requested%.xz}" -q; then
 			return 3
@@ -351,16 +361,16 @@ module_dependencies()
 {
 echo -e "\nAdding modules that are dependencies of selected modules"
 for pkgname in `list_all_packages`; do
-	if [ -e $pkgname/lib64/modules/$KERNVER ]; then
-		find $pkgname/lib64/modules/$KERNVER -name \*.ko.xz > ./modules.list
+	if [ -e $pkgname/usr/lib64/modules/$KERNVER ]; then
+		find $pkgname/usr/lib64/modules/$KERNVER -name \*.ko.xz > ./modules.list
 		while [ -s ./modules.list ]; do
 			for module in `cat modules.list`; do
 				allfirm `basename $module`
 				depends="`modinfo -F depends $module |sed -e 's/,/ /g'`"
 				# Checks for already existing modules
 				for depend in $depends; do
-					if [ -z "`find ./tmp-tree/lib64/modules/$KERNVER -name ${depend}.ko.xz`" ] && \
-					   [ -z "`find $pkgname/lib64/modules/$KERNVER -name ${depend}.ko.xz`" ]; then
+					if [ -z "`find ./tmp-tree/usr/lib64/modules/$KERNVER -name ${depend}.ko.xz`" ] && \
+					   [ -z "`find $pkgname/usr/lib64/modules/$KERNVER -name ${depend}.ko.xz`" ]; then
 						needed="$needed ${depend}.ko.xz"
 					fi
 				done
@@ -408,14 +418,14 @@ module_package_dependencies()
 	for pkgname in `list_mod_packages`; do
 		(ls ./kernel/dependencies_module/ ) |
 		while read module; do
-			if [ -n "`find ./tmp-tree/lib/modules/$KERNVER -name ${module}.ko.xz`" ] || \
-			   [ -n "`find $pkgname/lib/modules/$KERNVER -name ${module}.ko.xz`" ]; then
+			if [ -n "`find ./tmp-tree/usr/lib64/modules/$KERNVER -name ${module}.ko.xz`" ] || \
+			   [ -n "`find $pkgname/usr/lib64/modules/$KERNVER -name ${module}.ko.xz`" ]; then
 				(cat ./kernel/dependencies_module/$module ) |
 				while read type name; do
 					case $type in
 						module)
-							if [ -z "`find ./tmp-tree/lib/modules/$KERNVER -name ${name}.ko.xz`" ] && \
-							   [ -z "`find $pkgname/lib/modules/$KERNVER -name ${name}.ko.xz`" ]; then
+							if [ -z "`find ./tmp-tree/usr/lib64/modules/$KERNVER -name ${name}.ko.xz`" ] && \
+							   [ -z "`find $pkgname/usr/lib64/modules/$KERNVER -name ${name}.ko.xz`" ]; then
 								if ! is_enabled $DISPLAYED; then
 									echo "Adding module dependencies for $module"
 									DISPLAYED=true
@@ -427,7 +437,7 @@ module_package_dependencies()
 						;;
 						firmware)
 							if is_enabled $ts_allfirmware; then
-								if [ ! -e "./tmp-tree/lib/firmware/$name" ]; then
+								if [ ! -e "./tmp-tree/usr/lib64/firmware/$name" ]; then
 									if ! is_enabled $DISPLAYED; then
 										echo "Adding firmware dependencies for $module"
 										DISPLAYED=true
@@ -451,8 +461,8 @@ module_package_dependencies()
 								else
 									echo "Not Found $name!!"
 								fi
-							elif [ -z "`find ./tmp-tree/lib/modules -name ${module}.ko.xz`" ] && \
-								 [ -n "`find $pkgname/lib/modules/$KERNVER -name ${module}.ko.xz`" ] && \
+							elif [ -z "`find ./tmp-tree/usr/lib64/modules -name ${module}.ko.xz`" ] && \
+								 [ -n "`find $pkgname/usr/lib64/modules/$KERNVER -name ${module}.ko.xz`" ] && \
 								 [ ! -e $PACDIR/$name.pkg ]; then
 								if find_package $name ; then
 									echo "building-pkg $name"
@@ -494,6 +504,7 @@ merge_root_into_usr()
 {
 	local rootdir=$1
 	local usrdir=$2
+	local make_link=${3:-true}
 
 	# Package assembly still uses ThinStation's historical root layout.
 	# Convert only the completed filesystem so package definitions do not
@@ -510,7 +521,59 @@ merge_root_into_usr()
 		rm -f "$rootdir"
 	fi
 
-	ln -s "usr/${usrdir#usr/}" "$rootdir"
+	if [ "$make_link" = "true" ]; then
+		ln -s "usr/${usrdir#usr/}" "$rootdir"
+	fi
+}
+
+merge_usr_sbin_into_bin()
+{
+	local src base dst
+
+	if [ -L usr/sbin ]; then
+		rm -f usr/sbin
+		ln -s bin usr/sbin
+		return 0
+	fi
+
+	[ -d usr/sbin ] || {
+		ln -s bin usr/sbin
+		return 0
+	}
+
+	mkdir -p usr/bin
+
+	while IFS= read -r -d '' src; do
+		base=$(basename "$src")
+		dst="usr/bin/$base"
+
+		if [ ! -e "$dst" ] && [ ! -L "$dst" ]; then
+			mv "$src" "$dst"
+			continue
+		fi
+
+		# Package normalization should make collisions exceptional. Accept only
+		# genuinely identical regular files or identical symlinks; anything else
+		# means an old package fix-up still needs to be corrected at its source.
+		if [ -f "$src" ] && [ ! -L "$src" ] &&
+		   [ -f "$dst" ] && [ ! -L "$dst" ] &&
+		   cmp -s "$src" "$dst"; then
+			rm -f "$src"
+			continue
+		fi
+
+		if [ -L "$src" ] && [ -L "$dst" ] &&
+		   [ "$(readlink "$src")" = "$(readlink "$dst")" ]; then
+			rm -f "$src"
+			continue
+		fi
+
+		echo "ERROR: conflicting merged-bin payload: $src and $dst" >&2
+		return 1
+	done < <(find usr/sbin -mindepth 1 -maxdepth 1 -print0)
+
+	rm -rf usr/sbin
+	ln -s bin usr/sbin
 }
 
 usrmerge_tree()
@@ -520,8 +583,9 @@ usrmerge_tree()
 	mkdir -p usr usr/lib64 usr/share
 	merge_root_into_usr bin usr/bin
 	merge_root_into_usr sbin usr/sbin
-	merge_root_into_usr libexec usr/libexec
-	merge_root_into_usr share usr/share
+	merge_usr_sbin_into_bin
+	merge_root_into_usr libexec usr/libexec false
+	merge_root_into_usr share usr/share false
 
 	# ThinStation historically has one combined vendor/library namespace in
 	# lib64. Preserve that ABI while moving the canonical tree under /usr.
@@ -538,12 +602,12 @@ usrmerge_tree()
 	rm -f usr/lib
 	ln -s lib64 usr/lib
 
-	# Preserve ThinStation's historical aliases, but point them at the
-	# canonical usr-merged tree where applicable.
-	rm -f usr/icons usr/etc usr/local
+	# Preserve the historical /usr/etc alias while keeping /usr/local
+	# as an independent hierarchy for locally installed software.
+	rm -f usr/etc
 	ln -sf /etc usr/etc
-	ln -sf /usr/share/icons usr/icons
-	ln -sf /usr usr/local
+	if [ -L usr/local ]; then rm -f usr/local; fi
+	mkdir -p usr/local
 }
 
 make_initrd()
@@ -609,7 +673,9 @@ EOF
 	for module in squashfs loop overlay; do
 		copy_module ${module}.ko.xz $KERNVER ./tmp-stub
 	done
+	mv ./tmp-stub/usr/lib64 ./tmp-stub/lib
         depmod -b ./tmp-stub $KERNVER 2>/dev/null
+#exit 1
 	rm ./tmp-stub/lib/modules/$KERNVER/modules.{alias,alias.bin,builtin.alias.bin,builtin.bin,dep.bin,devname,softdep,symbols,symbols.bin,weakdep}
 
         cd tmp-stub
@@ -741,7 +807,7 @@ package_module_dependencies()
 		(cat ./kernel/dependencies_package/$name ) |
 		while read module; do
 			if [ -e $PACDIR/$name.package ]; then
-				if [ -z "`find ./tmp-tree/lib/modules/$KERNVER -name ${module}.ko.xz`" ]; then
+				if [ -z "`find ./tmp-tree/usr/lib64/modules/$KERNVER -name ${module}.ko.xz`" ]; then
 					echo "Package : $name   Module: $module"
 					copy_module ${module}.ko.xz $KERNVER ./tmp-tree
 					if [ "$?" == "0" ]; then
@@ -749,7 +815,7 @@ package_module_dependencies()
 					fi
 				fi
 			elif [ -e $PACDIR/$name.pkg ]; then
-				if [ -z "`find $PKGDIR/$name/lib/modules/$KERNVER -name ${module}.ko.xz`" ]; then
+				if [ -z "`find $PKGDIR/$name/usr/lib64/modules/$KERNVER -name ${module}.ko.xz`" ]; then
 					echo "Pkg     : $name   Module: $module"
 					copy_module ${module}.ko.xz $KERNVER $PKGDIR/$name
 					if [ "$?" == "0" ]; then
@@ -908,6 +974,7 @@ sample_configuration()
 locales()
 {
 	echo -e "\nAdding locales to archive.\n"
+	mkdir -p ./tmp-tree/usr/lib64/locale
 	# Removes extended locale libs if not selected
 	if [ -n "`find ./tmp-tree/build -maxdepth 1 -name \*.template`" ]; then
 		for localedef in `cat ./tmp-tree/build/*.template`; do
@@ -1013,16 +1080,20 @@ done
 
 copy_firmware()
 {
+	local firmware_root=/usr/lib/firmware
+	[ -d "$firmware_root" ] || firmware_root=/lib/firmware
+
 	if [ -n "$2" ]; then
-		firmfiles=`find -L /lib/firmware/ -name $1\* | grep $2`
+		firmfiles=`find -L "$firmware_root/" -name $1\* | grep $2`
 	else
-		firmfiles=$(find -L /lib/firmware/`dirname $1` -name `basename $1`\* 2>/dev/null)
+		firmfiles=$(find -L "$firmware_root/`dirname $1`" -name `basename $1`\* 2>/dev/null)
 	fi
 	if [ -n "$firmfiles" ]; then
 		for firmfile in $firmfiles; do
-			firmpath=$(echo "./tmp-tree${firmfile}" |sed 's|/lib/|/lib64/|g')
+			ffile=$firmfile
+			firmpath=$(echo "./tmp-tree${firmfile}" | sed -e 's|^./tmp-tree/usr/lib/|./tmp-tree/usr/lib64/|' -e 's|^./tmp-tree/lib/|./tmp-tree/usr/lib64/|')
 			if [ -e $firmfile ]; then
-				if [ -n `readlink $firmfile` ]; then
+				if [ -n "`readlink $firmfile`" ]; then
 					ffile=`readlink -e $firmfile`
 				fi
 				if [ -e $ffile ]; then
@@ -1226,7 +1297,7 @@ fi
 
 mkdir -p $PKGDIR
 unsquashfs -d ./tmp-tree $INITDIR/initrd.devices > /dev/null
-mkdir -p ./tmp-tree/lib64/modules
+mkdir -p ./tmp-tree/usr/lib64/modules
 mkdir -p ./tmp-tree/packages
 mkdir -p $MODDIR
 
@@ -1255,28 +1326,31 @@ if [ ! -e /boot/vmlinuz-$KERNVER ] ; then
 	exit 0
 fi
 
+firmware_root=/usr/lib/firmware
+[ -d "$firmware_root" ] || firmware_root=/lib/firmware
+
 if is_enabled $ts_earlymicrocode ; then
 	echo "Creating Early Microcode!"
 	mkdir -p kernel/x86/microcode
-	cat /lib/firmware/intel-ucode/*-*-* > kernel/x86/microcode/GenuineIntel.bin
-	cat /lib/firmware/amd-ucode/microcode_amd*.bin > kernel/x86/microcode/AuthenticAMD.bin
+	cat "$firmware_root"/intel-ucode/*-*-* > kernel/x86/microcode/GenuineIntel.bin
+	cat "$firmware_root"/amd-ucode/microcode_amd*.bin > kernel/x86/microcode/AuthenticAMD.bin
 	ls kernel/x86/microcode/* | cpio -o -C 1024 -H newc -R 0:0 > $INITDIR/ucode
 	rm -rf kernel/x86
 elif is_enabled $ts_allfirmware ; then
 	echo "Doing an All Firmware Build!"
-	if [ -e /lib/firmware/amd-ucode ]; then
-	    for microcode in `find /lib/firmware/amd-ucode -type f |cut -d "/" -f4-`; do
+	if [ -e "$firmware_root/amd-ucode" ]; then
+	    for microcode in `find "$firmware_root/amd-ucode" -type f | sed "s|^$firmware_root/||"`; do
 		copy_firmware $microcode
 	    done
 	fi
-	if [ -e /lib/firmware/intel-ucode ]; then
-	    for microcode in `find /lib/firmware/intel-ucode -type f |cut -d "/" -f4-`; do
+	if [ -e "$firmware_root/intel-ucode" ]; then
+	    for microcode in `find "$firmware_root/intel-ucode" -type f | sed "s|^$firmware_root/||"`; do
 		copy_firmware $microcode
 	    done
 	fi
 fi
 
-mkdir -p ./tmp-tree/lib64/modules/$KERNVER
+mkdir -p ./tmp-tree/usr/lib64/modules/$KERNVER
 copy_module modules.builtin $KERNVER ./tmp-tree
 copy_module modules.order $KERNVER ./tmp-tree
 if [ -e ./ALLMODULES ]; then
@@ -1366,6 +1440,10 @@ for filename in `cat ./filelist | grep "\.param"` ; do
 	. $filename
 done
 rm ./filelist
+
+# Normalize the assembled runtime tree before locale/chroot/fixup work.
+# Compatibility paths are needed by localedef and chrooted helpers.
+( cd ./tmp-tree && usrmerge_tree )
 
 # Compile ThinStation's own gettext catalogs from source for every build.
 # The generated package cache may contain older .mo files when a .po changes;
@@ -1626,7 +1704,7 @@ ln -sf /usr/share/zoneinfo/$TIME_ZONE ./tmp-tree/etc/localtime
 
 # Copy across sample file for www administration interface
 if [ -e $PACDIR/www.* ]; then
-  WEBDIR=./tmp-tree/lib64/www/html/admin/config
+  WEBDIR=./tmp-tree/usr/lib64/www/html/admin/config
 	if [ ! -d $WEBDIR ] ; then 
 		mkdir -p $WEBDIR
 	fi
@@ -1745,10 +1823,10 @@ mesa()
 {
 	if is_disabled $ts_mesa_3d; then
 		echo -e "Mesa 3D disabled, deleting the dri folder."
-		rm -rf ./tmp-tree/lib64/dri
-		rm -rf ./tmp-tree/lib64/gallium-pipe
-		rm -rf ./tmp-tree/lib64/vdpau
-		rm -f ./tmp-tree/lib64/xorg/modules/extensions/libglx.so
+		rm -rf ./tmp-tree/usr/lib64/dri
+		rm -rf ./tmp-tree/usr/lib64/gallium-pipe
+		rm -rf ./tmp-tree/usr/lib64/vdpau
+		rm -f ./tmp-tree/usr/lib64/xorg/modules/extensions/libglx.so
 	fi
 }
 
@@ -1790,35 +1868,30 @@ filesystem_fixups()
 	fi
 	echo "CDVOLNAME=$ts_cdvolname" >> ./tmp-tree/etc/thinstation.env
 	echo "TS_VERSION=$TSVER" >> ./tmp-tree/etc/thinstation.env
-	if [ -e ./tmp-tree/etc/icewm/toolbar ]; then
-		echo -e "\tFixing IceWM toolbar"
-		sed -i "s/\$XTERM_CMD/$XTERM_CMD/g" ./tmp-tree/etc/icewm/toolbar
-		sed -i "s/\$XTERM_CMD/$XTERM_CMD/g" ./tmp-tree/etc/icewm/keys
-	fi
 	if [ -e ./tmp-tree/usr/lib64/gconv ] ; then
 		echo -e "\tBuilding Charmap Cache"
 		for i in `ls ./tmp-tree/usr/lib64/gconv --color=never |cut -d . -f1`; do
 			cat /usr/lib64/gconv/gconv-modules|grep -e "$i" >>./tmp-tree/usr/lib64/gconv/gconv-modules
 		done
-        cp -H `which iconvconfig` ./tmp-tree/bin/.
-        chroot ./tmp-tree /bin/iconvconfig
-        rm ./tmp-tree/bin/iconvconfig
+        cp -H `which iconvconfig` ./tmp-tree/usr/bin/.
+        chroot ./tmp-tree /usr/bin/iconvconfig
+        rm ./tmp-tree/usr/bin/iconvconfig
         fi
 	echo -e "\tRemoving Extra Files"
 	find ./tmp-tree -name .gitignore -delete
 #	if [ ! -e ./tmp-tree/etc/init.d/audio ]; then
-#		for sound in `find ./tmp-tree/lib/modules -type d -name sound`; do
+#		for sound in `find ./tmp-tree/usr/lib64/modules -type d -name sound`; do
 #			rm -rf $sound
 #		done
 #	fi
-#	if [ -z "`find ./tmp-tree/lib/modules -name udf.ko.xz -o -name isofs.ko.xz`" ]; then
-#		for cdrom in `find ./tmp-tree/lib/modules -type d -name cdrom`; do
+#	if [ -z "`find ./tmp-tree/usr/lib64/modules -name udf.ko.xz -o -name isofs.ko.xz`" ]; then
+#		for cdrom in `find ./tmp-tree/usr/lib64/modules -type d -name cdrom`; do
 #			rm -rf $cdrom
 #		done
 #	fi
 #	for KERNVER in $KERNVERS; do
-#		if [ ! -e ./tmp-tree/lib/modules/$KERNVER/kernel/fs ]; then
-#			for driver in `find ./tmp-tree/lib/modules/$KERNVER -type d -name scsi -o -name ata -o -name fusion`; do
+#		if [ ! -e ./tmp-tree/usr/lib64/modules/$KERNVER/kernel/fs ]; then
+#			for driver in `find ./tmp-tree/usr/lib64/modules/$KERNVER -type d -name scsi -o -name ata -o -name fusion`; do
 #				rm -rf $driver
 #			done
 #		fi
@@ -1827,7 +1900,7 @@ filesystem_fixups()
 		echo -e "\tRemoving Extra Font Files"
 		rm -rf ./tmp-tree/usr/share/X11/fonts
 		rm -rf ./tmp-tree/usr/share/X11
-		rm -rf ./tmp-tree/lib64/keymaps
+		rm -rf ./tmp-tree/usr/lib64/keymaps
 		rm -f ./tmp-tree/etc/background.jpg
 	else
 		echo -e "\tRunning mkfontdir and mkfontscale"
@@ -1839,66 +1912,66 @@ filesystem_fixups()
 			mkfontdir $fontdir
 		done
 			fi
-		if [ -e ./tmp-tree/lib64/gdk-pixbuf-2.0/2.10.0/loaders ] ; then
+		if [ -e ./tmp-tree/usr/lib64/gdk-pixbuf-2.0/2.10.0/loaders ] ; then
 			echo -e "\tCaching pixbuf loaders"
-			for loader in `find ./tmp-tree/lib64/gdk-pixbuf-2.0/ -type f -printf "%f "`; do
+			for loader in `find ./tmp-tree/usr/lib64/gdk-pixbuf-2.0/ -type f -printf "%f "`; do
 				loader=`find /usr/lib64/gdk-pixbuf-2.0/ -name $loader`
 				lver=`echo $loader |cut -d "/" -f5`
 				gdk-pixbuf-query-loaders-64 $loader | \
 					grep -v "#" \
-					>>./tmp-tree/lib64/gdk-pixbuf-2.0/$lver/loaders.cache
+					>>./tmp-tree/usr/lib64/gdk-pixbuf-2.0/$lver/loaders.cache
 			done
 		fi
-#		if [ -d ./tmp-tree/lib/pango ] ;then
+#		if [ -d ./tmp-tree/usr/lib/pango ] ;then
 #			echo -e "\tCaching pango modules"
-#			for module in `find ./tmp-tree/lib/pango -type f -printf "%f "`; do
+#			for module in `find ./tmp-tree/usr/lib/pango -type f -printf "%f "`; do
 #				module=`find /usr/lib/pango -name $module`
 #				pver=`echo $module |cut -d "/" -f5`
 #				pango-querymodules $module | \
 #					grep -v "#" \
-#					>> ./tmp-tree/lib/pango/$pver/modules.cache
+#					>> ./tmp-tree/usr/lib/pango/$pver/modules.cache
 #			done
 #		fi
-		if [ -d ./tmp-tree/lib64/gtk-2.0 ]; then
+		if [ -d ./tmp-tree/usr/lib64/gtk-2.0 ]; then
 			echo -e "\tCaching gtk-2.0 immodules"
-			for immodule in `find ./tmp-tree/lib64/gtk-2.0/2.10.0/immodules -type f -printf "%f "`; do
+			for immodule in `find ./tmp-tree/usr/lib64/gtk-2.0/2.10.0/immodules -type f -printf "%f "`; do
 				immodule=`find /usr/lib64/gtk-2.0/2.10.0/immodules -name $immodule`
 				gtk-query-immodules-2.0-64 $immodule | \
 					grep -v "#" \
-					>> ./tmp-tree/lib64/gtk-2.0/2.10.0/immodules.cache
+					>> ./tmp-tree/usr/lib64/gtk-2.0/2.10.0/immodules.cache
 			done
 		fi
-                if [ -d ./tmp-tree/lib64/gtk-3.0 ]; then
+                if [ -d ./tmp-tree/usr/lib64/gtk-3.0 ]; then
                         echo -e "\tCaching gtk-3.0 immodules"
-                        for immodule in `find ./tmp-tree/lib64/gtk-3.0/3.0.0/immodules -type f -printf "%f "`; do
+                        for immodule in `find ./tmp-tree/usr/lib64/gtk-3.0/3.0.0/immodules -type f -printf "%f "`; do
                                 immodule=`find /usr/lib64/gtk-3.0/3.0.0/immodules -name $immodule`
                                 gtk-query-immodules-3.0-64 $immodule | \
                                         grep -v "#" \
-                                        >> ./tmp-tree/lib64/gtk-3.0/3.0.0/immodules.cache
+                                        >> ./tmp-tree/usr/lib64/gtk-3.0/3.0.0/immodules.cache
                         done
                 fi
-		if [ -e ./tmp-tree/lib64/glib-2.0/schemas ]; then
+		if [ -e ./tmp-tree/usr/share/glib-2.0/schemas ]; then
 			echo -e "\tCompiling Schemas"
-			cp -H `which glib-compile-schemas` ./tmp-tree/bin/.
-			chroot ./tmp-tree /bin/glib-compile-schemas /lib64/glib-2.0/schemas 2>/dev/null
+			cp -H `which glib-compile-schemas` ./tmp-tree/usr/bin/.
+			chroot ./tmp-tree /usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null
 #			rm ./tmp-tree/bin/glib-compile-schemas
-			gio-querymodules-64 ./tmp-tree/lib64/gio/modules
+			gio-querymodules-64 ./tmp-tree/usr/lib64/gio/modules
 		fi
 	fi
 	echo -e "\tLinking BusyBox\n"
-	chroot ./tmp-tree /bin/busybox.shared --install -s
+	chroot ./tmp-tree /usr/bin/busybox.shared --install -s
 
 	if [ -e ./tmp-tree/usr/lib64/libcrypto.so.1.1 ]; then
-		cp -a /usr/lib64/.libcrypto.so.1.1.hmac ./tmp-tree/lib64
+		cp -a /usr/lib64/.libcrypto.so.1.1.hmac ./tmp-tree/usr/lib64
 	fi
 	if [ -e ./tmp-tree/usr/lib64/libssl.so.1.1 ]; then
-		cp -a /usr/lib64/.libssl.so.1.1.hmac ./tmp-tree/lib64
+		cp -a /usr/lib64/.libssl.so.1.1.hmac ./tmp-tree/usr/lib64
 	fi
         if echo "$ts_kernelcmdline" |grep -q -e 'fips=1'; then
                 touch tmp-tree/FIPS
-		cp -a /usr/lib64/hmaccalc tmp-tree/lib64/.
-		cp -a /usr/lib64/fipscheck tmp-tree/lib64/.
-		cp -a /usr/lib64/.*.hmac tmp-tree/lib64/.
+		cp -a /usr/lib64/hmaccalc tmp-tree/usr/lib64/.
+		cp -a /usr/lib64/fipscheck tmp-tree/usr/lib64/.
+		cp -a /usr/lib64/.*.hmac tmp-tree/usr/lib64/.
         fi
 	if [ -e ./tmp-tree/finalize ]; then
 		echo -e "\tRunning Finalize\n"
@@ -1908,7 +1981,7 @@ filesystem_fixups()
 		cat ./tmp-tree/finalize/* >> ./tmp-tree/build.finalize
 		cp /etc/passwd ./tmp-tree/build/.
 		cp /etc/group ./tmp-tree/build/.
-		chroot ./tmp-tree /bin/bash /build.finalize
+		chroot ./tmp-tree /usr/bin/bash /build.finalize
 		while fuser ./tmp-tree 2>&1 > /dev/null; do
 			sleep .1
 		done
@@ -1922,7 +1995,7 @@ filesystem_fixups()
 			echo -e "\tCompressing Modules"
 			export -f compress_module
 			export ts_modcmd
-			find ./tmp-tree/lib64/modules -name \*.ko | \
+			find ./tmp-tree/usr/lib64/modules -name \*.ko | \
 			 xargs -P $procs -I {} bash -c 'compress_module "$@"' _ {}
 		fi
 		depmod -b ./tmp-tree $KERNVER 2>/dev/null
@@ -1952,6 +2025,9 @@ compress_module()
 
 
 # this is the starting point =>
+# fastboot-tmp may have been preserved by a previous --savedir build. It is
+# build-specific scratch state, so never carry it into a new invocation.
+rm -rf ./fastboot-tmp
 remove_files
 rm -rf boot-images/initrd/{kernel_parameters,initrd,ucode,image.md5,lib.squash,vmlinuz*}
 

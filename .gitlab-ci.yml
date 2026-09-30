@@ -358,12 +358,14 @@ test-usr-merge-prototype:
           test "$(readlink ts/build/tmp-tree/lib)" = "usr/lib64"
           test "$(readlink ts/build/tmp-tree/lib64)" = "usr/lib64"
           test "$(readlink ts/build/tmp-tree/usr/lib)" = "lib64"
-          test "$(readlink ts/build/tmp-tree/libexec)" = "usr/libexec"
+          test ! -e ts/build/tmp-tree/libexec
+          test ! -L ts/build/tmp-tree/libexec
           test -d ts/build/tmp-tree/usr/libexec
           test "$(readlink ts/build/tmp-tree/usr/local)" = "/usr"
           test -d ts/build/tmp-tree/usr/share
           test ! -L ts/build/tmp-tree/usr/share
-          test "$(readlink ts/build/tmp-tree/share)" = "usr/share"
+          test ! -e ts/build/tmp-tree/share
+          test ! -L ts/build/tmp-tree/share
           test ! -e ts/build/tmp-tree/usr/X11R7
           test ! -L ts/build/tmp-tree/usr/X11R7
           test -x ts/build/tmp-tree/usr/bin/systemctl

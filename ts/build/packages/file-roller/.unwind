@@ -1,6 +1,6 @@
-#6eaa45359a2a9388dc454d253fa3533d  .dna
+#27b5b84aa825a9db7756bbe6db10fb8b  .dna
 
-mkdir -p /ts/build/packages/file-roller/build/extra/bin
-ln /usr/bin/tar /ts/build/packages/file-roller/build/extra/bin/tar
-ln /usr/bin/unzip /ts/build/packages/file-roller/build/extra/bin/unzip
-ln /usr/bin/zip /ts/build/packages/file-roller/build/extra/bin/zip
+mkdir -p /ts/build/packages/file-roller/build/extra/usr/bin
+ln /usr/bin/tar /ts/build/packages/file-roller/build/extra/usr/bin/tar
+ln /usr/bin/unzip /ts/build/packages/file-roller/build/extra/usr/bin/unzip
+ln /usr/bin/zip /ts/build/packages/file-roller/build/extra/usr/bin/zip

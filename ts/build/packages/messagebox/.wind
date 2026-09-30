@@ -1,4 +1,4 @@
-#27d65512d4d9cbe2a660a8f5ff3f1ffe  .dna
+#330c5a63df39fe4dac896b57de877321  .dna
 
-rm -f /ts/build/packages/messagebox/bin/Xdialog
-rm -f /ts/build/packages/messagebox/bin/dialog
+rm -f /ts/build/packages/messagebox/usr/bin/Xdialog
+rm -f /ts/build/packages/messagebox/usr/bin/dialog

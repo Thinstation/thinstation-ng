@@ -1,2 +1,2 @@
-/bin/gettext
-/sbin/useradd
+/usr/bin/gettext
+/usr/sbin/useradd

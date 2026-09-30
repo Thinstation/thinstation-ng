@@ -1,4 +1,4 @@
-#66354fb43d31c178b7cf825df4a8994d  .dna
+#7561f4163e6f465d7d89089143f52539  .dna
 
-mkdir -p /ts/build/packages/x-common/build/extra/bin
-ln /usr/bin/mcookie /ts/build/packages/x-common/build/extra/bin/mcookie
+mkdir -p /ts/build/packages/x-common/build/extra/usr/bin
+ln /usr/bin/mcookie /ts/build/packages/x-common/build/extra/usr/bin/mcookie

@@ -14,8 +14,8 @@ export DROP_FILES="	etc.conf \
 			init"
 
 export DROP_DIRS="	etc/kernel \
-			usr/lib64/dnf5 \
-			usr/lib64/kernel "
+			dnf5 \
+			kernel "
 
 repackage -e
 returnval=$?

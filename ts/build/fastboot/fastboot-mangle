@@ -4,10 +4,11 @@
 # The package/build format remains ThinStation's historical merged-root layout.
 # make_initrd() converts the completed tree to usr-merge before this script runs.
 #
-# lib.squash is the complete /usr vendor tree. The initrd keeps only the early
-# subset required to activate that tree:
-#   FASTBOOT=true      -> mount lib.squash read-only on /usr
-#   FASTBOOT=lotsofmem -> expand lib.squash onto /usr
+# Split /usr into an early initrd half and a deferred lib.squash half.
+#   FASTBOOT=true      -> early files live under /fastboot and mounted /usr
+#                         contains links back to them.
+#   FASTBOOT=lotsofmem -> deferred files are unpacked over /; no early payload
+#                         file is also present in lib.squash.
 
 LANG=C
 
@@ -17,6 +18,7 @@ HARDLINK=$3
 FB_COMP_EXTRA=$4
 
 FASTBOOT_DIR=../fastboot
+DEFERRED_DIR=../fastboot-tmp
 WORK_DIR=${TMPDIR:-/tmp}/thinstation-fastboot.$$
 
 USR_DIR=usr
@@ -152,6 +154,24 @@ expand_retained_library_dependencies()
 	done
 }
 
+copy_missing_retained_libraries()
+{
+	local lib source
+
+	while IFS= read -r lib; do
+		[ -n "$lib" ] || continue
+		target_library "$lib" >/dev/null && continue
+
+		source=$(find_library_source "$lib") || {
+			echo "WARNING: retained library dependency not found: $lib" >&2
+			continue
+		}
+
+		mkdir -p "$LIB64_DIR"
+		cp -L --preserve=mode,timestamps "$source" "$LIB64_DIR/$lib"
+	done < "$FASTLIB_KEEP"
+}
+
 collect_early_dependencies()
 {
 	local item path
@@ -214,22 +234,164 @@ prepare_vendor_tree()
 	done < <(read_list "$FASTBOOT_DIR/lib-rw")
 }
 
+stage_deferred_usr()
+{
+	rm -rf "$DEFERRED_DIR"
+	mkdir -p "$DEFERRED_DIR"
+	cp -a --reflink=auto "$USR_DIR" "$DEFERRED_DIR/usr"
+}
+
+remove_early_from_deferred()
+{
+	local path rel
+
+	while IFS= read -r -d '' path; do
+		rel=${path#./}
+		rm -f "$DEFERRED_DIR/$rel"
+	done < <(find "$USR_DIR" \( -type f -o -type l \) -print0)
+
+	find "$DEFERRED_DIR/usr" -depth -type d -empty -delete
+}
+
+same_symlink()
+{
+	local early="$1"
+	local deferred="$2"
+
+	[ -L "$early" ] && [ -L "$deferred" ] || return 1
+	[ "$(readlink "$early")" = "$(readlink "$deferred")" ]
+}
+
+subtree_is_all_early()
+{
+	local rel="$1"
+	local deferred="$DEFERRED_DIR/$rel"
+	local leaf leaf_rel early_leaf
+
+	[ -d "$deferred" ] || return 1
+
+	while IFS= read -r -d '' leaf; do
+		leaf_rel=${leaf#"$DEFERRED_DIR/"}
+		early_leaf="$leaf_rel"
+
+		if [ -L "$leaf" ]; then
+			# Relative links are location-sensitive. Keep their containing tree
+			# in the logical /usr hierarchy and fall back to leaf links.
+			case "$(readlink "$leaf")" in
+				/*) ;;
+				*) return 1 ;;
+			esac
+
+			# A deferred absolute symlink can be covered by a directory link only
+			# when the early tree contains the exact same symlink.
+			same_symlink "$early_leaf" "$leaf" || return 1
+		elif [ -f "$leaf" ]; then
+			# Executable trees stay at their logical /usr location. Programs may
+			# discover their physical path (for example via /proc/self/exe) and
+			# derive helpers/resources from it, so moving the containing directory
+			# below /fastboot is not namespace-equivalent even when symlinks are.
+			[ -x "$leaf" ] && return 1
+
+			# Match the historical true-mode rule: only real early files are
+			# candidates for relocation through /fastboot. BusyBox applet
+			# symlinks created by relink_busybox must not replace deferred
+			# real utilities.
+			[ -f "$early_leaf" ] && [ ! -L "$early_leaf" ] || return 1
+		fi
+	done < <(find "$deferred" \( -type f -o -type l \) -print0)
+
+	return 0
+}
+
+absolutize_relative_links()
+{
+	local root="$1"
+	local logical_root="$2"
+	local link target link_rel logical_dir absolute
+
+	while IFS= read -r -d '' link; do
+		target=$(readlink "$link")
+		case "$target" in
+			.|./) continue ;;
+			/*) continue ;;
+		esac
+
+		link_rel=${link#"$root/"}
+		logical_dir=$(dirname "/usr/$logical_root/$link_rel")
+		absolute=$(realpath -m -s "$logical_dir/$target")
+		ln -snf "$absolute" "$link"
+	done < <(find "$root" -type l -print0)
+}
+
+link_early_path()
+{
+	local rel="$1"
+	local path="$rel"
+	local target="/fastboot/$rel"
+	local deferred="$DEFERRED_DIR/$rel"
+
+	mkdir -p "fastboot/$(dirname "$rel")" "$(dirname "$deferred")"
+
+	# A directory moved below /fastboot changes the resolution base of any
+	# relative symlink inside it. Rewrite those links to their equivalent
+	# absolute logical /usr targets before moving the directory.
+	if [ -d "$path" ] && [ ! -L "$path" ]; then
+		absolutize_relative_links "$path" "${rel#usr/}"
+	fi
+
+	mv "$path" "fastboot/$rel"
+	ln -s "$target" "$path"
+
+	rm -rf "$deferred"
+	ln -s "$target" "$deferred"
+}
+
+collapse_early_tree()
+{
+	local dir="$1"
+	local child rel
+
+	while IFS= read -r -d '' child; do
+		rel=${child#./}
+
+		if [ -d "$child" ] && [ ! -L "$child" ]; then
+			if subtree_is_all_early "$rel"; then
+				link_early_path "$rel"
+			else
+				collapse_early_tree "$child"
+			fi
+		elif [ -f "$child" ] && [ ! -L "$child" ]; then
+			# Preserve existing true-mode semantics: relocate physical early
+			# files only. Existing symlinks stay where the complete vendor
+			# snapshot put them.
+			link_early_path "$rel"
+		fi
+	done < <(find "$dir" -mindepth 1 -maxdepth 1 -print0)
+}
+
+link_early_through_fastboot()
+{
+	rm -rf fastboot/usr
+	mkdir -p fastboot/usr
+
+	# Collapse fully-early subtrees into directory links where that is exactly
+	# equivalent to the historical leaf-by-leaf map. Mixed trees recurse until
+	# only physical early regular files are linked individually.
+	collapse_early_tree "$USR_DIR"
+}
+
 make_usr_squash()
 {
 	local output=../$INITDIR/lib.squash
-	local squash_root="$WORK_DIR/squash-root"
-
-	rm -rf "$squash_root"
-	mkdir -p "$squash_root"
-	cp -a --reflink=auto "$USR_DIR" "$squash_root/usr"
 
 	if [ "$HARDLINK" = "true" ]; then
-		hardlink "$squash_root"
+		hardlink "$DEFERRED_DIR"
 	fi
 
-	echo -e "\tMaking root-relative /usr lib.squash"
-	mksquashfs "$squash_root" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
+	echo -e "	Making split /usr lib.squash"
+	mksquashfs "$DEFERRED_DIR" "$output" -always-use-fragments -no-recovery -noappend $FB_COMP_EXTRA
 }
+
 
 prune_early_binaries()
 {
@@ -315,20 +477,67 @@ prune_early_usr()
 	prune_early_binaries
 	prune_early_libraries
 	prune_early_share
+}
 
+relink_busybox()
+{
 	cd ..
-	echo -e "\tRe-Linking BusyBox\n"
+	echo -e "	Re-Linking BusyBox
+"
 	chroot ./tmp-tree /bin/busybox.shared --install -s
 	cd tmp-tree
 }
 
 prepare_vendor_tree
+
+# lotsofmem must expand lib.squash before /usr exists, so unsquashfs is an
+# early-boot-only tool for that mode.  Pull it from the build environment here;
+# collect_early_dependencies() will retain its shared-library closure.
+if [ "$FASTBOOT_MODE" = "lotsofmem" ]; then
+	for tool in cp mv; do
+		tool_source=$(command -v "$tool") || {
+			echo "ERROR: fastboot=lotsofmem requires $tool" >&2
+			exit 1
+		}
+		cp --remove-destination "$tool_source" "$BIN_DIR/$tool"
+	done
+
+	unsquashfs_source=$(command -v unsquashfs) || {
+		echo "ERROR: fastboot=lotsofmem requires unsquashfs" >&2
+		exit 1
+	}
+	cp --remove-destination "$unsquashfs_source" "$SBIN_DIR/unsquashfs"
+fi
+
 collect_early_dependencies
 
-# Both fastboot modes use the same complete vendor image. They differ only in
-# whether runtime mounts it read-only or expands it into the initrd tmpfs.
-make_usr_squash
+# lotsofmem injects host/build utilities (cp, mv, unsquashfs). Their shared
+# libraries may not otherwise be part of the assembled ThinStation payload.
+# Mirror the original fastboot behavior and copy those missing dependencies
+# into the early /usr/lib64 tree before the split.
+if [ "$FASTBOOT_MODE" = "lotsofmem" ]; then
+	copy_missing_retained_libraries
+fi
+
+# Snapshot the complete vendor tree, then prune tmp-tree to the early subset.
+stage_deferred_usr
 prune_early_usr
+
+case "$FASTBOOT_MODE" in
+	true)
+		relink_busybox
+		link_early_through_fastboot
+		;;
+	lotsofmem)
+		remove_early_from_deferred
+		;;
+	*)
+		echo "Unsupported fastboot mode: $FASTBOOT_MODE" >&2
+		exit 1
+		;;
+esac
+
+make_usr_squash
 
 cd ..
 chmod 755 "$INITDIR/lib.squash"

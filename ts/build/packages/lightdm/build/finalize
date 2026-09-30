@@ -17,7 +17,7 @@ if is_enabled $LIGHTDM_BANNER; then
 	cp /build/$BANNER_SRC /etc/banner.svg
 
 	sed -i -e '/^autologin/d'		$LDM_CONF
-	sed -i 's|^#\?greeter-setup-script=.*|greeter-setup-script=/sbin/lightdm-banner|' $LDM_CONF
+	sed -i 's|^#\?greeter-setup-script=.*|greeter-setup-script=/usr/bin/lightdm-banner|' $LDM_CONF
 
 	sed -i -e '/^background/d'		$LDMG_CONF
 	echo "theme-name = Adwaita"             >> $LDMG_CONF

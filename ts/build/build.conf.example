@@ -75,7 +75,6 @@ module vfat                  # FAT and VFAT file system support
 module isofs                 # ISO9660 file system for CD-ROMs
 module udf                   # Universal Disk Format for CD/DVDs
 module fuse                  # Filesystem in Userspace
-module fuse3                 # Updated FUSE version
 #module ntfs3                 # NTFS file system support
 #module cifs                  # CIFS/SMB file system support
 #module autofs4               # Automount file system support
@@ -367,8 +366,6 @@ param bootlogo       true                   # Enable or Disable the use of the B
 #param acpisupport    disable                # Tells the kernel not to load acpi modules. (Breaks some Intel Chipsets if disabled)
 #param kernelcmdline "selinux=0"             # Just disable selinux, but show all the kernel and boot messages
 param kernelcmdline "selinux=0 vt.global_cursor_default=0 loglevel=3 udev.log_priority=3 systemd.show_status=false rd.systemd.show_status=false quiet" # A very quiet kernel command line
-#param debugconsole ttyS0,115200             # Optional kernel console override for QEMU/serial debugging.
-                                            # If unset or commented, normal non-debug builds default to console=tty1.
 
 # Additional modules and settings
 param allfirmware    true

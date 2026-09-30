@@ -9,4 +9,4 @@
 ,60-autonet.rules,0,0,etc/udev/rules.d,0,,,,,,,,,
 ,net.sh,0,0,etc/udev/scripts,0,,,,,,,,,
 ,lease_dhcp,0,0,etc/udev/scripts,0,,,,,,,,,
-net-tools,ifconfig,0,0,sbin,1,,,,,,,,,
+net-tools,ifconfig,0,0,usr/bin,1,,,,,,,,,

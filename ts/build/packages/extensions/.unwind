@@ -1,25 +1,24 @@
-#fd8f579ef2489bcf6e262719a9da8d65  .dna
+#bff84c54a7cefb1f402dacd9e8294112  .dna
 
-mkdir -p /ts/build/packages/extensions/bin
-mkdir -p /ts/build/packages/extensions/sbin
+mkdir -p /ts/build/packages/extensions/usr/bin
 mkdir -p /ts/build/packages/extensions/usr/share/terminfo/a
 mkdir -p /ts/build/packages/extensions/usr/share/terminfo/d
 mkdir -p /ts/build/packages/extensions/usr/share/terminfo/l
 mkdir -p /ts/build/packages/extensions/usr/share/terminfo/v
-ln /bin/setserial /ts/build/packages/extensions/bin/setserial
-ln /usr/bin/bzip2 /ts/build/packages/extensions/bin/bzip2
-ln /usr/bin/chroot /ts/build/packages/extensions/sbin/chroot
-ln /usr/bin/grep /ts/build/packages/extensions/bin/grep
-ln /usr/bin/gzip /ts/build/packages/extensions/bin/gzip
-ln /usr/bin/ifconfig /ts/build/packages/extensions/bin/ifconfig
-ln /usr/bin/ldconfig /ts/build/packages/extensions/bin/ldconfig
-ln /usr/bin/ldd /ts/build/packages/extensions/bin/ldd
-ln /usr/bin/lsusb /ts/build/packages/extensions/bin/lsusb
-ln /usr/bin/nano /ts/build/packages/extensions/bin/nano
-ln /usr/bin/setpci /ts/build/packages/extensions/bin/setpci
-ln /usr/bin/strace /ts/build/packages/extensions/bin/strace
-ln /usr/bin/umount /ts/build/packages/extensions/bin/umount
-ln /usr/bin/usb-devices /ts/build/packages/extensions/bin/usb-devices
+ln /bin/setserial /ts/build/packages/extensions/usr/bin/setserial
+ln /usr/bin/bzip2 /ts/build/packages/extensions/usr/bin/bzip2
+ln /usr/bin/chroot /ts/build/packages/extensions/usr/bin/chroot
+ln /usr/bin/grep /ts/build/packages/extensions/usr/bin/grep
+ln /usr/bin/gzip /ts/build/packages/extensions/usr/bin/gzip
+ln /usr/bin/ifconfig /ts/build/packages/extensions/usr/bin/ifconfig
+ln /usr/bin/ldconfig /ts/build/packages/extensions/usr/bin/ldconfig
+ln /usr/bin/ldd /ts/build/packages/extensions/usr/bin/ldd
+ln /usr/bin/lsusb /ts/build/packages/extensions/usr/bin/lsusb
+ln /usr/bin/nano /ts/build/packages/extensions/usr/bin/nano
+ln /usr/bin/setpci /ts/build/packages/extensions/usr/bin/setpci
+ln /usr/bin/strace /ts/build/packages/extensions/usr/bin/strace
+ln /usr/bin/umount /ts/build/packages/extensions/usr/bin/umount
+ln /usr/bin/usb-devices /ts/build/packages/extensions/usr/bin/usb-devices
 ln /usr/share/terminfo/a/ansi /ts/build/packages/extensions/usr/share/terminfo/a/ansi
 ln /usr/share/terminfo/d/dumb /ts/build/packages/extensions/usr/share/terminfo/d/dumb
 ln /usr/share/terminfo/l/linux /ts/build/packages/extensions/usr/share/terminfo/l/linux

@@ -14,15 +14,15 @@ if [ ! -d /etc/selinux ]; then
 	sed -i -e '/selinux/d' /etc/audit/rules.d/30-stig.rules
 fi
 
-find /bin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b64 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' > /etc/audit/rules.d/31-privileged.rules
-find /sbin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b64 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
-filecap /bin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b64 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
-filecap /sbin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b64 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
+find /usr/bin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b64 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' > /etc/audit/rules.d/31-privileged.rules
+find /usr/sbin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b64 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
+filecap /usr/bin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b64 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
+filecap /usr/sbin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b64 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
 
-find /bin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b32 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
-find /sbin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b32 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
-filecap /bin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b32 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
-filecap /sbin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b32 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
+find /usr/bin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b32 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
+find /usr/sbin -type f -perm -04000 2>/dev/null | awk '{ printf "-a always,exit -F arch=b32 -F path=%s -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $1 }' >> /etc/audit/rules.d/31-privileged.rules
+filecap /usr/bin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b32 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
+filecap /usr/sbin 2>/dev/null | sed '1d' | awk '{ printf "-a always,exit -F path=%s -F arch=b32 -F perm=x -F auid>=1000 -F auid!=unset -F key=privileged\n", $2 }' >> /etc/audit/rules.d/31-privileged.rules
 
 # Copy default rules into place on new installation
 files=`ls /etc/audit/rules.d/ 2>/dev/null | wc -w`
@@ -36,4 +36,4 @@ if [ "$files" -eq 0 ] ; then
     fi
 fi
 /usr/lib/systemd/systemd-update-helper install-system-units auditd.service
-sed -i -e 's|/sbin/auditctl|/bin/auditctl|g' /bin/augenrules
+sed -i -e 's|/sbin/auditctl|/bin/auditctl|g' /usr/bin/augenrules

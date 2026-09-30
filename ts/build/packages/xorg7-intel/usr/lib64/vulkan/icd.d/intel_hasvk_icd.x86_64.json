@@ -1,0 +1,8 @@
+{
+    "ICD": {
+        "api_version": "1.3.354",
+        "library_arch": "64",
+        "library_path": "/usr/lib64/libvulkan_intel_hasvk.so"
+    },
+    "file_format_version": "1.0.1"
+}

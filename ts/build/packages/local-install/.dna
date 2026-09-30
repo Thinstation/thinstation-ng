@@ -6,7 +6,7 @@
 ,local-install_32x32.xpm,0,0,lib/pixmaps,0,,,,,,,,,
 ,local-install_16x16.xpm,0,0,lib/pixmaps,0,,,,,,,,,
 ,local_install_32x32.xpm,0,0,lib/pixmaps,0,,,,,,,,,
-,local-install.sh,0,0,bin,0,,,,,,,,,
+,local-install.sh,0,0,usr/bin,0,,,,,,,,,
 ,local-upgrade.init,0,0,etc/init.d,0,,,,,,,,,
 ,S01local-install_mount,0,0,etc/rc2.d,0,,,,,,,,,
 ,S90local-install,0,0,etc/rc5.d,0,,,,,,,,,

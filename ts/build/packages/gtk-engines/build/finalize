@@ -27,7 +27,7 @@ if [ "$GTK_THEME" != "ALL" ]; then
 	elif [ -e /etc/gtk-3.0 ]; then
 		echo -e "\tGtk-3 Theme $GTK_THEME not found!"
 	fi
-	for theme in `find /usr/share/themes -name gtkrc -o -name gtk.css |cut -d "/" -f4`; do
+	for theme in `find /usr/share/themes -name gtkrc -o -name gtk.css |cut -d "/" -f5`; do
 		if [ "$theme" != "$GTK_THEME" ]; then
 			rm -rf /usr/share/themes/$theme/gtk-2.0
 			rm -rf /usr/share/themes/$theme/gtk-3.0

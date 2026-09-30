@@ -1,6 +1,6 @@
-#f08b37f0102ff0b3dd75d599cafa68e3  .dna
+#5da15a4e746fa4ea077f424015ca79c7  .dna
 
-mkdir -p /ts/build/packages/cups/build/extra/bin
-ln /usr/bin/gawk /ts/build/packages/cups/build/extra/bin/gawk
-ln /usr/bin/pdftops /ts/build/packages/cups/build/extra/bin/pdftops
-ln /usr/bin/sed /ts/build/packages/cups/build/extra/bin/sed
+mkdir -p /ts/build/packages/cups/build/extra/usr/bin
+ln /usr/bin/gawk /ts/build/packages/cups/build/extra/usr/bin/gawk
+ln /usr/bin/pdftops /ts/build/packages/cups/build/extra/usr/bin/pdftops
+ln /usr/bin/sed /ts/build/packages/cups/build/extra/usr/bin/sed

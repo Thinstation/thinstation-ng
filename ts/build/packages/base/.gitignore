@@ -1,11 +1,11 @@
-/bin/
-!/bin/checklogs
-!/bin/lsb_release
-!/bin/pkg
-!/bin/shutdown
-!/bin/unused
-!/bin/update-initrd
-!/bin/used
+/usr/bin/
+!/usr/bin/checklogs
+!/usr/bin/lsb_release
+!/usr/bin/pkg
+!/usr/bin/shutdown
+!/usr/bin/unused
+!/usr/bin/update-initrd
+!/usr/bin/used
 
 
 /etc/pam.d/
@@ -26,8 +26,5 @@
 !/usr/lib64/security/pam_hooks.so
 /lib64/ld-linux-*
 
-/sbin/
-!/sbin/session
-!/sbin/shutdown
 
 /usr/share/locale/

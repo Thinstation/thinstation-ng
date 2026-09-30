@@ -1,6 +1,6 @@
 #dbus 50
-chown root:dbus /libexec/dbus-1/dbus-daemon-launch-helper
-chmod u+s /libexec/dbus-1/dbus-daemon-launch-helper
+chown root:dbus /usr/libexec/dbus-1/dbus-daemon-launch-helper
+chmod u+s /usr/libexec/dbus-1/dbus-daemon-launch-helper
 #systemctl enable dbus-daemon
 /usr/lib/systemd/systemd-update-helper install-system-units dbus-broker.service 
 /usr/lib/systemd/systemd-update-helper install-user-units dbus-broker.service

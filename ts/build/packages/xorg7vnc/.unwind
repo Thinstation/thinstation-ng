@@ -1,4 +1,4 @@
-#a3f6c0a0197d7c7960176e1284a8cb00  .dna
+#eb1c0052c4f94a1fd63f507faf571009  .dna
 
-mkdir -p /ts/build/packages/xorg7vnc/bin
-ln /usr/bin/x11vnc /ts/build/packages/xorg7vnc/bin/x11vnc
+mkdir -p /ts/build/packages/xorg7vnc/usr/bin
+ln /usr/bin/x11vnc /ts/build/packages/xorg7vnc/usr/bin/x11vnc

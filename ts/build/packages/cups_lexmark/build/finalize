@@ -6,9 +6,9 @@ OEM=Lexmark
 P_RELEASE=Lexmark-UPD-PPD-Files
 
 TYPE=1 #For other machines i.e Suse/SuseServer/Redhat/Fedora both for 32 & 64 bit
-file /bin/bash | grep "ARM" >/dev/null 2>&1
+file /usr/bin/bash | grep "ARM" >/dev/null 2>&1
 if [ $? -eq 0 ]; then
-	file /bin/bash | grep "32-bit" >/dev/null 2>&1
+	file /usr/bin/bash | grep "32-bit" >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		TYPE=2 #for future use. 2 - Ubuntu ARM 32 bit
 		echo "This is ARM 32 bit system and this driver doesn't support ARM 32 bit architecture."
@@ -19,7 +19,7 @@ if [ $? -eq 0 ]; then
 else
 	if [ -f "/etc/debian_version" ];then
                 if [ -f "/etc/lsb-release" ];then
-			file /bin/bash | grep "32-bit" >/dev/null 2>&1
+			file /usr/bin/bash | grep "32-bit" >/dev/null 2>&1
 			if [ $? -eq 0 ]; then
 				TYPE=4 #4 - Ubuntu INTEL 32 bit
 			else

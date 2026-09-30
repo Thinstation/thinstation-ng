@@ -60,14 +60,14 @@ fi
 
 # Configure FreeRDP if UDS_FREERDP_OPTIONS is set
 if [ -n "$UDS_FREERDP_OPTIONS" ]; then
-    if [ -e /bin/xfreerdp ]; then
-        mv /bin/xfreerdp /bin/xfreerdp.real
+    if [ -e /usr/bin/xfreerdp ]; then
+        mv /usr/bin/xfreerdp /usr/bin/xfreerdp.real
     fi
 
-    cat <<EOF > /bin/xfreerdp
+    cat <<EOF > /usr/bin/xfreerdp
 #!/bin/bash
 /bin/xfreerdp.real $UDS_FREERDP_OPTIONS "\$@"
 EOF
 
-    chmod +x /bin/xfreerdp
+    chmod +x /usr/bin/xfreerdp
 fi

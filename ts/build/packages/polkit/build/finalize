@@ -8,5 +8,5 @@ chmod 0750 /etc/polkit-1/localauthority
 mkdir -p /var/lib/polkit-1
 chmod 0750 /var/lib/polkit-1
 chmod 4755 /lib64/polkit-1/polkit-agent-helper-1
-chmod 4755 /bin/pkexec
+chmod 4755 /usr/bin/pkexec
 

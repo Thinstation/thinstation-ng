@@ -1,9 +1,9 @@
-#9b29ae955fe14b38b911ae042a82cd47  .dna
+#42cc3a81ca032ea49826c7080c9fd3cb  .dna
 
-rm -f /ts/build/packages/xorg7-amdgpu/lib64/libvulkan_radeon.so
-rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/amdgpu_drv.so
-rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/ati_drv.so
-rm -f /ts/build/packages/xorg7-amdgpu/lib64/xorg/modules/drivers/radeon_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/usr/lib64/libvulkan_radeon.so
+rm -f /ts/build/packages/xorg7-amdgpu/usr/lib64/xorg/modules/drivers/amdgpu_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/usr/lib64/xorg/modules/drivers/ati_drv.so
+rm -f /ts/build/packages/xorg7-amdgpu/usr/lib64/xorg/modules/drivers/radeon_drv.so
 rm -f /ts/build/packages/xorg7-amdgpu/usr/share/X11/xorg.conf.d/10-amdgpu.conf
 rm -f /ts/build/packages/xorg7-amdgpu/usr/share/X11/xorg.conf.d/10-radeon.conf
 rm -f /ts/build/packages/xorg7-amdgpu/usr/share/vulkan/icd.d/radeon_icd.x86_64.json

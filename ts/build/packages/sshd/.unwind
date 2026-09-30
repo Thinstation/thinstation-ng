@@ -1,4 +1,4 @@
-#b7ac926eb5debf6f0937b2649bd24c0e  .dna
+#243932ceb1d38943cb14250fccc8c181  .dna
 
-mkdir -p /ts/build/packages/sshd/bin
-ln /usr/bin/dropbear /ts/build/packages/sshd/bin/dropbear
+mkdir -p /ts/build/packages/sshd/usr/bin
+ln /usr/bin/dropbear /ts/build/packages/sshd/usr/bin/dropbear

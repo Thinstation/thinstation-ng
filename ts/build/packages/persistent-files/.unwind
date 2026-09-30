@@ -1,4 +1,4 @@
-#4ac2a504e6c684bd0402deb1c12d8e35  .dna
+#1fe9806ad42c3d327334f554c326c79f  .dna
 
-mkdir -p /ts/build/packages/persistent-files/bin
-ln /usr/bin/inotifywait /ts/build/packages/persistent-files/bin/inotifywait
+mkdir -p /ts/build/packages/persistent-files/usr/bin
+ln /usr/bin/inotifywait /ts/build/packages/persistent-files/usr/bin/inotifywait
