@@ -20,9 +20,9 @@ export DROP_DIRS="	etc/kernel \
 repackage -e
 returnval=$?
 
-mkdir -p ./packages/$PACKAGE/sbin
+mkdir -p ./packages/$PACKAGE/usr/bin
 for i in runlevel reboot poweroff halt telinit; do
-	ln -sf /bin/systemctl ./packages/$PACKAGE/bin/$i
+	ln -sf /usr/bin/systemctl ./packages/$PACKAGE/usr/bin/$i
 	let returnval=returnval+$?
 done
 #for link in init sbin/init ; do
