@@ -1,0 +1,10 @@
+#k3s 90
+mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/agent/images /var/lib/kubelet
+systemctl set-default multi-user.target
+install -d -m 0700 /root/.ssh
+if [ -r /usr/share/thinstation/k3s-debug-authorized_keys ]; then
+    install -m 0600 /usr/share/thinstation/k3s-debug-authorized_keys /root/.ssh/authorized_keys
+fi
+systemctl enable k3s-storage-mount.service
+systemctl enable k3s-image-sync.service
+systemctl enable k3s.service

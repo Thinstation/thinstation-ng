@@ -1,0 +1,5 @@
+/usr/bin/k3s
+/usr/bin/kubectl
+/usr/bin/crictl
+/usr/bin/ctr
+/build/installed

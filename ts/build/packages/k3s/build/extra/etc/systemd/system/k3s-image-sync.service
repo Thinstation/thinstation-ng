@@ -1,0 +1,14 @@
+[Unit]
+Description=Stage K3s and appliance images from boot media
+After=persistent-dirs.service fastboot.service k3s-storage-mount.service
+ConditionPathExists=/var/lib/rancher/k3s/.configured
+Before=k3s.service
+ConditionPathIsDirectory=/mnt/cdrom0/K3s/images
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/k3s-image-sync
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

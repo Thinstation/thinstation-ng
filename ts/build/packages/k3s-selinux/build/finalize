@@ -1,0 +1,3 @@
+#k3s-selinux 90
+. /build/scripts/k3s-selinux_preinstall.sh 1
+. /build/scripts/k3s-selinux_postinstall.sh 1

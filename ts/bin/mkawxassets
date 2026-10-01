@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="${OUT:-$ROOT/build/boot-images/grub/efi-source/K3s/images}"
+CACHE="${CACHE:-$ROOT/build/downloads/awx-appliance}"
+K3S_VERSION="${K3S_VERSION:-v1.37.0+k3s1}"
+LIST="${LIST:-$ROOT/build/packages/awx/build/extra/usr/share/thinstation/awx/images.txt}"
+
+usage() {
+  cat <<USAGE
+Usage: mkawxassets [--output DIR] [--cache DIR] [--k3s-version VERSION] [--list FILE]
+
+Build the disconnected K3s/AWX image payload used by the ThinStation appliance ISO.
+Existing cached archives are reused.
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --output) OUT=$2; shift 2 ;;
+    --cache) CACHE=$2; shift 2 ;;
+    --k3s-version) K3S_VERSION=$2; shift 2 ;;
+    --list) LIST=$2; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+command -v skopeo >/dev/null || { echo "skopeo is required" >&2; exit 1; }
+command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
+[ -r "$LIST" ] || { echo "Image list not found: $LIST" >&2; exit 1; }
+
+mkdir -p "$OUT" "$CACHE"
+
+k3s_file="k3s-airgap-images-amd64.tar.zst"
+k3s_url="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION//+/%2B}/$k3s_file"
+if [ ! -s "$CACHE/$k3s_file" ]; then
+  echo "Fetching K3s air-gap images $K3S_VERSION"
+  curl -fL --retry 3 -o "$CACHE/$k3s_file.tmp" "$k3s_url"
+  mv "$CACHE/$k3s_file.tmp" "$CACHE/$k3s_file"
+fi
+ln -f "$CACHE/$k3s_file" "$OUT/$k3s_file" 2>/dev/null || cp -f "$CACHE/$k3s_file" "$OUT/$k3s_file"
+
+printf '%-72s %s\n' IMAGE DIGEST > "$OUT/images.lock"
+while IFS= read -r image; do
+  [ -n "$image" ] || continue
+  safe="$(printf '%s' "$image" | sed 's#[/:]#_#g').tar"
+  dest="$CACHE/$safe"
+  echo "Resolving $image"
+  digest="$(skopeo inspect --format '{{.Digest}}' "docker://$image")"
+  if [ ! -s "$dest" ]; then
+    echo "Caching $image"
+    skopeo copy --retry-times 3 "docker://$image" "docker-archive:$dest:$image"
+  fi
+  ln -f "$dest" "$OUT/$safe" 2>/dev/null || cp -f "$dest" "$OUT/$safe"
+  printf '%-72s %s\n' "$image" "$digest" >> "$OUT/images.lock"
+done < "$LIST"
+
+(
+  cd "$OUT"
+  sha256sum *.tar *.tar.zst 2>/dev/null | sort -k2 > SHA256SUMS
+)
+echo "AWX appliance assets staged in $OUT"

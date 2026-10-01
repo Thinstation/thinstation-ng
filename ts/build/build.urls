@@ -25,3 +25,4 @@ param cisco_secure_client_darturl   file://downloads/cisco-secure-client-dart-5.
 param cisco_secure_client_vpnurl   file://downloads/cisco-secure-client-vpn-5.1.7.80-1.x86_64.rpm
 param splunkurl		file://downloads/splunk-9.3.2-d8bb32809498.x86_64.rpm
 param udsclienturl      file://downloads/udsclient3-3.6.0-1.noarch.rpm
+param k3surl           https://github.com/k3s-io/k3s/releases/download/v1.37.0%2Bk3s1/k3s

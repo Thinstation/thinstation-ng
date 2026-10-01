@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ISO_ROOT="${ISO_ROOT:-/mnt/cdrom0/K3s}"
+IMAGE_DIR="${IMAGE_DIR:-/var/lib/rancher/k3s/agent/images}"
+STATE_DIR="${STATE_DIR:-/var/lib/rancher/k3s/image-state}"
+SUMS="${SUMS:-$ISO_ROOT/images/SHA256SUMS}"
+
+log() { echo "[k3s-image-sync] $*"; }
+
+mkdir -p "$IMAGE_DIR" "$STATE_DIR"
+
+# Enable K3s conditional image imports. K3s records size/mtime metadata here
+# after importing archives, so unchanged persistent archives are not re-read
+# into containerd on every boot.
+touch "$IMAGE_DIR/.cache.json"
+
+[ -d "$ISO_ROOT/images" ] || {
+    log "No image directory at $ISO_ROOT/images"
+    exit 0
+}
+
+changed=0
+current_list="$STATE_DIR/.iso-images.$$"
+: > "$current_list"
+trap 'rm -f "$current_list"' EXIT
+
+for src in "$ISO_ROOT"/images/*; do
+    [ -f "$src" ] || continue
+    case "$src" in
+        *.tar|*.tar.gz|*.tgz|*.tar.zst) ;;
+        *) continue ;;
+    esac
+
+    name="$(basename "$src")"
+    printf '%s\n' "$name" >> "$current_list"
+    dest="$IMAGE_DIR/$name"
+    state="$STATE_DIR/$name.sha256"
+
+    digest=""
+    if [ -r "$SUMS" ]; then
+        digest="$(awk -v n="$name" '$2 == n || $2 == "*" n { print $1; exit }' "$SUMS")"
+    fi
+    if [ -z "$digest" ]; then
+        log "No precomputed digest for $name; calculating fallback SHA256"
+        digest="$(sha256sum "$src" | awk '{print $1}')"
+    fi
+
+    if [ -f "$state" ] && [ "$(cat "$state")" = "$digest" ] && [ -f "$dest" ]; then
+        log "$name unchanged; skipping"
+        continue
+    fi
+
+    log "Staging changed image archive: $name"
+    tmp="$dest.tmp"
+    rm -f "$tmp"
+    cp -p "$src" "$tmp"
+    mv -f "$tmp" "$dest"
+    printf '%s\n' "$digest" > "$state"
+    changed=1
+done
+
+# Prune only archives previously managed by this synchronizer. Locally
+# managed archives without our state marker are intentionally left alone.
+for state in "$STATE_DIR"/*.sha256; do
+    [ -f "$state" ] || continue
+    name="$(basename "$state" .sha256)"
+    if ! grep -Fxq "$name" "$current_list"; then
+        log "Removing stale managed archive: $name"
+        rm -f "$IMAGE_DIR/$name" "$state"
+        changed=1
+    fi
+done
+
+if [ "$changed" -eq 0 ]; then
+    log "No image changes detected"
+else
+    log "Image archive set updated"
+fi

@@ -21,6 +21,7 @@ BT_CPUS="${BT_CPUS:-}"
 BT_DETACH=false
 REMOTE_ACCESS=false
 BT_QEMU_EXTRA=()
+BT_DISK_IMAGES=()
 
 usage()
 {
@@ -51,6 +52,7 @@ Options:
       --ssh-port PORT     Host-forwarded guest SSH port
       --serial-file PATH  Write serial output to a file instead of TCP
       --pcap PATH         Capture network traffic
+      --disk-image PATH   Attach an existing raw image as a virtio disk; repeatable
       --qemu-arg ARG      Append one QEMU argument; may be repeated
       --debug             Trace bt itself
   -h, --help              Show help
@@ -59,6 +61,7 @@ Examples:
   bt net-efi
   bt net-efi-secure --memory 4G --cpus 2
   bt hd-efi --detach --name smoke
+  bt cd-efi --disk-image /tmp/persistent.img --detach --name smoke
   bt attach smoke
   bt monitor smoke
   bt ssh smoke
@@ -124,11 +127,18 @@ ssh_vm()
 
 stop_vm()
 {
-        local n=$1 p helper vars
+        local n=$1 p helper vars qga
         p=$(state_get "$n" pid); [ -n "$p" ] || { echo "No PID recorded for $n" >&2; exit 1; }
         if pid_running "$p"; then
-                kill "$p"
-                for _ in 1 2 3 4 5; do pid_running "$p" || break; sleep 1; done
+                qga="$(state_path "$n")/qga.sock"
+                if [ -S "$qga" ] && command -v socat >/dev/null 2>&1; then
+                        printf '%s\n' '{"execute":"guest-shutdown","arguments":{"mode":"powerdown"}}' | socat -T 2 - UNIX-CONNECT:"$qga" >/dev/null 2>&1 || true
+                        for _ in $(seq 1 20); do pid_running "$p" || break; sleep 1; done
+                fi
+                if pid_running "$p"; then
+                        kill "$p" 2>/dev/null || true
+                        for _ in 1 2 3 4 5; do pid_running "$p" || break; sleep 1; done
+                fi
                 pid_running "$p" && kill -9 "$p"
         fi
         helper=$(state_get "$n" http_pid)
@@ -165,6 +175,10 @@ while [ $# -gt 0 ]; do
                 --ssh-port) BT_SSH_PORT=$2; shift 2 ;;
                 --serial-file) BT_SERIAL_FILE=$2; shift 2 ;;
                 --pcap) BT_PCAP_FILE=$2; shift 2 ;;
+                --disk-image)
+                        if [[ "$2" = /* ]]; then disk="$2"; else disk="$start/$2"; fi
+                        BT_DISK_IMAGES+=("$(realpath -m "$disk")")
+                        shift 2 ;;
                 --qemu-arg) BT_QEMU_EXTRA+=("$2"); shift 2 ;;
                 --debug) set -x; shift ;;
                 -h|--help) usage; exit 0 ;;
@@ -191,6 +205,13 @@ setup_qemu()
         SHARED_FOLDER="-virtfs local,path=/,mount_tag=host0,security_model=mapped,id=host0,multidevs=remap"
         HDD="-drive file=$HD,index=0,media=disk,format=raw"
         AGENT="-chardev spicevmc,id=ch1,name=vdagent,clipboard=on -device virtio-serial-pci -device virtserialport,chardev=ch1,id=ch1,name=com.redhat.spice.0"
+        QGA=""
+        if [ -n "${BT_NAME:-}" ]; then
+                QGA_SOCKET="$BT_STATE_DIR/$BT_NAME/qga.sock"
+                mkdir -p "$BT_STATE_DIR/$BT_NAME"
+                rm -f "$QGA_SOCKET"
+                QGA="-chardev socket,path=$QGA_SOCKET,server=on,wait=off,id=qga0 -device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        fi
         USBHD="-drive if=none,id=stick,file=/usbhd.img -device nec-usb-xhci,id=xhci -device usb-storage,bus=xhci.0,drive=stick"
         VGA="-vga qxl -global qxl-vga.vram_size=132710400"
 #       VGA="-vga virtio"
@@ -237,7 +258,14 @@ setup_qemu()
 		CONSOLE="-serial stdio"
 	fi
 
-        STANDARD_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $NETWORK $CONSOLE $AGENT $SHARED_FOLDER"
+        EXTRA_DISKS=()
+        local disk
+        for disk in "${BT_DISK_IMAGES[@]}"; do
+                [ -f "$disk" ] || { echo "Disk image not found: $disk" >&2; exit 1; }
+                EXTRA_DISKS+=("-drive" "file=$disk,if=virtio,format=raw,cache=none")
+        done
+
+        STANDARD_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $NETWORK $CONSOLE $AGENT $QGA $SHARED_FOLDER"
         NET_MACHINE="$SOUND $RNG $VGA $CPU $MEMORY $MOUSE $KVM $CONSOLE"
         PCAP=""
         if [ -n "${BT_PCAP_FILE:-}" ]; then
@@ -254,6 +282,7 @@ setup_qemu()
                 $REMOTE_ACCESS && state_put ssh "$SSH_PORT"
                 if [ -n "${BT_SERIAL_FILE:-}" ]; then state_put serial_file "$BT_SERIAL_FILE"; elif $REMOTE_ACCESS; then state_put serial "$SERIAL_PORT"; fi
                 [ -n "${BT_PCAP_FILE:-}" ] && state_put pcap "$BT_PCAP_FILE"
+                [ ${#BT_DISK_IMAGES[@]} -gt 0 ] && state_put disk_images "${BT_DISK_IMAGES[*]}"
         fi
 }
 
@@ -267,7 +296,7 @@ run_qemu()
         fi
         if $BT_DETACH; then
                 [ -n "$pidfile" ] || { echo "Detached bt VMs require a name" >&2; return 2; }
-                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}" -daemonize -pidfile "$pidfile"
+                "$QEMU" "$@" "${EXTRA_DISKS[@]}" "${BT_QEMU_EXTRA[@]}" -daemonize -pidfile "$pidfile"
                 rc=$?
                 if [ "$rc" -eq 0 ]; then
                         echo "Started $BT_NAME (PID $(cat "$pidfile" 2>/dev/null))"
@@ -279,9 +308,9 @@ run_qemu()
                 return "$rc"
         fi
         if [ -n "$pidfile" ]; then
-                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}" -pidfile "$pidfile"
+                "$QEMU" "$@" "${EXTRA_DISKS[@]}" "${BT_QEMU_EXTRA[@]}" -pidfile "$pidfile"
         else
-                "$QEMU" "$@" "${BT_QEMU_EXTRA[@]}"
+                "$QEMU" "$@" "${EXTRA_DISKS[@]}" "${BT_QEMU_EXTRA[@]}"
         fi
 }
 
@@ -468,17 +497,23 @@ case "$MODE" in
                 echo "Exit code $?"
 	;;
 	cd-efi)
-		confirm_iso grub && \
-		confirm_usb_hd && \
-		run_qemu $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
+		confirm_iso grub || exit $?
+		if [ ${#BT_DISK_IMAGES[@]} -gt 0 ]; then
+			run_qemu $STANDARD_MACHINE $CDROM $EFI --boot d
+		else
+			confirm_usb_hd && run_qemu $STANDARD_MACHINE $CDROM $USBHD $EFI --boot d
+		fi
 		echo "Exit code $?"
         ;;
 	cd-efi-secure)
                 setup_secure_ovmf
                 trap cleanup_secure_ovmf EXIT INT TERM
-		confirm_iso grub && \
-		confirm_usb_hd && \
-                run_qemu $STANDARD_MACHINE $CDROM $USBHD $SECBOOT_EFI --boot d
+		confirm_iso grub || exit $?
+		if [ ${#BT_DISK_IMAGES[@]} -gt 0 ]; then
+                run_qemu $STANDARD_MACHINE $CDROM $SECBOOT_EFI --boot d
+		else
+			confirm_usb_hd && run_qemu $STANDARD_MACHINE $CDROM $USBHD $SECBOOT_EFI --boot d
+		fi
                 echo "Exit code $?"
         ;;
 	image)

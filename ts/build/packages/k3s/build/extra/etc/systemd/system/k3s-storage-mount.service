@@ -1,0 +1,12 @@
+[Unit]
+Description=Mount persistent K3s appliance storage
+After=local-fs.target fastboot.service
+Before=k3s-image-sync.service k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/k3s-storage-mount
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
