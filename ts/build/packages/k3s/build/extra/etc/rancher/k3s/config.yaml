@@ -1,0 +1,8 @@
+# ThinStation k3s appliance defaults.
+# AWX-specific manifests and settings should be layered on top of this package.
+write-kubeconfig-mode: "0640"
+prefer-bundled-bin: true
+kubelet-arg:
+  - "local-storage-capacity-isolation=false"
+  - "node-ip=0.0.0.0"
+disable-network-policy: true

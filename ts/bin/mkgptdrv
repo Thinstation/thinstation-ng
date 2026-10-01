@@ -24,6 +24,7 @@ PID=$$
 MNTDIR=`mktemp -t -d mkgptdrv.XXXXXX`
 ESP=$MNTDIR
 cpt=262144 #default Copy Progress Threshold
+data_only=false
 
 needed="parted mkswap mkfs.vfat mkfs.ext4 fuser"
 
@@ -37,8 +38,8 @@ clean_up()
 	if mountpoint -q $MNTDIR; then
 		umount $MNTDIR
 	fi
-	lodestroy_
-	rm -rf $MNTDIR
+	lodestroy_ >/dev/null 2>&1 || true
+	rm -rf "$MNTDIR"
 	exit $1
 }
 
@@ -65,6 +66,7 @@ Options:
        --sync,-s                   : Mount volumes with sync enabled.
      --device,-d <block device>    : The last argument is interpreted as the device anyways.
    --loopfile,-l <filename:Size>   : Create a file of <size> and use instead of a real device.
+    --data-only,-D                  : Format partitions only; do not require/mount a boot partition.
        --help,-h                   : Show this usage.
 
 Partition Types:
@@ -98,6 +100,7 @@ getopts()
 			-d|--device)	device="$2";	shift;;
 			-s|--sync)	mount_opts="-o sync";;
 			-l|--loop)	loopfile=$2;	shift;;
+			-D|--data-only) data_only=true;;
 			--cpt)		let cpt=`convert_to_sectors $2`*512;shift;;
 			-h|--help)	usage 255;;
 			*) device="$1";;
@@ -113,6 +116,9 @@ getopts()
 	fi
 	let number_of_parts=$part-1
 	if [ -z ${ID[0]} ]; then
+		if $data_only; then
+			usage 23 "Error: --data-only requires at least one --partition."
+		fi
 		add_part "d:0:boot"
 		number_of_parts=0
 	fi
@@ -267,7 +273,12 @@ enough_room()
 
 part_id()
 {
-	blockdev --rereadpt $device
+	# Loop devices may report EBUSY while partitions are being refreshed even
+	# though the kernel has accepted the new table.  Refresh quietly and let
+	# partprobe/udev settle before resolving partition node naming.
+	blockdev --rereadpt "$device" 2>/dev/null || true
+	command -v partprobe >/dev/null 2>&1 && partprobe "$device" >/dev/null 2>&1 || true
+	command -v udevadm >/dev/null 2>&1 && udevadm settle || true
 	short_dev=`basename $device`
 	if grep -qoe "$short_dev[p][0-9]*" /proc/partitions; then
 		p=p
@@ -286,8 +297,10 @@ main()
 	   not_being_used $device && \
 	   user_agrees; then
 		if [ -n "$loopfile" ]; then
-			if [ -z "$overlay" ] && [ -z "$configdir" ]; then
-				usage 21 "You must specify an overlay or configdir when creating a loopfile"
+			if ! $data_only && [ -z "$overlay" ] && [ -z "$configdir" ]; then
+				usage 21 "You must specify an overlay or configdir when creating a bootable loopfile"
+			elif $data_only && ! echo "$loopfile" | grep -qe ":"; then
+				usage 24 "--data-only loopfiles require an explicit filename:size"
 			else
 				losetup_
 			fi
@@ -295,11 +308,15 @@ main()
 		if enough_room $device; then
 			partition
 			format
-			mount_dev
-			sync
-			copy_overlay
-			_sync
-			umount $MNTDIR
+			if $data_only; then
+				sync
+			else
+				mount_dev
+				sync
+				copy_overlay
+				_sync
+				umount $MNTDIR
+			fi
 			clean_up 0
 		fi
 	fi
@@ -402,20 +419,21 @@ losetup_()
 
 lodestroy_()
 {
-	if [ -n "$loopfile" ]; then
-		losetup -d $device; orbail 53
+	if [ -n "$loopfile" ] && [ -n "$device" ]; then
+		losetup -d "$device"
 	fi
 }
 
 orbail()
 {
-	if [ $? -gt 0 ]; then
+	local rc=$?
+	if [ $rc -gt 0 ]; then
 		if [ -n "$2" ]; then
 			echo "$2"
 		else
 			echo "Something went very wrong?"
 		fi
-		exit $1
+		clean_up "$1"
 	else
 		return 0
 	fi

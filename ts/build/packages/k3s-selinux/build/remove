@@ -1,0 +1,5 @@
+#!/bin/sh
+rm -rf usr/share/selinux/devel/include/contrib/k3s.if
+rm -rf usr/share/selinux/packages/k3s.pp
+rm -rf build/scripts
+rm -f build/installed

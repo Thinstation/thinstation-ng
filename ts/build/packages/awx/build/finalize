@@ -1,0 +1,2 @@
+#awx 91
+# AWX manifests are seeded by setup-k3s.sh after persistent storage is mounted.

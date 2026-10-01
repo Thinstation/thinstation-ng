@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+VG=ts_persistent
+for lv in prstnt log k3s-data; do
+  [ -b "/dev/$VG/$lv" ] || { echo "[k3s-storage-mount] persistent storage not configured yet"; exit 0; }
+done
+vgchange -ay "$VG" >/dev/null 2>&1 || true
+mkdir -p /var/prstnt /var/log /var/lib/rancher/k3s
+mountpoint -q /var/prstnt || mount /dev/$VG/prstnt /var/prstnt
+mountpoint -q /var/log || mount /dev/$VG/log /var/log
+mountpoint -q /var/lib/rancher/k3s || mount /dev/$VG/k3s-data /var/lib/rancher/k3s

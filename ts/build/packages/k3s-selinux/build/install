@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+export PACKAGE="k3s-selinux"
+export RPM="k3s-selinux-1.6-1.el8.noarch.rpm"
+export IGNORE_DEPS=true
+
+URL="https://rpm.rancher.io/k3s/stable/common/centos/8/noarch/$RPM"
+EXPECTED_SHA256="a1e24b0d82b1a6806cd420e2c0398a1796b055efe368fa4aebc8bb173850934f"
+DEST="/build/wget_tmp/$RPM"
+KEY="/ts/keys/rancher-rpm.asc"
+
+mkdir -p /build/wget_tmp
+if [ ! -f "$DEST" ] || ! printf '%s  %s\n' "$EXPECTED_SHA256" "$DEST" | sha256sum -c - >/dev/null 2>&1; then
+    rm -f "$DEST"
+    wget -O "$DEST" "$URL"
+fi
+printf '%s  %s\n' "$EXPECTED_SHA256" "$DEST" | sha256sum -c -
+
+if [ -f "$KEY" ]; then
+    rpmkeys --import "$KEY"
+fi
+rpmkeys --checksig "$DEST" | grep -q 'digests signatures OK'
+
+repackage -e

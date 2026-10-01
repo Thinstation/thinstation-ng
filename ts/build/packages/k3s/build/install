@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+INSTALLDIR=/build/packages/k3s
+SOURCE="wget_tmp/$(basename "$1")"
+EXPECTED_SHA256="39eed8f53f277497dfc2542f66eab0ed68a94dfc598946dbebfb50366916c7a2"
+
+[ -f "$SOURCE" ] || { echo "Missing k3s binary: $SOURCE" >&2; exit 1; }
+printf "%s  %s\n" "$EXPECTED_SHA256" "$SOURCE" | sha256sum -c -
+
+mkdir -p "$INSTALLDIR/usr/bin"
+install -m 0755 "$SOURCE" "$INSTALLDIR/usr/bin/k3s"
+ln -sfn k3s "$INSTALLDIR/usr/bin/kubectl"
+ln -sfn k3s "$INSTALLDIR/usr/bin/crictl"
+ln -sfn k3s "$INSTALLDIR/usr/bin/ctr"
+
+exit 0

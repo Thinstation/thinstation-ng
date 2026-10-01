@@ -1,0 +1,7 @@
+base
+ca-certificates
+coreutils
+iproute
+util-linux
+persistent-files
+k3s-selinux
