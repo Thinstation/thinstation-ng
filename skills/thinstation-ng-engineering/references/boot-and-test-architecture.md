@@ -109,3 +109,36 @@ A pcap is often more decisive than console output. Verify the actual sequence: l
 Use direct SSH to the runner for diagnostics when available. Prefer read-only operations on SSH key files and AD-owned files when NSS/SSSD name resolution is unstable; unnecessary `chown`/`touch` operations can break otherwise valid access.
 
 Run Git operations as the checkout owner rather than adding broad `safe.directory` exceptions or changing ownership on CI workspaces.
+
+
+## Persistent data-disk testing
+
+Use `mkgptdrv --data-only` to create disposable GPT storage images without a fake boot partition or overlay:
+
+```bash
+sudo env AGREE=true ts/bin/mkgptdrv --data-only \
+  -l ts/build/bt-vms/k3s-test.img:10G \
+  -p l:1G:prstnt \
+  -p l:1G:log \
+  -p l:0:k3s-data
+```
+
+Data-only mode requires explicit partitions and an explicit loopfile size. Formatting failures must still detach loop devices. Keep large test images off small tmpfs or `/tmp` filesystems.
+
+Use `bt --disk-image PATH` to attach existing raw virtio disks. The option is repeatable. For persistence tests, use `cache=none`; in CD/EFI modes explicit disks replace the implicit global `/usbhd.img`.
+
+For stateful-appliance validation:
+
+1. Create a fresh data disk.
+2. Boot ISO + data disk.
+3. Wait for Ready.
+4. Gracefully power off through ACPI/systemd.
+5. Wait for QEMU to release the image.
+6. Boot the exact same disk.
+7. Verify database, certificates, node identity, mounts, and service readiness.
+
+Do not diagnose persistence from a hard QEMU kill with writeback caching; it can mimic corrupted or partially flushed application state.
+
+## Active profile handoff
+
+Editing `ts/build/conf/<profile>/build.conf.example` does not change an already active `ts/build/build.conf`. Before validating profile changes, copy/sync the profile into the active build tree. For kernel command-line changes, verify the generated GRUB/iPXE configuration before booting.
