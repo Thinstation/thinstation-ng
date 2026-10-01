@@ -1,6 +1,6 @@
 ---
 name: thinstation-ng-engineering
-description: Engineering guide for the ThinStation Next Generation repository and lab workflow. Use when working on the thinstation-ng repo, ThinStation build system, install_chroot/setup-chroot, fastboot, Docker-backed appliance ISOs, GitLab CI appliance builds, package manifests/finalizers, persistent-files, setup-docker, PVE/QEMU validation, or debugging a built ThinStation appliance. Encodes repo conventions, source-vs-generated file distinctions, branch/MR workflow, and known lab validation patterns.
+description: Engineering guide for the ThinStation Next Generation repository and lab workflow. Use when working on the thinstation-ng repo, ThinStation build system, install_chroot/setup-chroot, fastboot, Docker- or K3s-backed appliance ISOs, AWX appliance work, GitLab CI appliance builds, package manifests/finalizers, persistent-files, setup-docker/setup-k3s, mkgptdrv/bt persistent-storage testing, PVE/QEMU validation, or debugging a built ThinStation appliance. Encodes repo conventions, source-vs-generated file distinctions, branch/MR workflow, and known lab validation patterns.
 ---
 
 # ThinStation NG Engineering
@@ -23,6 +23,7 @@ Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-S
 - For repo structure, build phases, active/template config rules, `install_chroot`, and package metadata rules: read `references/build-architecture.md`.
 - For the fastboot build/runtime handoff, loader selection, service ordering, and failure diagnostics: read `references/fastboot-runtime.md`.
 - For GitLab CI, appliance package selection, Docker image export, compose payloads, and CI variables: read `references/appliance-ci.md`.
+- For K3s/AWX appliance architecture, bundled containerd, SELinux, netfilter/kernel requirements, persistent storage, and first-run design: read `references/k3s-awx-appliance.md`.
 - For firewalld, nftables, `/etc/firewall.d` package contributions, and server-package port ownership: read `references/firewall-and-server-packages.md`.
 - For `persistent-files`, immutable appliance state, `setup-docker`, first-run configuration, and idempotency: read `references/persistence-and-setup.md`.
 - For PVE, QGA/SSH validation, lab aliases, and efficient debugging: read `references/lab-validation.md`.
@@ -40,3 +41,16 @@ Work from the canonical GitLab project `davinci/thinstation-ng` on branch `7.4-S
 8. Reuse initialized chroots and generated boot trees when the test does not require regeneration. Do not repeatedly unwind/reinitialize the build environment for firmware/QEMU/parser experiments.
 9. If the output is an appliance ISO, publish it, boot it in PVE, and verify the behavior from the live guest.
 10. If new non-obvious behavior or a recurring trap is discovered, update this skill in the same repo.
+
+
+## Shortcut: Rectify skills
+
+Treat the phrase **"Rectify skills"** as a ThinStation knowledge-maintenance command.
+
+When invoked:
+
+1. Review recent ThinStation engineering work for durable, reusable lessons.
+2. Update `skills/thinstation-ng-engineering` first; keep `SKILL.md` concise and put detail in the appropriate reference.
+3. Also update the separate `automation/thinstation-infra` skill when the lesson affects the broader infrastructure/appliance operating model.
+4. Record architecture, invariants, commands, failure modes, and validation patterns. Omit transient logs, PIDs, temporary paths, and conversational history.
+5. Validate the skill structure and review the diff before commit/MR.

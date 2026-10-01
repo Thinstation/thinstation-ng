@@ -126,3 +126,24 @@ docker exec gitlab tail -80 /var/log/gitlab/gitlab-workhorse/current
 ```
 
 Treat a temporary 502 during first-run initialization as a readiness condition, not immediately as a networking failure. Confirm the Rails socket and retry before changing network/firewall configuration.
+
+
+## K3s persistence model
+
+Do not put the live K3s data tree into `persistent-files` or `persistent-dirs`.
+
+Use:
+
+- `/etc/rancher/k3s` -> ThinStation persistence for configuration
+- `/var/lib/rancher/k3s` -> dedicated persistent filesystem such as `k3s-data`
+- `/var/lib/kubelet` -> ephemeral unless a specific workload proves otherwise
+
+For an AWX/K3s appliance, a practical persistent layout is:
+
+- `prstnt` -> `/var/prstnt`
+- `log` -> `/var/log`
+- `k3s-data` -> `/var/lib/rancher/k3s`
+
+K3s local-path PVC data then remains on the same persistent K3s volume.
+
+Start K3s after both `persistent-files.service` and `persistent-dirs.service` so restored configuration is complete before K3s reads it.
