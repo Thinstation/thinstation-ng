@@ -75,9 +75,9 @@ append_ipv6_connection_config() {
 	echo "[ipv6]" >> $SCFILE
 
 	if [ "$NET_IPV6_MODE" == "disabled" ]; then
-		# "ignore" is used for IPv6, but for consistently we use
-		# "disable" in thinstation.conf for both protocols
-		NET_IPV6_MODE="ignore"
+		# Modern NetworkManager supports ipv6.method=disabled directly.
+		# Using "ignore" leaves IPv6 unmanaged and still allows SLAAC.
+		NET_IPV6_MODE="disabled"
 	fi
 
 	echo "method=$NET_IPV6_MODE" >> $SCFILE

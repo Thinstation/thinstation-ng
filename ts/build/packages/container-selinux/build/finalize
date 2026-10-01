@@ -1,3 +1,14 @@
 #container-selinux 90
 . /build/scripts/container-selinux_preinstall.sh 1
-. /build/scripts/container-selinux_postinstall.sh 1
+
+# Fedora's postinstall contains a multiline sed program that is flattened by
+# repackage's scriptlet extraction.  Drop only that broken line and perform
+# the same idempotent customizable_types update explicitly after the script.
+post=/build/scripts/container-selinux_postinstall.sh
+sed -i '\|^sed -e .*container_file_t|d' "$post"
+. "$post" 1
+
+custom="/etc/selinux/${SELINUXTYPE:-targeted}/contexts/customizable_types"
+if [ -f "$custom" ] && ! grep -qxF container_file_t "$custom"; then
+    printf '%s\n' container_file_t >> "$custom"
+fi
