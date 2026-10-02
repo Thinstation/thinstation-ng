@@ -1,0 +1,3 @@
+interface:
+  display_name: "ThinStation Boot Validation"
+  short_description: "Validate ThinStation with QEMU, QGA, EFI, PXE, and fastboot"

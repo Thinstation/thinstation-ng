@@ -147,3 +147,27 @@ For an AWX/K3s appliance, a practical persistent layout is:
 K3s local-path PVC data then remains on the same persistent K3s volume.
 
 Start K3s after both `persistent-files.service` and `persistent-dirs.service` so restored configuration is complete before K3s reads it.
+
+
+## Docker appliance storage boot ordering
+
+Stateful Docker appliances need their data filesystems mounted before persistence and container services read them.
+
+The validated generic layout uses a `docker-storage-mount.service` that:
+
+1. activates `ts_persistent`,
+2. mounts `prstnt`, `docker`, `log`, `docker-data`, and `container-data`,
+3. runs after fastboot,
+4. runs before `persistent-files`, `persistent-dirs`, containerd, and Docker.
+
+First-run setup should mount each LV explicitly by device. Do not assume `mount /var/prstnt` will work unless an fstab entry actually exists.
+
+For stateful Docker workloads, a fixed 2 GiB `/var/lib/docker` is too small. The validated generic split assigns roughly 60% of remaining VG space to `docker-data` and the remainder to `container-data`. On a 64 GiB test disk this produced about 35 GiB for Docker state/volumes and 23 GiB for containerd image/snapshot storage.
+
+## Secrets and generated configuration permissions
+
+Scope restrictive umasks narrowly.
+
+A global `umask 077` used while generating a root-only credentials file can accidentally make subsequently rewritten application configuration unreadable to non-root container users. For Wazuh this changed `internal_users.yml` to mode 0600 and prevented the indexer security plugin from initializing.
+
+Use a subshell or explicit mode for secret creation, then set application configuration to the permissions required by the container. Keep root-only secrets root-only; do not weaken them to solve an unrelated bind-mount permission problem.

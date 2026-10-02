@@ -29,15 +29,19 @@ This path model matters when passing build parameters that point to files. A fil
 
 CI currently uses 20 parallel downloads and 20 per mirror for appliance builds. Keep large preload lists in CI policy, not `ts/rpms/other`. `ts/rpms/other` should retain only standing/global dependencies such as `python3-pyside6` unless there is a real repository-wide reason.
 
-## Build cleanup
+## Build cleanup and generated state
 
-Use:
+Do not use `setup-chroot -c` casually as a source-diff cleanup command.
 
-```bash
-sudo ./setup-chroot -c
-```
+Important behavior established during appliance work:
 
-before assessing Fedora workspace diffs. This removes most generated build artifacts and makes source changes visible without a destructive `git clean` or reset.
+- `setup-chroot -c` can remove generated boot output, including a completed ISO. Preserve any ISO or staged payload that matters before cleaning.
+- Cleanup is two-stage and can leave `cleanstage2` or bind mounts behind if interrupted.
+- Never recursively remove chroot paths until confirming no host bind mounts remain below them. A mounted `/run`, `/proc`, `/sys`, or `/dev` can turn an apparent chroot cleanup into deletion of live host runtime state.
+- A chroot is considered initialized by `setup-chroot` when repository-root `bin/bash` exists. A half-populated chroot can therefore be mistaken for a valid one.
+- A stale `dostage2` marker can cause stage 1 to be skipped even when `bin/bash` is absent.
+
+Prefer targeted inspection first. If a truly fresh chroot is required, preserve outputs, unmount chroot bind mounts, remove stale stage markers, and then use the normal bootstrap path. Do not broad-`git clean` source trees.
 
 ## Fastboot model
 

@@ -142,3 +142,27 @@ Do not diagnose persistence from a hard QEMU kill with writeback caching; it can
 ## Active profile handoff
 
 Editing `ts/build/conf/<profile>/build.conf.example` does not change an already active `ts/build/build.conf`. Before validating profile changes, copy/sync the profile into the active build tree. For kernel command-line changes, verify the generated GRUB/iPXE configuration before booting.
+
+
+## QGA automation details
+
+For repeated automated guest commands, prefer a persistent UNIX-socket client and attach an `id` to every QGA request. Match responses by request ID and ignore stale queued responses. One-shot socket clients can leave prior replies queued and make later reads appear one message behind.
+
+A reliable sequence is:
+
+1. connect to the VM's `qga.sock`,
+2. send `guest-ping` with an ID,
+3. start work with `guest-exec`,
+4. retain the returned guest PID,
+5. poll `guest-exec-status` by PID until `exited=true`.
+
+Do not assume losing SSH means the guest is dead; first-run network reconfiguration can intentionally replace the active NetworkManager profile while QGA remains available.
+
+## bt process/state cleanup
+
+Distinguish live QEMU processes from stale `bt` metadata.
+
+- Kill exact QEMU PIDs or holders of a specific disk image rather than broad pattern matches.
+- A stopped VM directory can still confuse automatic serial/monitor port allocation.
+- When validating a single test, explicit unused serial/monitor/SSH ports are acceptable.
+- Before reusing a raw disk, confirm no process holds a write lock on it.
