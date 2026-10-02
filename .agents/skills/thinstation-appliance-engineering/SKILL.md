@@ -21,6 +21,7 @@ Use ThinStation as an immutable appliance OS with mutable application state on e
 ## References
 
 - `references/persistence-and-setup.md` — generic state and first-run rules.
+- `references/native-appliance-patterns.md` — ThinStation buildtime/config-writer/systemd patterns, immutable recovery, persistent runtime generations, update channels, registration UI, and hot-deploy development.
 - `references/appliance-ci.md` — package selection, offline image staging, and standard build-pipeline mechanics.
 - `references/firewall-and-server-packages.md` — package firewall ownership.
 - `references/k3s-awx-appliance.md` — reusable K3s/AWX build mechanics.

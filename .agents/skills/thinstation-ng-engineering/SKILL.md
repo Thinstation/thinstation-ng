@@ -25,4 +25,5 @@ Accept the desired **target** first, then derive the repository changes needed t
 - Read `references/target-definition.md` for the input contract and how to translate it into profile/package choices.
 - Read `references/build-architecture.md` for chroot paths, build phases, package metadata, fastboot build split, and cleanup traps.
 - Read `references/repository-hygiene.md` before cleaning an initialized workspace or interpreting a dirty package tree.
+- Read `references/package-development-patterns.md` for incremental package work, repackage/update behavior, /usr merge conventions, config writers, systemd integration, localization, and machine-profile maintenance.
 - Use the `thinstation-boot-validation` skill for local runtime qualification.

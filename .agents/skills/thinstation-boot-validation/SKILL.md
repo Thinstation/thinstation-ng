@@ -1,6 +1,6 @@
 ---
 name: thinstation-boot-validation
-description: Test and qualify ThinStation images locally with repository-native tooling. Use for ts/bin/bt, QEMU, BIOS/UEFI/Secure Boot, OVMF, PXE/iPXE, fastboot/lib.squash, QEMU Guest Agent automation, local SSH debug paths, persistent raw disks, graceful reboot tests, and proving that a build satisfies a target definition before commit.
+description: Test and qualify ThinStation images locally with repository-native tooling. Use for ts/bin/bt, QEMU, BIOS/UEFI/Secure Boot, OVMF, PXE/iPXE, fastboot/lib.squash, QEMU Guest Agent automation, local SSH debug paths, QGA hot-deploy loops, persistent raw disks, graceful reboot tests, and proving that a build satisfies a target definition before commit.
 ---
 
 # ThinStation Boot Validation
