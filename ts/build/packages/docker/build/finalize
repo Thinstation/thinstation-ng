@@ -14,3 +14,5 @@ echo "%$TSUSER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$TSUSER
 docker --version > /etc/issue
 echo 'Kernel \r on an \m (\l)' >> /etc/issue
 #systemctl enable docker-iso-update
+
+systemctl enable docker-storage-mount.service

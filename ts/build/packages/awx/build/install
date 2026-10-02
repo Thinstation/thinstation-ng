@@ -1,0 +1,10 @@
+#!/bin/sh
+
+export PACKAGE="awx"
+export PORTS=""
+export DROP_FILES=""
+export DROP_DIRS=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+
+exit 0

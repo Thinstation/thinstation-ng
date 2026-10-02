@@ -25,6 +25,10 @@ for i in runlevel reboot poweroff halt telinit; do
 	ln -sf /usr/bin/systemctl /build/packages/$PACKAGE/usr/bin/$i
 	let returnval=returnval+$?
 done
+
+# /sbin is usr-merged into /usr/bin; PID 1 must remain systemd, not BusyBox init.
+ln -sf /usr/lib64/systemd/systemd /build/packages/$PACKAGE/usr/bin/init
+let returnval=returnval+$?
 #for link in init sbin/init ; do
 #	ln -sf /usr/lib64/systemd/systemd ./packages/$PACKAGE/$link
 #	let returnval=returnval+$?

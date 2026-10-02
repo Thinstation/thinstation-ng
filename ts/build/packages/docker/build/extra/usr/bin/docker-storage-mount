@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+VG=ts_persistent
+vgchange -ay "$VG" >/dev/null 2>&1 || exit 0
+mount_one(){ local dev="$1" mp="$2"; [[ -b "$dev" ]] || return 0; mkdir -p "$mp"; mountpoint -q "$mp" || mount "$dev" "$mp"; }
+mount_one "/dev/$VG/prstnt" /var/prstnt
+mount_one "/dev/$VG/docker" /docker
+mount_one "/dev/$VG/log" /var/log
+mount_one "/dev/$VG/docker-data" /var/lib/docker
+mount_one "/dev/$VG/container-data" /var/lib/containerd
