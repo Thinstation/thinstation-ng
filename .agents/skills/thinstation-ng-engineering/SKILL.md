@@ -1,24 +1,28 @@
 ---
 name: thinstation-ng-engineering
-description: Engineer the ThinStation Next Generation repository safely. Use for setup-chroot/install_chroot, package metadata and build/extra behavior, source-vs-generated file questions, build profiles, usr-merge/fastboot build mechanics, cleanup/recovery, repository hygiene, and making or reviewing source changes in davinci/thinstation-ng.
+description: Turn a server, desktop, kiosk, or appliance target definition into a qualified ThinStation NG image. Use for choosing packages and machine profiles, creating or modifying build.conf/thinstation.conf inputs, setup-chroot/install_chroot, package metadata/build/extra behavior, source-vs-generated files, building images, debugging build failures, qualification, and preparing a branch/MR for the standard project pipeline.
 ---
 
 # ThinStation NG Engineering
 
-Work from canonical GitLab `davinci/thinstation-ng` and current `7.4-Stable`.
+Accept the desired **target** first, then derive the repository changes needed to build and qualify it.
 
-## Workflow
+## Target-to-image workflow
 
-1. Inspect canonical source before changing the build host.
-2. Identify whether a path is authored source, active build configuration, generated package-root content, or build output.
-3. Make the smallest reusable source change on a focused branch.
-4. Avoid broad cleanup/reset operations on a live initialized chroot.
-5. Validate with the cheapest test that proves the change, then use full integration build when required.
-6. Commit only source and intentional metadata; leave generated unwind/build content unstaged.
-7. Merge through an MR.
-8. When a durable rule is learned, update the appropriate skill/reference.
+1. Normalize the target definition: purpose, hardware/virtual platform, boot modes, packages/services, UI/session, network needs, persistence, storage, security constraints, and required output format.
+2. Inspect existing profiles and packages before inventing new ones.
+3. Choose or create the smallest appropriate configuration under `ts/build/conf/`; keep common behavior in reusable packages rather than duplicating profile logic.
+4. Add/update package source under `ts/build/packages/` when the target needs new runtime files, dependencies, finalizers, kernel modules, or first-run behavior.
+5. Activate the intended profile/config in the build tree.
+6. Initialize or reuse the chroot safely and build the image.
+7. Test locally with the repository's QEMU/`bt` tools using the smallest matrix that covers the target.
+8. Debug from concrete build/runtime evidence; fix source, rebuild only what changed, and repeat.
+9. Qualify the target against its declared requirements, including reboot/persistence or EFI/Secure Boot when applicable.
+10. Review the source diff versus generated state, commit only intentional source, and submit through the repository's normal branch/MR/CI workflow.
 
 ## References
 
+- Read `references/target-definition.md` for the input contract and how to translate it into profile/package choices.
 - Read `references/build-architecture.md` for chroot paths, build phases, package metadata, fastboot build split, and cleanup traps.
-- Read `references/repository-hygiene.md` before cleaning an initialized build workspace or interpreting a dirty package tree.
+- Read `references/repository-hygiene.md` before cleaning an initialized workspace or interpreting a dirty package tree.
+- Use the `thinstation-boot-validation` skill for local runtime qualification.

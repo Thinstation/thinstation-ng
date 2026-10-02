@@ -1,6 +1,21 @@
 # AI agent material
 
-This directory contains project-native guidance intended for AI coding/engineering agents.
+This directory contains public, project-native guidance for using the ThinStation NG repository effectively.
+
+## Scope
+
+The skills may document:
+
+- repository structure and package mechanics,
+- how to accept a server, desktop, kiosk, or appliance target definition,
+- how to create/update ThinStation build configuration,
+- package/profile selection,
+- image construction,
+- local QEMU/`bt` testing,
+- debugging and qualification,
+- preparing a source change for the repository's normal branch/MR/CI workflow.
+
+The skills must not document a maintainer's private deployment topology, internal host inventory, infrastructure organization, addresses, credentials, connector layout, or relationships to unrelated private repositories.
 
 ## Layout
 
@@ -15,20 +30,17 @@ AGENTS.md
       references/
 ```
 
-`AGENTS.md` is the small always-on repository guide. Reusable, task-specific knowledge lives in `.agents/skills/` and follows the Agent Skills `SKILL.md` format.
-
-The Agent Skills specification defines the contents of a skill, not a mandatory install path. `.agents/skills/` is the cross-client project convention recommended by current Agent Skills implementation guidance and used by compatible clients. Keep this directory canonical instead of maintaining duplicate vendor-specific copies.
-
-Client-specific compatibility links or copies may be generated locally when needed (for example `.claude/skills/`), but do not commit divergent copies.
+`AGENTS.md` is the small always-on repository guide. Reusable task-specific knowledge lives under `.agents/skills/`.
 
 ## Publishing rules
 
-- Keep `SKILL.md` concise; put detailed architecture and diagnostics in `references/`.
-- Include only durable, reusable knowledge. Exclude transient PIDs, temporary log paths, secrets, and one-off lab state.
-- Prefer repository-relative paths and portable methods.
-- Update skills when a real engineering session establishes a new invariant, failure mode, or validation method.
-- Validate YAML frontmatter, relative reference paths, and executable scripts before merging.
+- Keep `SKILL.md` concise and task-oriented; put detail in `references/`.
+- Prefer repository-relative paths and portable local methods.
+- Build examples may use concrete software targets when they teach reusable ThinStation mechanics.
+- Remove environment-specific names, addresses, IDs, device inventories, deployment topology, and private repo relationships.
+- Update skills when real engineering work establishes a durable repository invariant, failure mode, or validation technique.
+- Validate frontmatter, relative references, and scripts before merging.
 
 ## Rectify skills
 
-When a maintainer says **Rectify skills**, review recent ThinStation work and update the relevant project skills here. Also update the broader `automation/thinstation-infra` skill when the lesson affects infrastructure, CI, or operational architecture beyond this repository.
+When a maintainer says **Rectify skills**, update only durable ThinStation NG repository/build knowledge in this directory. Do not propagate private operational context into the public skill bundle.

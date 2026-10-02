@@ -1,23 +1,25 @@
 ---
 name: thinstation-boot-validation
-description: Test and debug ThinStation boot/runtime behavior. Use for ts/bin/bt, QEMU, BIOS/UEFI/Secure Boot, OVMF, PXE/iPXE, fastboot/lib.squash, QEMU Guest Agent automation, SSH debug paths, persistent raw disks, graceful reboot tests, and diagnosing whether a built ISO reached userspace.
+description: Test and qualify ThinStation images locally with repository-native tooling. Use for ts/bin/bt, QEMU, BIOS/UEFI/Secure Boot, OVMF, PXE/iPXE, fastboot/lib.squash, QEMU Guest Agent automation, local SSH debug paths, persistent raw disks, graceful reboot tests, and proving that a build satisfies a target definition before commit.
 ---
 
 # ThinStation Boot Validation
 
-Prefer direct runtime evidence over guessing from source.
+Prefer local, reproducible evidence over environment-specific deployment testing.
 
-## Test order
+## Qualification workflow
 
-1. Use the smallest `bt` mode that proves the change.
-2. Confirm the QEMU process and QGA socket.
-3. Use QGA for guest status/commands before depending on SSH.
-4. For persistent appliances, fresh disk -> setup -> healthy -> graceful stop -> same disk -> healthy.
-5. Repeat EFI for appliance images intended for Proxmox/modern VM deployment.
-6. Use Secure Boot/PXE variants when the changed area touches those paths.
+1. Start from the target definition's required boot modes and runtime behavior.
+2. Use the smallest relevant `bt` mode first.
+3. Confirm QEMU process state and QGA before depending on SSH.
+4. Verify expected filesystem/package/service state inside the guest.
+5. For persistent targets: fresh disk -> configure -> healthy -> graceful stop -> same disk -> healthy.
+6. Validate EFI when the target requires modern virtual/physical deployment; validate Secure Boot/PXE only when required.
+7. Record failures as repository-level causes and fix the source/configuration rather than adapting to a private deployment environment.
+8. Stop all test VMs and leave qualification artifacts outside the committed source diff.
 
 ## References
 
 - `references/boot-and-test-architecture.md` — bt matrix, OVMF, PXE, persistent disks, QGA protocol details.
 - `references/fastboot-runtime.md` — initrd/lib.squash split and runtime loader diagnostics.
-- `references/lab-validation.md` — guest inspection and live-service troubleshooting.
+- `references/local-qemu-validation.md` — local guest inspection and qualification checklist.
