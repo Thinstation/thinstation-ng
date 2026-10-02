@@ -14,6 +14,29 @@ At build time:
 
 Do not diagnose fastboot only from the final root tree. Inspect both the initrd side and the deferred `lib.squash` side.
 
+## Early networking policy
+
+Networking is a boot dependency when `ts-init` or another early consumer may need to retrieve configuration before the normal runtime is fully assembled. In that case, the networking implementation and its dependencies must be available in the early filesystem.
+
+Prefer one networking stack at runtime:
+
+- If the selected image uses NetworkManager and early configuration requires networking, retain NetworkManager, `nm-online`, required libraries, and the early configuration path before deferred payload mounting.
+- Make that retention package-aware rather than globally hard-coding NetworkManager into every fastboot image.
+- Do not keep NetworkManager and `autonet` active merely as mutual fallbacks; two live networking stacks create ordering and reconfiguration ambiguity.
+- Use `autonet` only for an explicit boot path that genuinely requires it.
+- Bootstrap networking must still allow later configuration files to change the effective configuration. Reload or regenerate connections after those files are applied.
+
+Validate both initial network acquisition and a later reconfiguration case. A DHCP lease alone does not prove the network lifecycle is correct.
+
+## Package-aware fastboot policy
+
+Early-boot retention should follow selected packages whenever possible.
+
+- Global `bin-boot` and `lib-boot` entries should represent true repository-wide requirements.
+- Package-specific early requirements belong with the package's fastboot policy.
+- Compare what is selected, what must execute before `lib.squash` exists, what must remain in the early tree, and what may stay deferred.
+- Dependency/audit tooling is valuable for proving those relationships even when a broader refactor is not pursued.
+
 ## Service ordering
 
 Runtime entrypoint:
@@ -91,7 +114,7 @@ Behavior:
 - If the initrd itself was loaded over HTTP and `FASTBOOT_URL` is empty, infer the base URL from the initrd URL.
 - Otherwise wait briefly for `SERVER_IP` and fetch with TFTP using `TFTP_BLOCKSIZE`.
 
-The runtime profile explicitly warns that the NetworkManager package is not suitable for this fastboot PXE path and points toward `autonet`.
+Historically this path favored `autonet`. Treat that as a boot-path constraint, not as a reason to run a second networking stack on ordinary NetworkManager images.
 
 ## Mount/decompression modes
 
@@ -108,6 +131,8 @@ Other enabled fastboot mode:
 
 This distinction matters when debugging missing files. In `lotsofmem` mode, inspect the expanded root. In mounted mode, verify the `/lib64` mount and the squash source.
 
+Any fastboot policy change that affects retained files should be validated in both modes. They share source lists but exercise different runtime behavior.
+
 ## Failure diagnostics
 
 `/etc/profile` is the operator-facing fallback when the console starts but no graphical/console session was launched.
@@ -123,7 +148,7 @@ When `DEBUG_BOOT` is set, the fastboot init script enables shell tracing and red
 The profile then checks loader-specific conditions:
 
 - `LM=hd`: vfat/module availability and `/boot` mount
-- `LM=pxe`: NetworkManager/autonet/server acquisition
+- `LM=pxe`: early networking/server acquisition
 - `LM=iso`: ISO/UDF modules and CD mount
 - unknown LM: loader selection never completed correctly
 

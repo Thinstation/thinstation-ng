@@ -60,6 +60,22 @@ When validating a fastboot build, inspect both trees. Early boot consumers canno
 
 A prior systemd/libbpf warning was fixed by retaining recursive dependencies for an explicitly retained `libbpf.so.1` (`libelf`, `libz`, `libc`, `libzstd`, etc.). Preserve the rule: recurse only from libraries actually retained.
 
+## Refactoring discipline
+
+The build system is mature shell with substantial implicit state, sourced variables, path assumptions, and side effects. Treat broad cleanup as a separate engineering project, not as incidental work while fixing a functional issue.
+
+Apply these rules:
+
+- Prefer the smallest change that resolves a demonstrated problem.
+- Do not rewrite or decompose `ts/build/build` merely because it is difficult to read.
+- Extract a section only when there is a concrete payoff such as isolation for testing, repeated defects, or a clear interface boundary.
+- For mechanical extractions, preserve behavior exactly and validate a representative full build before accepting the change.
+- Keep diagnostic tooling and validation when they improve observability even if a larger refactor is abandoned.
+- Stop an exploratory refactor when the risk or blast radius grows faster than the operational benefit.
+- Separate functional fixes from cleanup so either can be reverted or omitted independently.
+
+The preferred outcome is often better understanding and better tests rather than cleaner-looking shell.
+
 ## Other established build behavior
 
 - Kernel debug console is configurable with `param debugconsole`; absence means normal non-debug builds use `console=tty1`.
