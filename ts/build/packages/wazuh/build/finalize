@@ -1,0 +1,2 @@
+#wazuh 91
+# Wazuh is initialized after Docker persistence by /root/setup-wazuh.sh.

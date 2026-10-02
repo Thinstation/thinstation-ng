@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONF="$ROOT/build/packages/wazuh/build/extra/usr/share/thinstation/wazuh/images.conf"
+OUT="$ROOT/build/boot-images/grub/efi-source/Docker"
+exec "$ROOT/bin/export-docker-images" "$CONF" "$OUT"

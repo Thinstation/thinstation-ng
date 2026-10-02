@@ -160,9 +160,12 @@ CURRENT_PREFIX="${CURRENT_CIDR#*/}"
 CURRENT_GATEWAY="$(default_gateway)"
 read -r CURRENT_DNS1 CURRENT_DNS2 _ <<<"$(default_dns "$IFACE")"
 CURRENT_SEARCH="$(default_search "$IFACE")"
+CURRENT_SEARCH="$(printf '%s' "$CURRENT_SEARCH" | sed -e 's/^~//' -e 's/\.*$//' )"
+[[ "$CURRENT_SEARCH" == "." ]] && CURRENT_SEARCH=""
 CURRENT_HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
-if [[ "$CURRENT_HOSTNAME" != *.* && -n "$CURRENT_SEARCH" ]]; then
-  CURRENT_HOSTNAME="${CURRENT_HOSTNAME}.${CURRENT_SEARCH}"
+CURRENT_HOSTNAME="$(printf '%s' "$CURRENT_HOSTNAME" | sed 's/\.*$//')"
+if [[ "$CURRENT_HOSTNAME" != *.* ]]; then
+  CURRENT_HOSTNAME="${CURRENT_HOSTNAME}.${CURRENT_SEARCH:-localdomain}"
 fi
 
 NET_IP_ADDRESS="${NET_IP_ADDRESS:-$CURRENT_IP}"
@@ -288,7 +291,10 @@ if (( ! REUSE_STORAGE )); then
   lvcreate -y -L 1G -n prstnt "$VG_NAME"
   lvcreate -y -L 1G -n docker "$VG_NAME"
   lvcreate -y -L 4G -n log "$VG_NAME"
-  lvcreate -y -L 2G -n docker-data "$VG_NAME"
+  # Split remaining capacity between persistent Docker volumes/state and
+  # containerd image/snapshot storage. Stateful appliances (Wazuh, NPM, etc.)
+  # need substantial space under /var/lib/docker, not a fixed 2G LV.
+  lvcreate -y -l 60%FREE -n docker-data "$VG_NAME"
   lvcreate -y -l 100%FREE -n container-data "$VG_NAME"
 
   mkfs.ext4 -F -L prstnt "/dev/$VG_NAME/prstnt"
@@ -300,8 +306,15 @@ fi
 
 mkdir -p /var/prstnt /docker /var/log /var/lib/docker /var/lib/containerd
 
-for mp in /var/prstnt /var/log /docker /var/lib/docker /var/lib/containerd; do
-  mountpoint -q "$mp" || mount "$mp"
+declare -A STORAGE_MOUNTS=(
+  [/var/prstnt]="/dev/$VG_NAME/prstnt"
+  [/docker]="/dev/$VG_NAME/docker"
+  [/var/log]="/dev/$VG_NAME/log"
+  [/var/lib/docker]="/dev/$VG_NAME/docker-data"
+  [/var/lib/containerd]="/dev/$VG_NAME/container-data"
+)
+for mp in /var/prstnt /docker /var/log /var/lib/docker /var/lib/containerd; do
+  mountpoint -q "$mp" || mount "${STORAGE_MOUNTS[$mp]}" "$mp"
 done
 
 DOCKER_SEED_ROOT="${DOCKER_SEED_ROOT:-/usr/lib/thinstation/docker-stacks}"

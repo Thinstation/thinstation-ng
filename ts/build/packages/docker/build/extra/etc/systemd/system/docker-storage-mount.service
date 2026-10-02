@@ -1,0 +1,13 @@
+[Unit]
+Description=Mount ThinStation Docker persistent storage
+DefaultDependencies=no
+After=fastboot.service
+Before=persistent-files.service persistent-dirs.service containerd.service docker.service tsinit.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker-storage-mount
+RemainAfterExit=yes
+
+[Install]
+WantedBy=tsinit.target
