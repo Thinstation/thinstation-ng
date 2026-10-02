@@ -1,0 +1,3 @@
+interface:
+  display_name: "ThinStation Appliance Engineering"
+  short_description: "Build persistent Docker and K3s ThinStation appliances"

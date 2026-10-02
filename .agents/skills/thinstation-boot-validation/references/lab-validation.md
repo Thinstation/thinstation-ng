@@ -91,3 +91,10 @@ firewall-cmd --zone=public --list-services
 firewall-cmd --zone=public --list-ports
 nft list ruleset
 ```
+
+
+## Appliance management services
+
+For appliance images, prefer the normal `sshd.service` ordered with `tsinit` over per-connection socket activation when early boot/persistent state is still settling. In validation, socket-activated SSH accepted TCP and then closed sessions before a usable daemon environment was ready.
+
+For QEMU Guest Agent, avoid a brittle hard `BindsTo=` on the virtio-port device unit. The validated appliance override starts after `tsinit.target` and `fastboot.service` and uses restart-on-failure, while the package still provides its normal device integration.

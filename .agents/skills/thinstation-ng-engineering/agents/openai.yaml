@@ -1,0 +1,3 @@
+interface:
+  display_name: "ThinStation NG Engineering"
+  short_description: "Safely change ThinStation NG build and package source"
