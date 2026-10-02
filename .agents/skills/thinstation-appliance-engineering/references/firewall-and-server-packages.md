@@ -31,37 +31,9 @@ Keep generic setup/configuration scripts firewall-agnostic. A service package sh
 
 ## Metadata-only appliance packages
 
-GitLab EE and NPM are not normal RPM-backed ThinStation packages. They have effectively empty `.dna` files and no standard `build/install` path that invokes `repackage`.
+Some appliance packages are metadata/static-payload packages rather than ordinary RPM-backed packages. When their normal install path does not invoke `repackage`, use the package's finalization path to materialize required runtime firewall fragments in the final image.
 
-For these packages, use `build/finalize` to create runtime firewall fragments directly in the final image.
-
-Current GitLab finalizer must create:
-
-```text
-/etc/firewall.d/70gitlab-ee
-```
-
-with:
-
-```bash
-firewall-cmd --add-service=http
-firewall-cmd --add-service=https
-firewall-cmd --add-port=2222/tcp
-```
-
-Current NPM finalizer must create:
-
-```text
-/etc/firewall.d/70nginx-proxy-manager
-```
-
-with:
-
-```bash
-firewall-cmd --add-service=http
-firewall-cmd --add-service=https
-firewall-cmd --add-port=81/tcp
-```
+Keep the rule generic: package-owned services declare their own required ports under `/etc/firewall.d`.
 
 ## Docker/firewalld coexistence
 
@@ -80,12 +52,4 @@ A host port can be correctly DNATed/accepted by nftables while the container sti
 
 ## Port ownership rule
 
-Do not let container service ports collide with appliance-management ports.
-
-For GitLab appliances:
-
-- appliance/MCP SSH owns host TCP 22
-- GitLab repository SSH owns host TCP 2222
-- GitLab HTTP/HTTPS own TCP 80/443
-
-Keep the compose mapping, the application-advertised port, and firewall contribution synchronized.
+Do not let container service ports collide with appliance-management ports. Keep compose mappings, application-advertised ports, and package firewall contributions synchronized.

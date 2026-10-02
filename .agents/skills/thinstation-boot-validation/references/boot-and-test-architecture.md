@@ -2,22 +2,16 @@
 
 ## Fast iteration hierarchy
 
-Prefer the cheapest test that proves the hypothesis.
+Prefer the cheapest local test that proves the hypothesis.
 
-1. Run a focused command directly on the persistent runner lab.
-2. Reuse an initialized chroot and existing generated artifacts.
+1. Run a focused parser/build/tool command.
+2. Reuse an initialized chroot and existing generated artifacts when safe.
 3. Rebuild only the affected boot/image output when required.
-4. Run CI only for final integration validation or when CI behavior itself is under test.
+4. Run the repository CI pipeline only for integration/final validation or when pipeline behavior itself is under test.
 
-The persistent ThinStation lab on the runner is:
+When using `setup-chroot`, initialize the full environment before applying a minimal active profile. A stale partial chroot can look initialized while required tools are missing; repair the chroot state rather than resetting source.
 
-`/home/gitlab-runner/thinstation-ng-lab`
-
-Keep it outside GitLab Runner's disposable `builds/` workspace so CI cleanup cannot remove the initialized chroot or boot artifacts.
-
-When using `setup-chroot`, initialize the full environment first, then copy a small profile such as `conf/tiny` into the active build tree. Applying the tiny profile before `setup-chroot -i` can leave the chroot without build tools. A stale partial chroot can look initialized while `root/ts/TS_ENV` or expected tools are missing; clear only the broken chroot/cache state and reinitialize rather than resetting source.
-
-Inside the chroot, `/build` maps to `ts/build`. Use paths under `/build` for diagnostic files that must survive chroot teardown. Chroot `/tmp` is temporary and may disappear when `setup-chroot` exits.
+Inside the chroot, `/build` maps to `ts/build`. Write diagnostic artifacts that must survive chroot exit under `/build`, not transient chroot `/tmp`.
 
 ## Network boot output contract
 
@@ -104,12 +98,9 @@ For headless or automated tests, prefer direct evidence over GUI inspection:
 
 A pcap is often more decisive than console output. Verify the actual sequence: loader request, sibling `autoexec.ipxe`, HTTP `vmlinuz`, HTTP `initrd`, Fedora shim for UEFI, and later `lib.squash` when applicable.
 
-## Runner access and ownership
+## Checkout ownership
 
-Use direct SSH to the runner for diagnostics when available. Prefer read-only operations on SSH key files and AD-owned files when NSS/SSSD name resolution is unstable; unnecessary `chown`/`touch` operations can break otherwise valid access.
-
-Run Git operations as the checkout owner rather than adding broad `safe.directory` exceptions or changing ownership on CI workspaces.
-
+Run Git operations as the checkout owner rather than adding broad `safe.directory` exceptions or changing ownership on initialized build trees.
 
 ## Persistent data-disk testing
 

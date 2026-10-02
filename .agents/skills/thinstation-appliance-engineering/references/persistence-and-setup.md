@@ -107,26 +107,9 @@ On rerun, the seed should refresh the persistent compose file before `docker com
 
 ## First-start service timing
 
-A successful container start does not mean the GitLab web UI is immediately ready.
+A successful container start does not mean the application is immediately ready. Treat temporary startup HTTP failures as readiness signals until the application's own health/listener/socket evidence shows otherwise.
 
-Observed first-start sequence:
-
-- PostgreSQL, Redis, Gitaly, KAS, and SSH start first.
-- Nginx and Workhorse may appear before Rails is ready.
-- Puma can spend roughly a minute preloading the Rails application.
-- Until Puma creates `/var/opt/gitlab/gitlab-rails/sockets/gitlab.socket`, Workhorse can return `502 Bad Gateway`.
-
-When validating GitLab startup, inspect:
-
-```bash
-docker exec gitlab gitlab-ctl status
-docker exec gitlab ls -l /var/opt/gitlab/gitlab-rails/sockets/
-docker exec gitlab tail -80 /var/log/gitlab/puma/current
-docker exec gitlab tail -80 /var/log/gitlab/gitlab-workhorse/current
-```
-
-Treat a temporary 502 during first-run initialization as a readiness condition, not immediately as a networking failure. Confirm the Rails socket and retry before changing network/firewall configuration.
-
+Validate readiness from the application layer before changing network/firewall configuration.
 
 ## K3s persistence model
 

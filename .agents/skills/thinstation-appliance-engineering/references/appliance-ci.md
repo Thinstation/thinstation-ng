@@ -4,20 +4,11 @@
 
 The shared boot2docker profile keeps appliance packages commented. CI selectively enables the appliance being built after copying the profile into the active build tree.
 
-For GitLab EE CI, the established pattern includes:
-
-```bash
-sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
-sudo sed -i 's/^#package gitlab-ee/package gitlab-ee/' ts/build/build.conf
-```
-
-Debug-only packages such as OpenSSH should be enabled in the GitLab appliance CI job, not globally in the shared boot2docker profile.
+A standard appliance job copies the reusable profile into the active build tree, then enables exactly the requested appliance package. Debug-only packages such as OpenSSH should be enabled only for a debug/test build, not globally in the shared profile.
 
 ## Docker image export
 
 Appliance packages carry `build/images.conf`. CI runs `ts/bin/export-docker-images` before the ThinStation build so the pinned image is baked into the ISO under the Docker image/manifests tree.
-
-GitLab EE currently uses a pinned upstream image retagged as `thinstation/gitlab-ee:appliance`.
 
 Do not add explicit `dnf install docker` lines to the appliance CI jobs. Those were removed because they bypassed the intended bootstrap/package flow.
 
@@ -69,14 +60,8 @@ Current convention:
 
 Do not seed compose files directly under the immutable image's `/docker` path because the persistent `docker` LV mounts there during boot and hides them before first-run setup can copy them.
 
-Always test both NPM and GitLab appliance packaging when changing generic Docker-appliance mechanics.
+When changing generic Docker-appliance mechanics, test at least two materially different appliance packages when practical.
 
-## GitLab appliance ports
+## Port ownership
 
-Keep appliance SSH and GitLab repository SSH distinct:
-
-- host/MCP OpenSSH: TCP 22
-- GitLab container SSH: host TCP 2222 -> container TCP 22
-- GitLab HTTP/HTTPS: TCP 80/443
-
-The GitLab compose seed, GitLab advertised shell SSH port, and firewall fragment must agree on 2222. Avoid making only one of those values configurable unless the others are derived from the same source.
+Keep appliance-management ports and application ports distinct. A package's compose mapping, application-advertised port, and firewall contribution must agree. Avoid hard-coding deployment-environment assumptions into generic setup logic.
