@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# ThinStation session/package launcher.
+#
+# Usage:
+#   pkg <mode> <package> [package arguments...]
+#
+# session-setup emits commands such as:
+#   pkg console sh "" ""
+#
+# /etc/thinstation.packages expects PACKAGE in the environment and the
+# requested launch mode as its first positional argument.
+
+mode="${1:-}"
+package="${2:-}"
+
+if [ -z "$mode" ] || [ -z "$package" ]; then
+    echo "Usage: pkg <mode> <package> [arguments...]" >&2
+    exit 2
+fi
+
+shift 2
+export PACKAGE="$package"
+
+exec /etc/thinstation.packages "$mode" "$@"
