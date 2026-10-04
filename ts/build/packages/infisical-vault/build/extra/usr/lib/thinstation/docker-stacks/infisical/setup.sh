@@ -6,6 +6,16 @@ for cfg in /thinstation.buildtime /etc/thinstation.network /etc/thinstation.user
   [[ -r "$cfg" ]] && . "$cfg"
 done
 
+# Capture only the documented, non-secret site knobs from ThinStation config.
+CFG_INFISICAL_SITE_URL="${INFISICAL_SITE_URL:-}"
+CFG_INFISICAL_BIND_ADDRESS="${INFISICAL_BIND_ADDRESS:-}"
+CFG_INFISICAL_HTTP_PORT="${INFISICAL_HTTP_PORT:-}"
+CFG_INFISICAL_TELEMETRY_ENABLED="${INFISICAL_TELEMETRY_ENABLED:-}"
+
+# Vault-internal secrets must never be accepted from ThinStation configuration.
+unset ENCRYPTION_KEY AUTH_SECRET POSTGRES_PASSWORD REDIS_PASSWORD POSTGRES_USER POSTGRES_DB
+unset INFISICAL_SITE_URL INFISICAL_BIND_ADDRESS INFISICAL_HTTP_PORT INFISICAL_TELEMETRY_ENABLED
+
 random_hex() {
   local bytes="${1:?bytes required}"
   od -An -N"$bytes" -tx1 /dev/urandom | tr -d ' \n'
@@ -32,8 +42,12 @@ fi
 : "${INFISICAL_HTTP_PORT:=8080}"
 : "${INFISICAL_TELEMETRY_ENABLED:=false}"
 
+[[ -z "$CFG_INFISICAL_BIND_ADDRESS" ]] || INFISICAL_BIND_ADDRESS="$CFG_INFISICAL_BIND_ADDRESS"
+[[ -z "$CFG_INFISICAL_HTTP_PORT" ]] || INFISICAL_HTTP_PORT="$CFG_INFISICAL_HTTP_PORT"
+[[ -z "$CFG_INFISICAL_TELEMETRY_ENABLED" ]] || INFISICAL_TELEMETRY_ENABLED="$CFG_INFISICAL_TELEMETRY_ENABLED"
+
 HOST_FQDN="$(hostname -f 2>/dev/null || hostname)"
-: "${INFISICAL_SITE_URL:=http://${HOST_FQDN}:${INFISICAL_HTTP_PORT}}"
+INFISICAL_SITE_URL="${CFG_INFISICAL_SITE_URL:-http://${HOST_FQDN}:${INFISICAL_HTTP_PORT}}"
 
 install -d -m 0700 postgres redis
 cat >.env.tmp <<EOF
