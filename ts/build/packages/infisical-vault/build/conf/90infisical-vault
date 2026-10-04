@@ -1,0 +1,27 @@
+# Infisical Vault appliance configuration.
+#
+# Put site defaults in thinstation.conf.buildtime and per-appliance overrides
+# in /etc/thinstation.custom. These variables are consumed by the Infisical
+# stack setup hook before Docker Compose starts.
+#
+# Never place ENCRYPTION_KEY, AUTH_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD,
+# or other vault secrets in ThinStation configuration. Those are generated on
+# first setup and persist in /docker/infisical/.env with mode 0600.
+#
+# INFISICAL_SITE_URL
+#   Public URL used by users and clients. If unset, the appliance derives
+#   http://<host-fqdn>:<INFISICAL_HTTP_PORT>.
+#INFISICAL_SITE_URL="https://vault.example.org"
+#
+# INFISICAL_BIND_ADDRESS
+#   Host address used for Docker's published Infisical listener. Set this to
+#   127.0.0.1 when a host-side TLS reverse proxy owns the external listener.
+INFISICAL_BIND_ADDRESS="0.0.0.0"
+#
+# INFISICAL_HTTP_PORT
+#   Host TCP port mapped to Infisical's internal port 8080.
+INFISICAL_HTTP_PORT="8080"
+#
+# INFISICAL_TELEMETRY_ENABLED
+#   Passed to Infisical as TELEMETRY_ENABLED. Appliance default is false.
+INFISICAL_TELEMETRY_ENABLED="false"

@@ -1,0 +1,16 @@
+ThinStation Infisical Vault Appliance
+
+This package embeds a pinned, offline-capable Infisical stack on the shared
+ThinStation Docker appliance base. PostgreSQL and Redis remain private to the
+Compose network and have no host port mappings.
+
+First-run flow:
+- setup-docker creates and mounts the generic persistent Docker appliance storage.
+- the immutable stack seed is copied to /docker/infisical.
+- /docker/infisical/setup.sh runs before Compose and creates persistent secrets.
+- subsequent setup runs preserve those secrets while applying non-secret site
+  overrides from ThinStation configuration.
+- Compose starts Infisical, PostgreSQL, and Redis.
+
+Supported non-secret runtime variables are documented in build/conf/90infisical-vault.
+Do not put vault encryption keys or service passwords in buildtime/custom config.

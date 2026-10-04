@@ -1,0 +1,3 @@
+#infisical-vault 92
+# Runtime payload is carried in build/extra. setup-docker copies the immutable
+# seed into persistent /docker/infisical and executes setup.sh before Compose.

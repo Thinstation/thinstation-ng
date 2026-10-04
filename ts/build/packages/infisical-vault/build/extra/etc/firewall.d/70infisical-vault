@@ -1,0 +1,8 @@
+# Infisical owns its application listener. Keep the port configurable through
+# the same documented ThinStation variables consumed by the stack setup.
+for cfg in /thinstation.buildtime /etc/thinstation.custom; do
+  [ -r "$cfg" ] && . "$cfg"
+done
+if [ "${INFISICAL_BIND_ADDRESS:-0.0.0.0}" != "127.0.0.1" ]; then
+  firewall-cmd --add-port="${INFISICAL_HTTP_PORT:-8080}/tcp"
+fi
