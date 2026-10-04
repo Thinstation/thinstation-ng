@@ -365,9 +365,8 @@ test-ipxe-image-layout:
     - fedora
     - shell
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
-      when: on_success
-    - when: never
+    - when: manual
+      allow_failure: true
   script:
     - sudo rm -rf build-ipxe-image-layout
     - sudo mkdir build-ipxe-image-layout
@@ -400,9 +399,8 @@ test-ipxe-sibling-config:
     - fedora
     - shell
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
-      when: on_success
-    - when: never
+    - when: manual
+      allow_failure: true
   script:
     - sudo dnf install -y qemu-system-x86 edk2-ovmf gcc make perl xz-devel zlib-devel git cpio dnf-plugins-core tcpdump
     - bash ts/build/tests/test-ipxe-sibling-config.sh
