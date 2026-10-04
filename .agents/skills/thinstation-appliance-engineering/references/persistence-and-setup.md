@@ -154,3 +154,51 @@ Scope restrictive umasks narrowly.
 A global `umask 077` used while generating a root-only credentials file can accidentally make subsequently rewritten application configuration unreadable to non-root container users. For Wazuh this changed `internal_users.yml` to mode 0600 and prevented the indexer security plugin from initializing.
 
 Use a subshell or explicit mode for secret creation, then set application configuration to the permissions required by the container. Keep root-only secrets root-only; do not weaken them to solve an unrelated bind-mount permission problem.
+
+## ThinStation configuration layering for appliances
+
+Use the native ThinStation configuration chain instead of inventing a second appliance-specific settings framework.
+
+The important runtime order is:
+
+1. defaults,
+2. `/thinstation.buildtime`,
+3. network/user/runtime configuration,
+4. `/etc/thinstation.custom`,
+5. package-specific config writer or stack setup hook.
+
+Use `thinstation.conf.buildtime` for portable image/site defaults that are safe to bake into an image. Use `/etc/thinstation.custom` for persistent machine/site overrides. The custom file is itself persisted by the base package, so generic setup tools must preserve settings they do not own.
+
+When a generic setup tool updates `/etc/thinstation.custom`, modify only the variables it owns. Do not replace the whole file. An appliance configurator may therefore safely coexist with network, application, certificate, and other package settings.
+
+Application stack setup hooks may source the ThinStation configuration layers and translate documented variables into native application configuration immediately before service start.
+
+## Runtime variable documentation contract
+
+Every new ThinStation variable consumed by an init script, config writer, first-run installer, firewall fragment, or appliance stack setup hook must be documented by the package that owns it under:
+
+```text
+ts/build/packages/<package>/build/conf/
+```
+
+Follow the existing package-conf convention: describe what the variable controls, valid forms/values, the default, and any security implications. This makes enabling the package contribute both behavior and its configuration contract.
+
+Do not document secret injection as a normal runtime variable merely because shell sourcing makes it technically possible. Separate variables into:
+
+- non-secret deployment/site settings suitable for buildtime/custom config;
+- generated or externally provisioned secrets that belong in protected persistent application state.
+
+For vault-like applications, encryption roots, auth secrets, database passwords, cache passwords, bootstrap tokens, and comparable credentials should not be accepted from `thinstation.conf.buildtime` or `/etc/thinstation.custom` by default.
+
+## Per-stack preparation hooks
+
+For Docker appliance stacks, keep application-specific preparation outside generic `setup-docker`.
+
+A reusable pattern is:
+
+1. seed an immutable stack under `/usr/lib/thinstation/docker-stacks/<stack>/`;
+2. copy it to persistent `/docker/<stack>/` after storage mounts;
+3. if the persistent stack contains executable `setup.sh`, run it before `docker compose up -d`;
+4. let that hook materialize native config, generate first-run secrets, create directories, and validate permissions.
+
+This preserves a generic Docker installer while still allowing sophisticated package-owned initialization.

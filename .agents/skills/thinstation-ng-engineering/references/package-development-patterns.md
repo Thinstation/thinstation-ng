@@ -29,14 +29,44 @@ Prefer ThinStation-native configuration materialization over parallel applicatio
 
 Pattern:
 
-1. Put portable defaults in thinstation.conf.buildtime.
-2. Let runtime expose them through /etc/thinstation.global.
-3. Add a package-owned /etc/init.d/<writer> that sources /etc/init.d/common.
-4. Let the writer translate ThinStation variables into the application's native runtime config.
-5. If needed, source a persistent site/local override after build-time defaults.
-6. Call the writer from the relevant systemd unit with ExecStartPre.
+1. Put portable, non-secret defaults in `thinstation.conf.buildtime`.
+2. Let runtime expose the normal ThinStation configuration chain through `/etc/thinstation.global`.
+3. Use `/etc/thinstation.custom` for persistent site/machine overrides.
+4. Add a package-owned `/etc/init.d/<writer>` or equivalent package-owned setup hook.
+5. Let the writer translate ThinStation variables into the application's native runtime config.
+6. Call the writer from the relevant systemd unit with `ExecStartPre`, or immediately before the application stack is started.
 
 The web UI should edit the persistent override or source variables, then invoke the same writer used at boot.
+
+Do not replace `/etc/thinstation.custom` wholesale from a generic setup tool. Upsert only variables owned by that tool so unrelated package/site settings survive.
+
+### Package variable documentation
+
+If a package consumes a new ThinStation variable, add or update a package-owned file under:
+
+```text
+ts/build/packages/<package>/build/conf/
+```
+
+Document the variable where the implementation lives, not only in a README or external skill. Include its purpose, valid values/form, default behavior, and important security constraints.
+
+Treat this as part of the package contract: code that introduces a new init/runtime variable is incomplete until its `build/conf` documentation is present.
+
+### Secrets vs. site configuration
+
+Do not use the ThinStation config chain as a generic secret store.
+
+Buildtime/custom configuration is appropriate for non-secret deployment behavior such as listener address, port, public URL, feature flags, DNS/search behavior, or other site policy.
+
+Application encryption keys, authentication secrets, database/cache passwords, bootstrap tokens, and comparable credentials should be generated at first run or provisioned through a dedicated protected mechanism, then persisted in application-owned storage with restrictive permissions.
+
+For a Docker appliance, a package-owned stack `setup.sh` executed before Compose is a good place to:
+
+- source only documented non-secret ThinStation settings;
+- load existing persistent secrets;
+- generate missing first-run secrets;
+- materialize the application's native config;
+- verify file/directory modes before service start.
 
 ## Systemd integration
 
