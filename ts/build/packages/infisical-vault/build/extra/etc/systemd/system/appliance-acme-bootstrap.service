@@ -1,0 +1,10 @@
+[Unit]
+Description=Prepare appliance ACME and TLS frontend
+Requires=docker-storage-mount.service
+After=docker-storage-mount.service
+Before=lighttpd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/appliance-acme-bootstrap
+RemainAfterExit=yes

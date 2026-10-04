@@ -1,6 +1,6 @@
 #!/bin/sh
 export PACKAGE="infisical-vault"
-export PORTS=""
+export PORTS="dehydrated"
 export DROP_FILES=""
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""

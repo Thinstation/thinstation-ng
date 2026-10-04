@@ -16,7 +16,7 @@
 # INFISICAL_BIND_ADDRESS
 #   Host address used for Docker's published Infisical listener. Set this to
 #   127.0.0.1 when a host-side TLS reverse proxy owns the external listener.
-INFISICAL_BIND_ADDRESS="0.0.0.0"
+INFISICAL_BIND_ADDRESS="127.0.0.1"
 #
 # INFISICAL_HTTP_PORT
 #   Host TCP port mapped to Infisical's internal port 8080.
@@ -25,3 +25,13 @@ INFISICAL_HTTP_PORT="8080"
 # INFISICAL_TELEMETRY_ENABLED
 #   Passed to Infisical as TELEMETRY_ENABLED. Appliance default is false.
 INFISICAL_TELEMETRY_ENABLED="false"
+
+#
+# Appliance TLS / ACME
+# Dehydrated uses TLS-ALPN-01 only.  Leave ACME_DIRECTORY empty to keep the
+# generated bootstrap certificate until an ACME endpoint is configured.
+ACME_ENABLED="On"
+ACME_DIRECTORY=""
+ACME_EMAIL=""
+# Defaults to the hostname used by INFISICAL_SITE_URL or NET_HOSTNAME.
+ACME_DOMAIN=""

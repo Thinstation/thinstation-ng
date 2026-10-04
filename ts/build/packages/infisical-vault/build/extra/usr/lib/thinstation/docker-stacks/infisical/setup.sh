@@ -38,7 +38,7 @@ fi
 : "${REDIS_PASSWORD:=$(random_hex 32)}"
 : "${ENCRYPTION_KEY:=$(random_hex 16)}"
 : "${AUTH_SECRET:=$(random_b64 32)}"
-: "${INFISICAL_BIND_ADDRESS:=0.0.0.0}"
+: "${INFISICAL_BIND_ADDRESS:=127.0.0.1}"
 : "${INFISICAL_HTTP_PORT:=8080}"
 : "${INFISICAL_TELEMETRY_ENABLED:=false}"
 
@@ -47,7 +47,7 @@ fi
 [[ -z "$CFG_INFISICAL_TELEMETRY_ENABLED" ]] || INFISICAL_TELEMETRY_ENABLED="$CFG_INFISICAL_TELEMETRY_ENABLED"
 
 HOST_FQDN="$(hostname -f 2>/dev/null || hostname)"
-INFISICAL_SITE_URL="${CFG_INFISICAL_SITE_URL:-http://${HOST_FQDN}:${INFISICAL_HTTP_PORT}}"
+INFISICAL_SITE_URL="${CFG_INFISICAL_SITE_URL:-https://${HOST_FQDN}}"
 
 install -d -m 0700 postgres redis
 cat >.env.tmp <<EOF

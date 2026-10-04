@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew appliance TLS certificate with dehydrated
+Wants=network-online.target
+After=network-online.target lighttpd.service
+Requires=lighttpd.service
+
+[Service]
+Type=oneshot
+UMask=0027
+ExecStart=/usr/bin/appliance-acme-renew
