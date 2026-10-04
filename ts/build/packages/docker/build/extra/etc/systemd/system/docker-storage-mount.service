@@ -2,7 +2,7 @@
 Description=Mount ThinStation Docker persistent storage
 DefaultDependencies=no
 After=fastboot.service
-Before=persistent-files.service persistent-dirs.service containerd.service docker.service tsinit.target
+Before=persistent-files.service persistent-dirs.service containerd.service docker.socket docker.service tsinit.target
 
 [Service]
 Type=oneshot
