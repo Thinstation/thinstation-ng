@@ -265,6 +265,7 @@ package locale-en_US         # English (US)
 
 #package nginx-proxy-manager  # Nginx Proxy Manager appliance
 #package gitlab-ee            # GitLab EE appliance
+#package infisical-vault      # Infisical secrets / identity vault appliance
 
 ####################
 ### --- Xorg --- ###

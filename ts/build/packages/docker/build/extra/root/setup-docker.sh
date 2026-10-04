@@ -361,10 +361,14 @@ done
 nmcli con up "$CON_NAME"
 hostnamectl set-hostname "$NET_HOSTNAME"
 
-cat >/etc/thinstation.custom <<EOF
-NET_HOSTNAME=$NET_HOSTNAME
-NET_USE_DHCP=Off
-EOF
+CUSTOM_CONFIG=/etc/thinstation.custom
+touch "$CUSTOM_CONFIG"
+CUSTOM_TMP="$(mktemp)"
+awk '!/^[[:space:]]*(NET_HOSTNAME|NET_USE_DHCP)=/' "$CUSTOM_CONFIG" >"$CUSTOM_TMP"
+printf 'NET_HOSTNAME=%q\n' "$NET_HOSTNAME" >>"$CUSTOM_TMP"
+printf 'NET_USE_DHCP=Off\n' >>"$CUSTOM_TMP"
+install -m 0644 "$CUSTOM_TMP" "$CUSTOM_CONFIG"
+rm -f "$CUSTOM_TMP"
 
 log "Seeding appliance compose payload"
 if [[ -d "$DOCKER_SEED_ROOT" ]]; then
@@ -381,6 +385,10 @@ shopt -s nullglob
 for stack in /docker/*; do
   [[ -d "$stack" ]] || continue
   [[ -f "$stack/docker-compose.yml" || -f "$stack/compose.yml" ]] || continue
+  if [[ -x "$stack/setup.sh" ]]; then
+    log "Preparing $(basename "$stack")"
+    (cd "$stack" && ./setup.sh)
+  fi
   log "Starting $(basename "$stack")"
   (cd "$stack" && docker compose up -d)
 done
