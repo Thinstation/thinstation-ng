@@ -3,6 +3,7 @@
 ,pkg,0,0,usr/bin,0,,,,,,,,,
 ,update-initrd,0,0,usr/bin,0,,,,,,,,,
 ,used,0,0,usr/bin,0,,,,,,,,,
+,unused,0,0,usr/bin,0,,,,,,,,,
 vmtouch,vmtouch,0,0,usr/bin,1,,,,,,,,,
 procps-ng,ps,0,0,usr/bin,1,,,,,,,,,
 glibc-common,getent,0,0,usr/bin,1,,,,,,,,,
