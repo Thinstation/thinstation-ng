@@ -1845,18 +1845,10 @@ filesystem_fixups()
 		echo -e "Installing Python3 Packages"
 		mkdir py-tmp
 		pip3 install -r ./tmp-tree/pip3.freeze -I --root ./py-tmp --prefix=/usr --no-warn-script-location --root-user-action=ignore --disable-pip-version-check
-		mkdir -p ./py-tmp/lib64
-		if [ -e ./py-tmp/usr/lib ]; then
-			cp -a ./py-tmp/usr/lib/* ./py-tmp/lib64/.
-			rm -rf ./py-tmp/usr/lib
-		fi
-                if [ -e ./py-tmp/usr/lib64 ]; then
-                        cp -a ./py-tmp/usr/lib64/* ./py-tmp/lib64/.
-                        rm -rf ./py-tmp/usr/lib64
-                fi
-		cp -a ./py-tmp/usr/* ./py-tmp/.
-		rm -rf ./py-tmp/usr
-		cp -a ./py-tmp/* ./tmp-tree/.
+		# Preserve pip's usr-merged layout. Python extension modules and
+		# site-packages must remain under /usr/lib* so the runtime interpreter
+		# can discover them via its normal sys.path.
+		cp -a ./py-tmp/usr/. ./tmp-tree/usr/.
 		rm -rf ./py-tmp
 		rm ./tmp-tree/pip3.freeze
 	fi
