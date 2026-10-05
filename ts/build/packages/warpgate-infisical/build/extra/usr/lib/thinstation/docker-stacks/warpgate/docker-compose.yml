@@ -1,0 +1,17 @@
+services:
+  warpgate:
+    image: thinstation/warpgate-infisical:0.29.1
+    container_name: warpgate
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${WARPGATE_SSH_PORT:-2222}:2222"
+      - "${WARPGATE_HTTPS_PORT:-8888}:8888"
+    volumes:
+      - ./data:/data
+    secrets:
+      - infisical-client-secret
+secrets:
+  infisical-client-secret:
+    file: ./infisical-client-secret

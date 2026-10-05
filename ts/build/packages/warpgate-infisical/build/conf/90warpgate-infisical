@@ -1,0 +1,5 @@
+# Warpgate + Infisical broker appliance
+WARPGATE_SSH_PORT="2222"
+WARPGATE_HTTPS_PORT="8888"
+INFISICAL_HOST_URL="https://vault.example.org"
+INFISICAL_UNIVERSAL_AUTH_CLIENT_ID=""

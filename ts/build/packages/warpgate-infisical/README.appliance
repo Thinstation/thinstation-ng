@@ -1,0 +1,5 @@
+# Warpgate + Infisical appliance
+
+Warpgate is the SSH session boundary. Target credentials are resolved from Infisical just in time by the Warpgate process and are never returned to the MCP appliance.
+
+Persistent state lives under /docker/warpgate. The Infisical Universal Auth client secret is stored root-only at /docker/warpgate/infisical-client-secret and is mounted into the Warpgate container as a Docker secret. Target records contain only Infisical references, not target passwords or private keys.
