@@ -24,8 +24,14 @@ while IFS= read -r spec || [[ -n "$spec" ]]; do
   target_image="$(echo "$target_image" | xargs)"
   name="$(safe_name "$target_image")"
 
-  echo "Pulling $source_image"
-  docker pull "$source_image"
+  if [[ "$source_image" == local:* ]]; then
+    source_image="${source_image#local:}"
+    echo "Using local image $source_image"
+    docker image inspect "$source_image" >/dev/null
+  else
+    echo "Pulling $source_image"
+    docker pull "$source_image"
+  fi
 
   digest="$(docker image inspect "$source_image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
   image_id="$(docker image inspect "$source_image" --format '{{.Id}}')"
