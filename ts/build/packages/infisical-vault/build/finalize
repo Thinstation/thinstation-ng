@@ -2,5 +2,9 @@
 # Runtime payload is carried in build/extra. setup-docker copies the immutable
 # seed into persistent /docker/infisical and executes setup.sh before Compose.
 
+chmod +x /usr/bin/appliance-acme-bootstrap
+chmod +x /usr/bin/appliance-acme-renew
+chmod +x /usr/bin/appliance-acme-hook
+
 systemctl enable appliance-acme-bootstrap.service
 systemctl enable appliance-acme-renew.timer
