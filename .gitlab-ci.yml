@@ -20,6 +20,12 @@ variables:
   BUILD_INFISICAL_VAULT:
     value: "0"
     description: "Set to 1 to build the Infisical vault appliance ISO."
+  WARPGATE_VERSION:
+    value: "0.29.1"
+    description: "Pinned Warpgate version for the Infisical-backed SSH broker appliance."
+  BUILD_WARPGATE_INFISICAL:
+    value: "0"
+    description: "Set to 1 to build the Warpgate + Infisical broker appliance ISO."
   GITLAB_EE_VERSION:
     value: "19.4.1"
     description: "GitLab EE semantic version to bake into the appliance ISO (for example 19.4.0)."
@@ -97,6 +103,54 @@ build-npm:
     - sudo umount build || true
     - sudo rm -rf build
 
+
+build-warpgate-infisical:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_WARPGATE_INFISICAL == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
+  script:
+    - |
+      set -Eeuo pipefail
+      [[ "$WARPGATE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+        echo "WARPGATE_VERSION must be major.minor.patch, got: $WARPGATE_VERSION" >&2
+        exit 1
+      }
+    - sudo rm -rf build-warpgate-infisical
+    - sudo mkdir build-warpgate-infisical
+    - sudo mount -t tmpfs -o size=40G tmpfs build-warpgate-infisical
+    - sudo chown gitlab-runner:gitlab-runner build-warpgate-infisical
+    - ln -s "$CI_PROJECT_DIR/.git" build-warpgate-infisical/.git
+    - cd build-warpgate-infisical
+    - git checkout -f "$CI_COMMIT_SHA"
+    - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" TS_EXTRA_PORTS="$TS_EXTRA_PORTS" ./setup-chroot -i
+    - sudo ./setup-chroot -e cp -a /build/conf/boot2docker/* /build/.
+    - sudo sed -i 's/^#package warpgate-infisical/package warpgate-infisical/' ts/build/build.conf
+    - sudo ./setup-chroot -e docker build --build-arg WARPGATE_VERSION="$WARPGATE_VERSION" -t thinstation/warpgate-infisical:"$WARPGATE_VERSION" -f /build/packages/warpgate-infisical/build/image/Dockerfile /build/packages/warpgate-infisical/build/image
+    - sudo sed -i -E "s#local:thinstation/warpgate-infisical:[0-9]+\.[0-9]+\.[0-9]+#local:thinstation/warpgate-infisical:$WARPGATE_VERSION#" ts/build/packages/warpgate-infisical/build/images.conf
+    - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/warpgate-infisical/build/images.conf build/boot-images/grub/efi-source/Docker
+    - sudo ./setup-chroot -e stb
+    - sudo mv ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/warpgate-infisical.iso"
+    - cd "$CI_PROJECT_DIR"
+    - STAMP="$(date -u -d "$CI_PIPELINE_CREATED_AT" +%Y%m%dT%H%M%SZ)"
+    - mv warpgate-infisical.iso "warpgate-infisical-$WARPGATE_VERSION-$STAMP.iso"
+    - sha256sum "warpgate-infisical-$WARPGATE_VERSION-$STAMP.iso" > "warpgate-infisical-$WARPGATE_VERSION-$STAMP.iso.sha256"
+    - sudo chown gitlab-runner:gitlab-runner "warpgate-infisical-$WARPGATE_VERSION-$STAMP.iso" "warpgate-infisical-$WARPGATE_VERSION-$STAMP.iso.sha256"
+  artifacts:
+    name: "warpgate-infisical-$WARPGATE_VERSION-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - warpgate-infisical-*.iso
+      - warpgate-infisical-*.iso.sha256
+    expire_in: 30 days
+  after_script:
+    - sudo umount build-warpgate-infisical || true
+    - sudo rm -rf build-warpgate-infisical
 
 build-infisical-vault:
   stage: build
@@ -223,6 +277,22 @@ deploy-npm:
       when: on_success
     - when: never
 
+deploy-warpgate-infisical:
+  extends: .deploy-repo
+  variables:
+    APPLIANCE_NAME: "warpgate-infisical"
+    APPLIANCE_PUBLISH_PROJECT: "warpgate-infisical"
+    APPLIANCE_ARTIFACT_GLOB: "warpgate-infisical-*.iso"
+  needs:
+    - job: build-warpgate-infisical
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_WARPGATE_INFISICAL == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
 deploy-infisical-vault:
   extends: .deploy-repo
   variables:
@@ -268,6 +338,17 @@ trigger-publisher-npm:
     - job: deploy-npm
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_NPM == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
+trigger-publisher-warpgate-infisical:
+  extends: .trigger-publisher
+  needs:
+    - job: deploy-warpgate-infisical
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_WARPGATE_INFISICAL == "1"'
       when: on_success
     - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
       when: on_success
