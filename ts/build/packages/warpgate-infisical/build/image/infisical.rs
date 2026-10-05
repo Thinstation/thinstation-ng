@@ -1,10 +1,106 @@
-{
-  "request_id": "ce041c8a-01b5-4190-bf73-f72861f30baf",
-  "ok": true,
-  "exit_code": 0,
-  "stdout": "use std::{env, fs};\n\nuse reqwest::{Client, Url};\nuse serde::{Deserialize, Serialize};\nuse warpgate_common::{SshTargetInfisicalAuth, WarpgateError};\nuse zeroize::{Zeroize, Zeroizing};\n\n#[derive(Serialize)]\n#[serde(rename_all = \"camelCase\")]\nstruct LoginRequest<'a> {\n    client_id: &'a str,\n    client_secret: &'a str,\n}\n\n#[derive(Deserialize)]\n#[serde(rename_all = \"camelCase\")]\nstruct LoginResponse {\n    access_token: String,\n}\n\n#[derive(Deserialize)]\nstruct SecretEnvelope {\n    secret: SecretValue,\n}\n\n#[derive(Deserialize)]\n#[serde(rename_all = \"camelCase\")]\nstruct SecretValue {\n    secret_value: String,\n}\n\nfn base_url() -> Result<Url, WarpgateError> {\n    let raw = env::var(\"INFISICAL_HOST_URL\")\n        .map_err(|_| anyhow::anyhow!(\"INFISICAL_HOST_URL is not configured\"))?;\n    Ok(Url::parse(raw.trim_end_matches('/'))?)\n}\n\nfn client_secret() -> Result<Zeroizing<String>, WarpgateError> {\n    let path = env::var(\"INFISICAL_CLIENT_SECRET_FILE\")\n        .unwrap_or_else(|_| \"/run/secrets/infisical-client-secret\".into());\n    let mut value = fs::read_to_string(path)?;\n    while value.ends_with(['\\r', '\\n']) {\n        value.pop();\n    }\n    if value.is_empty() {\n        return Err(anyhow::anyhow!(\"Infisical machine identity client secret is empty\").into());\n    }\n    Ok(Zeroizing::new(value))\n}\n\npub async fn fetch_secret(\n    auth: &SshTargetInfisicalAuth,\n) -> Result<Zeroizing<String>, WarpgateError> {\n    if auth.project_id.is_empty() || auth.environment.is_empty() || auth.secret_key.is_empty() {\n        return Err(anyhow::anyhow!(\"incomplete Infisical SSH target reference\").into());\n    }\n\n    let client_id = env::var(\"INFISICAL_UNIVERSAL_AUTH_CLIENT_ID\")\n        .map_err(|_| anyhow::anyhow!(\"INFISICAL_UNIVERSAL_AUTH_CLIENT_ID is not configured\"))?;\n    let client_secret = client_secret()?;\n    let client = Client::builder().build()?;\n\n    let mut login_url = base_url()?;\n    login_url.set_path(\"/api/v1/auth/universal-auth/login\");\n    let login = client\n        .post(login_url)\n        .form(&LoginRequest {\n            client_id: &client_id,\n            client_secret: &client_secret,\n        })\n        .send()\n        .await?\n        .error_for_status()?\n        .json::<LoginResponse>()\n        .await?;\n    let mut token = Zeroizing::new(login.access_token);\n\n    let mut secret_url = base_url()?;\n    {\n        let mut segments = secret_url\n            .path_segments_mut()\n            .map_err(|_| anyhow::anyhow!(\"Infisical URL cannot be used as a base URL\"))?;\n        segments.clear();\n        segments.extend([\"api\", \"v4\", \"secrets\", auth.secret_key.as_str()]);\n    }\n    secret_url\n        .query_pairs_mut()\n        .append_pair(\"projectId\", &auth.project_id)\n        .append_pair(\"environment\", &auth.environment)\n        .append_pair(\n            \"secretPath\",\n            if auth.secret_path.is_empty() { \"/\" } else { &auth.secret_path },\n        );\n\n    let response = client\n        .get(secret_url)\n        .bearer_auth(token.as_str())\n        .send()\n        .await?\n        .error_for_status()?\n        .json::<SecretEnvelope>()\n        .await?;\n\n    token.zeroize();\n    Ok(Zeroizing::new(response.secret.secret_value))\n}\n",
-  "stderr": "",
-  "stdout_truncated": false,
-  "stderr_truncated": false,
-  "timestamp": "2026-10-05T07:21:04.875922+00:00"
+use std::{env, fs};
+
+use reqwest::{Client, Url};
+use serde::{Deserialize, Serialize};
+use warpgate_common::{SshTargetInfisicalAuth, WarpgateError};
+use zeroize::{Zeroize, Zeroizing};
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoginRequest<'a> {
+    client_id: &'a str,
+    client_secret: &'a str,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LoginResponse {
+    access_token: String,
+}
+
+#[derive(Deserialize)]
+struct SecretEnvelope {
+    secret: SecretValue,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SecretValue {
+    secret_value: String,
+}
+
+fn base_url() -> Result<Url, WarpgateError> {
+    let raw = env::var("INFISICAL_HOST_URL")
+        .map_err(|_| anyhow::anyhow!("INFISICAL_HOST_URL is not configured"))?;
+    Ok(Url::parse(raw.trim_end_matches('/'))?)
+}
+
+fn client_secret() -> Result<Zeroizing<String>, WarpgateError> {
+    let path = env::var("INFISICAL_CLIENT_SECRET_FILE")
+        .unwrap_or_else(|_| "/run/secrets/infisical-client-secret".into());
+    let mut value = fs::read_to_string(path)?;
+    while value.ends_with(['\r', '\n']) {
+        value.pop();
+    }
+    if value.is_empty() {
+        return Err(anyhow::anyhow!("Infisical machine identity client secret is empty").into());
+    }
+    Ok(Zeroizing::new(value))
+}
+
+pub async fn fetch_secret(
+    auth: &SshTargetInfisicalAuth,
+) -> Result<Zeroizing<String>, WarpgateError> {
+    if auth.project_id.is_empty() || auth.environment.is_empty() || auth.secret_key.is_empty() {
+        return Err(anyhow::anyhow!("incomplete Infisical SSH target reference").into());
+    }
+
+    let client_id = env::var("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID")
+        .map_err(|_| anyhow::anyhow!("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID is not configured"))?;
+    let client_secret = client_secret()?;
+    let client = Client::builder().build()?;
+
+    let mut login_url = base_url()?;
+    login_url.set_path("/api/v1/auth/universal-auth/login");
+    let login = client
+        .post(login_url)
+        .form(&LoginRequest {
+            client_id: &client_id,
+            client_secret: &client_secret,
+        })
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LoginResponse>()
+        .await?;
+    let mut token = Zeroizing::new(login.access_token);
+
+    let mut secret_url = base_url()?;
+    {
+        let mut segments = secret_url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Infisical URL cannot be used as a base URL"))?;
+        segments.clear();
+        segments.extend(["api", "v4", "secrets", auth.secret_key.as_str()]);
+    }
+    secret_url
+        .query_pairs_mut()
+        .append_pair("projectId", &auth.project_id)
+        .append_pair("environment", &auth.environment)
+        .append_pair(
+            "secretPath",
+            if auth.secret_path.is_empty() { "/" } else { &auth.secret_path },
+        );
+
+    let response = client
+        .get(secret_url)
+        .bearer_auth(token.as_str())
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<SecretEnvelope>()
+        .await?;
+
+    token.zeroize();
+    Ok(Zeroizing::new(response.secret.secret_value))
 }
