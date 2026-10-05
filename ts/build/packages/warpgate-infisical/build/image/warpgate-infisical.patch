@@ -40,14 +40,14 @@ index 1d8ee63..9ef1bd7 100644
      fn default() -> Self {
          Self::PublicKey(SshTargetPublicKeyAuth::default())
 diff --git a/warpgate-protocol-ssh/Cargo.toml b/warpgate-protocol-ssh/Cargo.toml
-index 36e950f..b1f945e 100644
+index 36e950f..6672458 100644
 --- a/warpgate-protocol-ssh/Cargo.toml
 +++ b/warpgate-protocol-ssh/Cargo.toml
 @@ -18,6 +18,7 @@ ratatui = { version = "0.30", default-features = false, features = [
      "crossterm",
      "unstable-backend-writer",
  ] }
-+reqwest = { workspace = true, features = ["json"] }
++reqwest = { workspace = true, features = ["json", "form"] }
  russh.workspace = true
  sea-orm.workspace = true
  serde.workspace = true

@@ -39,7 +39,7 @@ fn client_secret() -> Result<Zeroizing<String>, WarpgateError> {
     let path = env::var("INFISICAL_CLIENT_SECRET_FILE")
         .unwrap_or_else(|_| "/run/secrets/infisical-client-secret".into());
     let mut value = fs::read_to_string(path)?;
-    while value.ends_with(['\r', '\n']) {
+    while value.ends_with('\r') || value.ends_with('\n') {
         value.pop();
     }
     if value.is_empty() {
