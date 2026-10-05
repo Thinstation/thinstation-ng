@@ -28,9 +28,14 @@ services:
       - --
       - /bin/sh
       - -ec
-    command: |
-      export INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET="$$(cat /run/secrets/infisical-agent-proxy-client-secret)"
-      exec /bin/infisical secrets agent-proxy start         --port 17322         --unmatched-host "${INFISICAL_AGENT_PROXY_UNMATCHED_HOST:-block}"         --poll-interval "${INFISICAL_AGENT_PROXY_POLL_INTERVAL:-60}"         --log-format json
+    command:
+      - |
+        export INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET="$(cat /run/secrets/infisical-agent-proxy-client-secret)"
+        exec /bin/infisical secrets agent-proxy start \
+          --port 17322 \
+          --unmatched-host "${INFISICAL_AGENT_PROXY_UNMATCHED_HOST:-block}" \
+          --poll-interval "${INFISICAL_AGENT_PROXY_POLL_INTERVAL:-60}" \
+          --log-format json
 
 secrets:
   infisical-ssh-client-secret:
