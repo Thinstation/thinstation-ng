@@ -6,5 +6,4 @@ chmod +x /usr/bin/appliance-acme-bootstrap
 chmod +x /usr/bin/appliance-acme-renew
 chmod +x /usr/bin/appliance-acme-hook
 
-systemctl enable appliance-acme-bootstrap.service
 systemctl enable appliance-acme-renew.timer
