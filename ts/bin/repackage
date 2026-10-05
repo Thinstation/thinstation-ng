@@ -121,7 +121,7 @@ apply_caps() {
 
 extract_archive()
 {
-	local archive ppath rpm_file native_arch package_spec
+	local archive ppath rpm_file native_arch package_spec installed_nevra cache_dir
 
 	if [ -n "$RPM" ]; then
 		archive=`basename "$RPM" .rpm`
@@ -133,50 +133,61 @@ extract_archive()
 		ppath=/build/wget_tmp
 	else
 		native_arch="$(rpm --eval '%{_arch}')"
-		package_spec="$package"
+		rpm_file=""
 
-		if dnf repoquery --available "$package.$native_arch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
-			package_spec="$package.$native_arch"
-		elif dnf repoquery --available "$package.noarch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
-			package_spec="$package.noarch"
-		else
-			echo "No native or noarch RPM available for $package"
-			return 1
+		# Fast path 1: exact installed NEVRA, no repo metadata.
+		installed_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$package" 2>/dev/null || true)"
+		if [ -n "$installed_nevra" ]; then
+			rpm_file="$(find /var/cache/dnf -type f -name "$installed_nevra.rpm" -print -quit 2>/dev/null)"
+			[ -n "$rpm_file" ] || rpm_file="$(find /var/cache -type f -name "$installed_nevra.rpm" -print -quit 2>/dev/null)"
 		fi
 
-		find_cached_rpm()
-		{
-			local candidate name arch
-			while IFS= read -r candidate; do
-				[ -f "$candidate" ] || continue
+		# Fast path 2: narrow native/noarch cache lookup.
+		if [ -z "$rpm_file" ]; then
+			for candidate in 				$(find /var/cache/dnf -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print 2>/dev/null | sort -r); do
 				name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
 				arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
 				if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
-					printf '%s\n' "$candidate"
-					return 0
+					rpm_file="$candidate"
+					break
 				fi
-			done < <(find /var/cache -type f -name "$package-*.rpm" 2>/dev/null | sort -r)
-			return 1
-		}
+			done
+		fi
 
-		rpm_file="$(find_cached_rpm || true)"
+		# Slow path: repository lookup and dependency-resolving download-only transaction.
 		if [ -z "$rpm_file" ]; then
+			package_spec="$package"
+			if dnf repoquery --available "$package.$native_arch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
+				package_spec="$package.$native_arch"
+			elif dnf repoquery --available "$package.noarch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
+				package_spec="$package.noarch"
+			else
+				echo "No native or noarch RPM available for $package"
+				return 1
+			fi
+
 			echo "Caching $package_spec and its dependency transaction"
 			dnf install --downloadonly --allowerasing --setopt=keepcache=1 -y "$package_spec" || return 1
-			rpm_file="$(find_cached_rpm || true)"
+
+			for candidate in 				$(find /var/cache/dnf -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print 2>/dev/null | sort -r); do
+				name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
+				arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
+				if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
+					rpm_file="$candidate"
+					break
+				fi
+			done
+
+			if [ -z "$rpm_file" ]; then
+				cache_dir="/var/cache/dnf/thinstation-repackage/packages"
+				mkdir -p "$cache_dir"
+				dnf download --destdir "$cache_dir" "$package_spec" || return 1
+				rpm_file="$(find "$cache_dir" -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print -quit 2>/dev/null)"
+			fi
 		fi
 
 		if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
-			# DNF may report "already installed" without re-downloading the RPM.
-			# In that case, place the archive into DNF's cache explicitly.
-			cache_dir="/var/cache/dnf/thinstation-repackage/packages"
-			mkdir -p "$cache_dir"
-			dnf download --destdir "$cache_dir" "$package_spec" || return 1
-			rpm_file="$(find_cached_rpm || true)"
-		fi
-
-		if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
-			echo "Unable to cache RPM for $package_spec"
+			echo "Unable to locate RPM archive for $package"
 			return 1
 		fi
 
