@@ -121,14 +121,16 @@ apply_caps() {
 
 extract_archive()
 {
-	local archive rpm_file ppath native_arch package_spec cache_hit download_dir
+	local archive ppath rpm_file native_arch package_spec
 
 	if [ -n "$RPM" ]; then
-		rpm_file="/build/wget_tmp/$(basename "$RPM")"
+		archive=`basename "$RPM" .rpm`
+		rpm_file="/build/wget_tmp/$archive.rpm"
 		if [ ! -f "$rpm_file" ]; then
 			echo "RPM not found: $rpm_file"
 			return 1
 		fi
+		ppath=/build/wget_tmp
 	else
 		native_arch="$(rpm --eval '%{_arch}')"
 		package_spec="$package"
@@ -142,39 +144,46 @@ extract_archive()
 			return 1
 		fi
 
-		# Prefer the existing DNF cache.  Repackage only needs the RPM payload;
-		# it does not need the package installed into the build chroot.
-		cache_hit=""
-		while IFS= read -r candidate; do
-			[ -f "$candidate" ] || continue
-			name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
-			arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
-			if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
-				cache_hit="$candidate"
-				break
-			fi
-		done < <(find /var/cache/dnf /var/cache -type f -name "$package-*.rpm" 2>/dev/null | sort -r)
+		find_cached_rpm()
+		{
+			local candidate name arch
+			while IFS= read -r candidate; do
+				[ -f "$candidate" ] || continue
+				name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
+				arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
+				if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
+					printf '%s\n' "$candidate"
+					return 0
+				fi
+			done < <(find /var/cache -type f -name "$package-*.rpm" 2>/dev/null | sort -r)
+			return 1
+		}
 
-		if [ -n "$cache_hit" ]; then
-			rpm_file="$cache_hit"
-			echo "Using cached RPM: $rpm_file"
-		else
-			download_dir="$(mktemp -d /tmp/repackage-rpm.XXXXXX)"
-			echo "Downloading RPM archive: $package_spec"
-			if ! dnf download --destdir "$download_dir" "$package_spec"; then
-				rm -rf "$download_dir"
-				return 1
-			fi
-			rpm_file="$(find "$download_dir" -maxdepth 1 -type f -name '*.rpm' -print -quit)"
-			if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
-				echo "Failed to download RPM for $package_spec"
-				rm -rf "$download_dir"
-				return 1
-			fi
+		rpm_file="$(find_cached_rpm || true)"
+		if [ -z "$rpm_file" ]; then
+			echo "Caching $package_spec and its dependency transaction"
+			dnf install --downloadonly --allowerasing --setopt=keepcache=1 -y "$package_spec" || return 1
+			rpm_file="$(find_cached_rpm || true)"
 		fi
+
+		if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
+			# DNF may report "already installed" without re-downloading the RPM.
+			# In that case, place the archive into DNF's cache explicitly.
+			cache_dir="/var/cache/dnf/thinstation-repackage/packages"
+			mkdir -p "$cache_dir"
+			dnf download --destdir "$cache_dir" "$package_spec" || return 1
+			rpm_file="$(find_cached_rpm || true)"
+		fi
+
+		if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
+			echo "Unable to cache RPM for $package_spec"
+			return 1
+		fi
+
+		archive="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$rpm_file")"
+		ppath="$(dirname "$rpm_file")"
 	fi
 
-	archive="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$rpm_file")"
 	if [ ! -d "$pkgpath" ]; then
 		mkdir -p "$pkgpath"
 	fi
@@ -183,10 +192,6 @@ extract_archive()
 	rpm2archive "$rpm_file" | tar --xattrs --selinux -xzf - -C "$pkgpath"
 	rpm -qp --qf '[%{filenames} %{filecaps}\n]' "$rpm_file" > "$pkgpath/file_caps.txt"
 	apply_caps
-
-	if [ -n "$download_dir" ]; then
-		rm -rf "$download_dir"
-	fi
 
 	rm -rf "$pkgpath/usr/lib/.build-id" "$pkgpath/usr/lib64/.build-id"
 	if [ -e "$pkgpath/usr/lib" ] && [ -z "$(ls -A "$pkgpath/usr/lib")" ]; then
