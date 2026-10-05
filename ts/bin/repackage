@@ -216,7 +216,41 @@ canonicalize_usr()
     merge_tree "$pkgpath/libexec" "$pkgpath/usr/libexec"
     merge_tree "$pkgpath/share" "$pkgpath/usr/share"
 
-    merge_tree "$pkgpath/usr/lib" "$pkgpath/usr/lib64"
+    # /usr/lib can contain multilib payload even during a native 64-bit
+    # transaction. Never promote ELF32 objects into /usr/lib64.
+    if [ -d "$pkgpath/usr/lib" ]; then
+        mkdir -p "$pkgpath/usr/lib64"
+
+        while IFS= read -r -d '' dir; do
+            rel="${dir#$pkgpath/usr/lib/}"
+            [ "$dir" = "$pkgpath/usr/lib" ] || mkdir -p "$pkgpath/usr/lib64/$rel"
+        done < <(find "$pkgpath/usr/lib" -type d -print0)
+
+        while IFS= read -r -d '' obj; do
+            rel="${obj#$pkgpath/usr/lib/}"
+            dst="$pkgpath/usr/lib64/$rel"
+            mkdir -p "$(dirname "$dst")"
+
+            candidate="$obj"
+            if [ -L "$obj" ]; then
+                resolved="$(readlink -f "$obj" 2>/dev/null || true)"
+                [ -n "$resolved" ] && candidate="$resolved"
+            fi
+
+            if [ -f "$candidate" ]; then
+                magic="$(od -An -t x1 -N4 "$candidate" 2>/dev/null | tr -d ' \n')"
+                class="$(od -An -t u1 -j4 -N1 "$candidate" 2>/dev/null | tr -d ' ')"
+                if [ "$magic" = "7f454c46" ] && [ "$class" = "1" ]; then
+                    echo "Skipping ELF32 object during usr/lib -> usr/lib64 merge: $obj"
+                    continue
+                fi
+            fi
+
+            cp -a "$obj" "$dst"
+        done < <(find "$pkgpath/usr/lib" -mindepth 1 ! -type d -print0)
+
+        rm -rf "$pkgpath/usr/lib"
+    fi
 
 }
 
