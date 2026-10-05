@@ -52,6 +52,19 @@ if [[ "$changed" -eq 1 ]]; then
     [[ -f "$stack/docker-compose.yml" || -f "$stack/compose.yml" ]] || continue
 
     log "Updating stack: $stack"
+
+    # Refresh immutable stack control files on ISO upgrades while preserving
+    # persistent state such as .env, databases, volumes, and application data.
+    stack_name="$(basename "$stack")"
+    seed_stack="/usr/lib/thinstation/docker-stacks/$stack_name"
+    if [[ -d "$seed_stack" ]]; then
+      for control in docker-compose.yml compose.yml setup.sh; do
+        if [[ -f "$seed_stack/$control" ]]; then
+          cp -a "$seed_stack/$control" "$stack/$control"
+        fi
+      done
+    fi
+
     (
       cd "$stack"
       if [[ -x ./setup.sh ]]; then

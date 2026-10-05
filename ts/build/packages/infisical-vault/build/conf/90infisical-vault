@@ -13,11 +13,6 @@
 #   http://<host-fqdn>:<INFISICAL_HTTP_PORT>.
 #INFISICAL_SITE_URL="https://vault.example.org"
 #
-# INFISICAL_BIND_ADDRESS
-#   Host address used for Docker's published Infisical listener. Set this to
-#   127.0.0.1 when a host-side TLS reverse proxy owns the external listener.
-INFISICAL_BIND_ADDRESS="127.0.0.1"
-#
 # INFISICAL_HTTP_PORT
 #   Host TCP port mapped to Infisical's internal port 8080.
 INFISICAL_HTTP_PORT="8080"
