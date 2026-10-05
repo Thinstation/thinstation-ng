@@ -19,6 +19,7 @@ done
 : "${INFISICAL_AGENT_PROXY_CLIENT_ID:=}"
 
 mkdir -p data
+chown 1000:1000 data
 chmod 0700 data
 
 # Migrate the original single-secret filename into the SSH broker secret once.
