@@ -149,7 +149,24 @@ extract_archive()
 	                        done
 	                fi
 			if $install_port; then
-	                        dnf install --setopt=keepcache=1 -y $package $PORTS
+	                        native_arch="$(rpm --eval '%{_arch}')"
+	                        package_spec="$package"
+	                        if dnf repoquery --available "$package.$native_arch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
+	                                package_spec="$package.$native_arch"
+	                        elif dnf repoquery --available "$package.noarch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
+	                                package_spec="$package.noarch"
+	                        fi
+
+	                        # PACKAGE is often repeated in PORTS.  Remove only that
+	                        # duplicate so an unqualified token cannot make DNF
+	                        # select a foreign multilib architecture.
+	                        filtered_ports=""
+	                        for port in $PORTS; do
+	                                [ "$port" = "$package" ] && continue
+	                                filtered_ports="$filtered_ports $port"
+	                        done
+
+	                        dnf install --setopt=keepcache=1 -y "$package_spec" $filtered_ports
 	                fi
 		fi
 	done
