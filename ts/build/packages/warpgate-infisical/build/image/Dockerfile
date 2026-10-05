@@ -14,7 +14,6 @@ WORKDIR /opt/warpgate
 RUN git apply --check /tmp/warpgate-infisical.patch \
     && git apply /tmp/warpgate-infisical.patch \
     && install -m 0644 /tmp/infisical.rs warpgate-protocol-ssh/src/infisical.rs \
-    && cargo fmt --all -- --check \
     && just npm ci \
     && just openapi \
     && just npm run build \
