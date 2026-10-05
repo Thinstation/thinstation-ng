@@ -17,7 +17,7 @@ RUN git apply --check /tmp/warpgate-infisical.patch \
     && just npm ci \
     && just openapi \
     && just npm run build \
-    && cargo build --features mysql,postgres,rdp-openssl-tls --release
+    && cargo build --release
 
 FROM debian:bookworm-slim
 ARG USER_ID=1000
