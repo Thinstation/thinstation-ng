@@ -22,7 +22,10 @@ variables:
     description: "Set to 1 to build the Infisical vault appliance ISO."
   WARPGATE_VERSION:
     value: "0.29.1"
-    description: "Pinned Warpgate version for the Infisical-backed SSH broker appliance."
+    description: "Pinned Warpgate version for the Infisical-backed credential broker appliance."
+  INFISICAL_CLI_VERSION:
+    value: "0.43.138"
+    description: "Pinned Infisical CLI version providing Agent Proxy for HTTP/HTTPS/REST brokering."
   BUILD_WARPGATE_INFISICAL:
     value: "0"
     description: "Set to 1 to build the Warpgate + Infisical broker appliance ISO."
@@ -134,6 +137,8 @@ build-warpgate-infisical:
     - sudo sed -i 's/^#package warpgate-infisical/package warpgate-infisical/' ts/build/build.conf
     - sudo ./setup-chroot -e docker build --build-arg WARPGATE_VERSION="$WARPGATE_VERSION" -t thinstation/warpgate-infisical:"$WARPGATE_VERSION" -f /build/packages/warpgate-infisical/build/image/Dockerfile /build/packages/warpgate-infisical/build/image
     - sudo sed -i -E "s#local:thinstation/warpgate-infisical:[0-9]+\.[0-9]+\.[0-9]+#local:thinstation/warpgate-infisical:$WARPGATE_VERSION#" ts/build/packages/warpgate-infisical/build/images.conf
+    - sudo sed -i -E "s#infisical/cli:[0-9]+\.[0-9]+\.[0-9]+#infisical/cli:$INFISICAL_CLI_VERSION#" ts/build/packages/warpgate-infisical/build/images.conf
+    - sudo sed -i -E "s#infisical/cli:[0-9]+\.[0-9]+\.[0-9]+#infisical/cli:$INFISICAL_CLI_VERSION#" ts/build/packages/warpgate-infisical/build/extra/usr/lib/thinstation/docker-stacks/warpgate/docker-compose.yml
     - sudo ./setup-chroot -e ts/bin/export-docker-images build/packages/warpgate-infisical/build/images.conf build/boot-images/grub/efi-source/Docker
     - sudo ./setup-chroot -e stb
     - sudo mv ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/warpgate-infisical.iso"

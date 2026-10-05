@@ -1,2 +1,3 @@
 firewall-cmd --add-port=2222/tcp
 firewall-cmd --add-port=8888/tcp
+firewall-cmd --add-port=17322/tcp
