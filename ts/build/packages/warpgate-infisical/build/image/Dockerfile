@@ -17,7 +17,7 @@ RUN git apply --check /tmp/warpgate-infisical.patch \
     && just npm ci \
     && just openapi \
     && just npm run build \
-    && cargo build --release
+    && cargo build --profile release-no-lto
 
 FROM debian:bookworm-slim
 ARG USER_ID=1000
@@ -27,7 +27,7 @@ RUN apt-get -y update -qq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && adduser warpgate --disabled-password --gecos "" --uid ${USER_ID} --home /data --shell /usr/sbin/nologin
-COPY --from=build /opt/warpgate/target/release/warpgate /usr/local/bin/warpgate
+COPY --from=build /opt/warpgate/target/release-no-lto/warpgate /usr/local/bin/warpgate
 VOLUME /data
 ENV WARPGATE_CONFIG=/data/warpgate.yaml \
     INFISICAL_CLIENT_SECRET_FILE=/run/secrets/infisical-client-secret \
