@@ -104,6 +104,10 @@
       result='Credential saved.';selected=null;await onRefresh();
     }catch(e){result=e.message}
   }
+  async function pinLocal(){
+    try{await json('/api/vault/pin-local','POST',{name:selected.name});result='Credential pinned to the local bootstrap provider and marked non-exportable.';selected=null;await onRefresh()}
+    catch(e){result=e.message}
+  }
   async function deleteSelected(){
     try{await json('/api/vault/delete','POST',{name:selected.name});result='Credential deleted.';selected=null;await onRefresh()}
     catch(e){result=e.message}
@@ -136,8 +140,8 @@
   <div class="two-col">
     <section class="panel">
       <div class="panel-head"><h2>Credential inventory</h2><span class="spacer"></span><input style="max-width:300px" placeholder="Search credentials" bind:value={search}/></div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Scopes</th><th>Targets</th><th></th></tr></thead><tbody>
-      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}</td><td>{c.type||'secret'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><button class="btn small" on:click={()=>open(c)}>Open</button></td></tr>{/each}
+      <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Provider</th><th>Scopes</th><th>Targets</th><th></th></tr></thead><tbody>
+      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}{#if c.storage_class==='bootstrap'}<div class="muted">bootstrap · non-exportable</div>{/if}</td><td>{c.type||'secret'}</td><td>{c.provider||'local'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><button class="btn small" on:click={()=>open(c)}>Open</button></td></tr>{/each}
       </tbody></table>{#if !filtered.length}<div class="empty">No matching credentials.</div>{/if}</div>
     </section>
     <section class="panel">
@@ -147,6 +151,8 @@
           <div class="detail-grid">
             <div class="detail-item"><div class="k">Name</div><div class="v">{selected.name}</div></div>
             <div class="detail-item"><div class="k">Type</div><div class="v">{selected.type||'secret'}</div></div>
+            <div class="detail-item"><div class="k">Provider</div><div class="v">{selected.provider||'local'}</div></div>
+            <div class="detail-item"><div class="k">Storage class</div><div class="v">{selected.storage_class||'managed'}{selected.exportable===false?' · non-exportable':''}</div></div>
             <div class="detail-item"><div class="k">Protection</div><div class="v">{selected.passphrase_protected?'Passphrase protected':'Standard vault protection'}</div></div>
             <div class="detail-item"><div class="k">Public key</div><div class="v">{selected.public_key?'Available':'Not applicable'}</div></div>
           </div>
@@ -168,7 +174,7 @@
             {#if selected.public_key}<div><button class="btn" on:click={()=>navigator.clipboard.writeText(selected.public_key)}>Copy public key</button></div>{/if}
             <hr style="border:0;border-top:1px solid var(--line);width:100%"/>
             <label class="field"><span>Rename credential</span><input bind:value={selected.newName}/></label>
-            <div class="actions"><button class="btn primary" on:click={saveSelected}>Save</button><button class="btn danger" on:click={()=>confirm('Delete this credential?')&&deleteSelected()}>Delete</button></div>
+            <div class="actions"><button class="btn primary" on:click={saveSelected}>Save</button>{#if (selected.provider||'local')==='local'&&selected.storage_class!=='bootstrap'}<button class="btn" on:click={()=>confirm('Pin this credential to the local bootstrap provider? This marks it non-exportable.')&&pinLocal()}>Pin local</button>{/if}<button class="btn danger" on:click={()=>confirm('Delete this credential?')&&deleteSelected()}>Delete</button></div>
           </div>
         {:else}<div class="empty">Select a credential to inspect scopes, targets, and administrative options.</div>{/if}
       </div>
