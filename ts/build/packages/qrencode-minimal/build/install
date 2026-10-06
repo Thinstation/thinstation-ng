@@ -1,0 +1,9 @@
+#!/bin/sh
+export PACKAGE=qrencode-minimal
+export PORTS="qrencode qrencode-libs libpng"
+export DROP_DIRS="usr/share/doc usr/share/man"
+export DROP_FILES=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+returnval=$?
+exit $returnval
