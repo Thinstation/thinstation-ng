@@ -1,0 +1,106 @@
+#!/usr/bin/python3
+"""Extend the appliance gateway without changing legacy client access."""
+import json
+import os
+import runpy
+import ssl
+from pathlib import Path
+from http.server import ThreadingHTTPServer
+from urllib.parse import urlparse
+from mcp_operator import OperatorAPI
+from mcp_openai import OpenAITunnel
+from mcp_acme import Certificates
+from mcp_storage import Storage
+
+legacy=runpy.run_path(str(Path(__file__).resolve().with_name('mcp-appliance-web')),run_name='mcp_web_backend')
+web_override=os.environ.get('MCP_OPERATOR_WEB_ROOT','')
+if web_override:
+    web_root=Path(web_override).resolve(strict=True)
+    if not (web_root/'index.html').is_file():raise RuntimeError('Development web root is incomplete')
+    legacy['H'].do_GET.__globals__['WEB_DEV']=web_root
+    legacy['H'].do_GET.__globals__['WEB_DEFAULT']=web_root
+operator=OperatorAPI(legacy)
+openai_tunnel=OpenAITunnel(operator)
+certificates=Certificates(legacy)
+storage=Storage()
+
+class H(legacy['H']):
+    def mcp_auth(self):
+        self.operator_client_id=None
+        if super().mcp_auth():return True
+        self.operator_client_id=operator.authenticate_client(self.headers.get('Authorization',''))
+        return bool(self.operator_client_id)
+    def send_response(self,code,message=None):
+        if urlparse(self.path).path=='/mcp':self.operator_gateway_status=code
+        super().send_response(code,message)
+    def proxy_mcp(self):
+        super().proxy_mcp()
+        identifier=getattr(self,'operator_client_id',None)
+        status=getattr(self,'operator_gateway_status',None)
+        if identifier and status:operator.record_gateway_request(identifier,status)
+    def operator_auth(self,write=False):
+        if not self.auth(write=write):self.js(401,{'error':'Administrator sign-in required.'});return False
+        if self.auth_kind!='session' or not self.user or self.user.get('role')!='admin':
+            self.js(403,{'error':'Sign in as an administrator to manage appliance settings.'});return False
+        return True
+    def do_GET(self):
+        path=urlparse(self.path).path
+        if not path.startswith('/api/operator/'):return super().do_GET()
+        if not self.operator_auth():return
+        try:
+            if path=='/api/operator/certificates':self.js(200,certificates.status())
+            elif path=='/api/operator/certificates/authorization':self.js(200,certificates.authorization_status())
+            elif path=='/api/operator/storage':self.js(200,storage.status())
+            elif path=='/api/operator/storage/job':self.js(200,storage.job())
+            elif path=='/api/operator/connections':self.js(200,operator.connections())
+            elif path=='/api/operator/runtime':self.js(200,operator.runtime())
+            elif path=='/api/operator/openai':self.js(200,openai_tunnel.status())
+            else:self.js(404,{'error':'Not found.'})
+        except Exception:self.js(503,{'error':'Operator state is unavailable. Refresh or check the appliance configuration.'})
+    def do_PUT(self):
+        if urlparse(self.path).path=='/api/config/acme':
+            self.js(410,{'error':'Use the validated Certificates settings API.'});return
+        return super().do_PUT()
+    def do_POST(self):
+        path=urlparse(self.path).path
+        if path in ('/api/acme/renew','/api/acme/force-renew'):
+            self.js(410,{'error':'Use the administrator Certificates page for validated renewal requests.'});return
+        if path=='/api/storage/provision':
+            if not self.operator_auth(write=True):return
+            try:
+                with storage.lock():
+                    if storage.job().get('state') in ('queued','running'):
+                        raise ValueError('A storage operation is already pending.')
+                    return super().do_POST()
+            except ValueError as exc:self.js(409,{'error':str(exc)});return
+        if not path.startswith('/api/operator/'):
+            return super().do_POST()
+        if not self.operator_auth(write=True):return
+        try:
+            body=json.loads(self.body() or '{}')
+            if not isinstance(body,dict):raise ValueError('A JSON object is required.')
+            if path=='/api/operator/certificates/save':self.js(200,certificates.save(body))
+            elif path=='/api/operator/certificates/authorization/once':self.js(200,certificates.authorize_once(self.user['username']))
+            elif path=='/api/operator/certificates/authorization/automatic':self.js(200,certificates.authorize_automatic(str(body.get('revision','')),self.user['username']))
+            elif path=='/api/operator/certificates/authorization/revoke':self.js(200,certificates.revoke_automatic(self.user['username']))
+            elif path=='/api/operator/certificates/validate':self.js(200,certificates.validate(body))
+            elif path=='/api/operator/certificates/action':self.js(202,certificates.action(body))
+            elif path=='/api/operator/storage/plan':self.js(200,storage.prepare(body,self.user['username']))
+            elif path=='/api/operator/storage/apply':self.js(202,storage.apply(body,self.user['username']))
+            elif path=='/api/operator/connections/create':self.js(200,operator.create_connection(body))
+            elif path=='/api/operator/connections/revoke':self.js(200,operator.revoke_connection(body))
+            elif path=='/api/operator/probe':self.js(200,operator.probe())
+            elif path=='/api/operator/shared-token':self.js(200,{'token':legacy['current_mcp_token']()})
+            elif path=='/api/operator/openai/save':self.js(200,openai_tunnel.save(body))
+            elif path=='/api/operator/openai/install':self.js(200,openai_tunnel.install_runtime())
+            elif path=='/api/operator/openai/action':self.js(200,openai_tunnel.action(str(body.get('action',''))))
+            else:self.js(404,{'error':'Not found.'})
+        except ValueError as exc:self.js(400,{'error':str(exc)})
+        except Exception:self.js(503,{'error':'The operation could not be completed. Refresh before retrying.'})
+
+if __name__=='__main__':
+    server=ThreadingHTTPServer(('0.0.0.0',8443),H)
+    context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(str(legacy['BASE']/'identity/web.crt'),str(legacy['BASE']/'identity/web.key'))
+    server.socket=context.wrap_socket(server.socket,server_side=True)
+    server.serve_forever()

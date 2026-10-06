@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+import json, os, socket, subprocess, sys, tempfile
+from pathlib import Path
+from urllib.parse import quote
+BASE=Path('/var/prstnt/mcp-appliance')
+ISSUE=Path('/run/issue.d/90-mcp-appliance.issue')
+REG=BASE/'state/registered.json'
+TOKEN=BASE/'secrets/web.token'
+CUSTOM_ISSUE=Path('/etc/mcp-appliance/issue.txt')
+
+def run(argv):
+    try:
+        p=subprocess.run(argv,text=True,capture_output=True,timeout=3)
+        return p.returncode,p.stdout.strip()
+    except Exception:return 255,''
+
+def addresses():
+    v4=[]; v6=[]
+    rc,out=run(['/usr/bin/ip','-o','address','show'])
+    if rc==0:
+        for line in out.splitlines():
+            p=line.split()
+            if len(p)<4 or p[1].rstrip(':')=='lo': continue
+            addr=p[3].split('/',1)[0]
+            if p[2]=='inet': v4.append(addr)
+            elif p[2]=='inet6' and not addr.lower().startswith('fe80:'): v6.append(addr)
+    return v4,v6
+
+def management_host(v4,v6):
+    fqdn=socket.getfqdn() or socket.gethostname() or 'mcp-appliance'
+    if '.' in fqdn and fqdn not in ('localhost.localdomain',): return fqdn
+    if v4:return v4[0]
+    if v6:return '['+v6[0]+']'
+    return socket.gethostname() or 'mcp-appliance'
+
+def registered(): return REG.exists()
+
+def mcp_state():
+    p=Path('/run/mcp-appliance/selected.json')
+    try:
+        d=json.loads(p.read_text())
+        if d.get('kind')=='recovery': return 'immutable recovery'
+        return str(d.get('generation') or d.get('kind') or 'unknown')
+    except Exception:return 'starting'
+
+def vault_state():
+    rc,out=run(['/usr/bin/mcp-vault-core','status'])
+    if rc:return 'unavailable'
+    try:
+        d=json.loads(out); return str(d.get('key_mode_effective') or 'unknown')
+    except Exception:return 'unknown'
+
+def qr(text):
+    if not Path('/usr/bin/qrencode').exists(): return ''
+    p=subprocess.run(['/usr/bin/qrencode','-t','UTF8','-m','2','-o','-',text],text=True,capture_output=True)
+    return p.stdout.rstrip() if p.returncode==0 else ''
+
+def render():
+    v4,v6=addresses(); host=management_host(v4,v6); base=f'https://{host}:8443/'
+    reg=registered(); token=TOKEN.read_text().strip() if TOKEN.exists() else ''
+    scan=base if reg else base+'#token='+quote(token,safe='')
+    custom=CUSTOM_ISSUE.read_text().strip() if CUSTOM_ISSUE.exists() else ''
+    lines=['','ThinStation MCP Appliance','=========================','']
+    if custom: lines += [custom,'']
+    lines += [f'Hostname:      {socket.gethostname()}',f'IPv4:          {", ".join(v4) if v4 else "none"}',f'IPv6:          {", ".join(v6) if v6 else "none"}',f'Management:    {base}',f'Vault:         {vault_state()}',f'MCP:           {mcp_state()}',f'Registration:  {"complete" if reg else "REQUIRED"}','']
+    if not reg:
+        lines += ['Bootstrap token:',token,'','Scan to register:']
+    else:
+        lines += ['Bootstrap access: disabled','','Scan to open management console:']
+    q=qr(scan)
+    if q: lines += [q]
+    lines += ['','']
+    return '\n'.join(lines)
+
+def refresh(console=False):
+    text=render(); ISSUE.parent.mkdir(parents=True,exist_ok=True)
+    tmp=ISSUE.with_suffix('.new'); tmp.write_text(text); os.chmod(tmp,0o644); os.replace(tmp,ISSUE)
+    return text
+
+def reset_gettys():
+    rc,out=run(['/usr/bin/systemctl','list-units','--type=service','--state=active','--no-legend','--plain'])
+    units=[]
+    if rc==0:
+        for line in out.splitlines():
+            u=line.split(None,1)[0] if line.split() else ''
+            if u in ('console-getty.service','display-manager.service') or u.startswith('getty@') or u.startswith('serial-getty@'): units.append(u)
+    for u in units: subprocess.run(['/usr/bin/systemctl','restart',u],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return units
+
+if __name__=='__main__':
+    args=sys.argv[1:]
+    if '--refresh' in args or '--console' in args:
+        text=refresh('--console' in args)
+    else:
+        text=render(); print(text)
+    if '--reset-getty' in args:
+        reset_gettys()

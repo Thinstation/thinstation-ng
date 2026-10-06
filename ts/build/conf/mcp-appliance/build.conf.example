@@ -158,7 +158,10 @@ package curl                 # Command-line tool for transferring data with URLs
 # Miscellaneous utilities and tools.
 
 #package gparted              # Graphical partition manager
-#package git                  # Version control system
+package git                   # Version control for persistent chroot workspaces
+package dnf                   # DNF5/RPM package manager for persistent chroot creation and maintenance
+package zstd                  # Fast general-purpose compression for chroot/image archives
+package lz4                   # Very fast compression/decompression for transient images/caches
 #package nano                 # Lightweight text editor
 #package sudo                 # Privileged command execution
 #package yad                  # Yet Another Dialog - GTK-based dialog boxes
@@ -339,8 +342,10 @@ param downloads         /downloads         # Leave this alone unless you can t d
 package python3-minimal
 package openssl
 package tpm2-tss-minimal
+package site
 package ca-certificates
 package util-linux
+package e2fsprogs
 package persistent-files
 package qemu-guest-agent
 package mcp-appliance

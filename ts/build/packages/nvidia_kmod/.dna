@@ -1,0 +1,7 @@
+,install,0,0,build,0,,,,,,,,,
+,dependencies,0,0,,0,,,,,,,,,
+,nvidia.conf,0,0,etc/modprobe.d,0,,,,,,,,,
+,nvidia.conf,0,0,etc/modules-load.d,0,,,,,,,,,
+,nvidia-device-init,0,0,usr/bin,0,,,,,,,,,
+,nvidia-devnodes.service,0,0,etc/systemd/system,0,etc/systemd/system/tsinit.target.wants/nvidia-devnodes.service,,,,,,,,
+,finalize,0,0,build,0,,,,,,,,,

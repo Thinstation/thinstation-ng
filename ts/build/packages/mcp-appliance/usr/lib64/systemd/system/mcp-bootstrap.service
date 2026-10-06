@@ -1,0 +1,15 @@
+[Unit]
+Description=Bootstrap persistent MCP generation
+After=network-online.target mcp-appliance-init.service
+Wants=network-online.target
+Requires=mcp-appliance-init.service
+Before=mcp-selector.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sh /etc/init.d/mcp-appliance-config init
+ExecStart=/bin/sh /usr/bin/mcp-bootstrap
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

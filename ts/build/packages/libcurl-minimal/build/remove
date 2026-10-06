@@ -1,0 +1,3 @@
+#!/bin/sh
+export PACKAGE="libcurl-minimal"
+repackage -c

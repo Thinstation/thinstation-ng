@@ -1,0 +1,16 @@
+[Unit]
+Description=MCP appliance runtime supervisor
+After=network-online.target mcp-selector.service nvidia-devnodes.service
+Wants=network-online.target nvidia-devnodes.service
+Requires=mcp-selector.service
+
+[Service]
+Type=simple
+Environment=MCP_HOSTS_FILE=/var/prstnt/mcp-appliance/config/hosts.json
+Environment=THINSTATION_MCP_HOSTS_FILE=/var/prstnt/mcp-appliance/config/hosts.json
+ExecStart=/usr/bin/mcp-runtime-supervisor
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

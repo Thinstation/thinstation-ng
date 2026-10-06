@@ -1,0 +1,3 @@
+#!/bin/sh
+export PACKAGE=lego
+repackage -c

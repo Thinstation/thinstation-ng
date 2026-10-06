@@ -1,0 +1,10 @@
+# Full-size utilities that the headless MCP appliance intentionally replaces
+# with BusyBox applets during package finalize. Keep this list conservative:
+# add an entry only after the appliance has been cast-tested with BusyBox.
+cal
+hexdump
+less
+more
+readlink
+rev
+true

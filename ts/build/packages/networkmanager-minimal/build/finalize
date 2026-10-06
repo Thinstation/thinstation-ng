@@ -1,0 +1,6 @@
+#networkmanager-minimal 80
+# Service enablement is shipped through build/extra target.wants links so it
+# survives ThinStation's later systemd normalization.
+install -d -m 0755 /etc/systemd/system/multi-user.target.wants /etc/systemd/system/network-online.target.wants
+ln -sfn /usr/lib64/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
+ln -sfn /usr/lib64/systemd/system/NetworkManager-wait-online.service /etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service

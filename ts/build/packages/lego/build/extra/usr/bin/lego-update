@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+force=false
+case "${1:-}" in -f|--force) force=true;; "") :;; *) echo "usage: lego-update [-f|--force]" >&2; exit 2;; esac
+CONF=/etc/mcp-appliance/lego.conf
+[ -r "$CONF" ] || exit 0
+. "$CONF"
+[ "${LEGO_ENABLED:-false}" = true ] || exit 0
+LEGO_PATH=${LEGO_PATH:-/var/prstnt/mcp-appliance/lego}
+mkdir -p "$LEGO_PATH"
+: "${LEGO_EMAIL:?LEGO_EMAIL is required}"
+: "${LEGO_DOMAINS:?LEGO_DOMAINS is required}"
+: "${LEGO_DNS_PROVIDER:?LEGO_DNS_PROVIDER is required}"
+set --
+for d in $LEGO_DOMAINS; do set -- "$@" --domains "$d"; done
+if $force; then
+  lego --path "$LEGO_PATH" --accept-tos --email "$LEGO_EMAIL" --dns "$LEGO_DNS_PROVIDER" "$@" renew --days 9999
+else
+  lego --path "$LEGO_PATH" --accept-tos --email "$LEGO_EMAIL" --dns "$LEGO_DNS_PROVIDER" "$@" renew
+fi
+if [ -n "${LEGO_DEPLOY_HOOK:-}" ]; then "$LEGO_DEPLOY_HOOK"; fi

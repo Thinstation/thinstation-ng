@@ -1,0 +1,10 @@
+#!/bin/sh
+# Native storage administration tools; this recipe never creates/resizes volumes.
+# Keep upstream licenses. Do not enable automatic LVM activation services.
+set -eu
+export PACKAGE=mcp-storage-tools
+export PORTS="lvm2 lvm2-libs device-mapper device-mapper-libs device-mapper-event device-mapper-event-libs libaio libedit libnvme json-c keyutils-libs libblkid libuuid e2fsprogs e2fsprogs-libs libcom_err libss xfsprogs userspace-rcu inih fuse3-libs"
+export DROP_DIRS="usr/share/doc usr/share/man usr/share/examples usr/lib/systemd/system usr/lib64/systemd/system"
+export DROP_FILES=""
+export CREATE_EMPTY_DIRS=""
+repackage -e

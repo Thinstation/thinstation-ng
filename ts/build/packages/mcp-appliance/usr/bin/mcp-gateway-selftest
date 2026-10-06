@@ -1,0 +1,55 @@
+#!/usr/bin/python3
+import json, pathlib, ssl, urllib.request
+
+TOKEN=pathlib.Path('/var/prstnt/mcp-appliance/secrets/mcp.token')
+URL='https://127.0.0.1:8443/mcp'
+
+def request(payload, session=None):
+    headers={
+        'Authorization':'Bearer '+TOKEN.read_text().strip(),
+        'Content-Type':'application/json',
+        'Accept':'application/json, text/event-stream',
+    }
+    if session:
+        headers['Mcp-Session-Id']=session
+    data=json.dumps(payload).encode()
+    req=urllib.request.Request(URL,data=data,headers=headers,method='POST')
+    ctx=ssl._create_unverified_context()
+    with urllib.request.urlopen(req,context=ctx,timeout=30) as resp:
+        body=resp.read()
+        sid=resp.headers.get('Mcp-Session-Id')
+        ctype=resp.headers.get('Content-Type','')
+        return resp.status,ctype,sid,body
+
+def decode(body,ctype):
+    text=body.decode()
+    if 'text/event-stream' in ctype:
+        chunks=[]
+        for line in text.splitlines():
+            if line.startswith('data:'):
+                chunks.append(line[5:].strip())
+        if not chunks:
+            raise RuntimeError('empty MCP event stream')
+        return json.loads(chunks[-1])
+    return json.loads(text)
+
+status,ctype,sid,body=request({
+    'jsonrpc':'2.0','id':1,'method':'initialize',
+    'params':{
+        'protocolVersion':'2025-06-18',
+        'capabilities':{},
+        'clientInfo':{'name':'mcp-gateway-selftest','version':'1'}
+    }
+})
+init=decode(body,ctype).get('result',{})
+request({'jsonrpc':'2.0','method':'notifications/initialized','params':{}},sid)
+status2,ctype2,sid2,body2=request({'jsonrpc':'2.0','id':2,'method':'tools/list','params':{}},sid)
+tools=decode(body2,ctype2).get('result',{}).get('tools',[])
+print(json.dumps({
+    'ok':status==200 and status2==200,
+    'gateway':URL,
+    'protocol':init.get('protocolVersion'),
+    'server':init.get('serverInfo',{}).get('name'),
+    'session':bool(sid),
+    'tool_count':len(tools),
+},indent=2))

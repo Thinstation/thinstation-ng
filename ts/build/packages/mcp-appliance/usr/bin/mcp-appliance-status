@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+printf 'node=%s\n' "$(hostname)"
+printf 'persist=%s\n' "$(mountpoint -q /var/prstnt && echo mounted || echo degraded)"
+printf 'state=%s\n' "/var/prstnt/mcp-appliance/state"

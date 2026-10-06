@@ -1,0 +1,8 @@
+#!/bin/sh
+export PACKAGE=lz4
+export PORTS="lz4 lz4-libs"
+export DROP_FILES=""
+export DROP_DIRS=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+exit $?

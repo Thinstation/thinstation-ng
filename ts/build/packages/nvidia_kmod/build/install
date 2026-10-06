@@ -1,0 +1,78 @@
+#!/bin/sh
+set -eu
+
+url="${1:?NVIDIA installer URL is required}"
+archive="/build/wget_tmp/$(basename "$url")"
+INSTALLDIR="/build/packages/nvidia_kmod"
+
+[ -s "$archive" ] || {
+    echo "NVIDIA installer not found: $archive" >&2
+    exit 1
+}
+
+# ThinStation builds around the kernel installed in the chroot. Do not use
+# /boot/KERNEL_VERSION or append a legacy TS localversion.
+KERNVER="${NVIDIA_KERNEL_RELEASE:-$(ls --color=never /lib/modules | sort -V | tail -n1)}"
+KERNELSRC="/usr/src/kernels/$KERNVER"
+[ -d "$KERNELSRC" ] || {
+    echo "Kernel headers not found for $KERNVER: $KERNELSRC" >&2
+    exit 1
+}
+
+work="$(mktemp -d /build/wget_tmp/nvidia-kmod.XXXXXX)"
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+
+(
+    cd "$work"
+    sh "$archive" --extract-only >/dev/null
+)
+
+src="$(find "$work" -mindepth 1 -maxdepth 1 -type d -name 'NVIDIA-Linux-x86_64-*' | head -n1)"
+[ -n "$src" ] && [ -d "$src/kernel" ] || {
+    echo "Unable to locate extracted NVIDIA kernel source" >&2
+    exit 1
+}
+
+# Explicitly build the proprietary module tree. The runfile also carries the
+# open kernel modules, but this package intentionally implements the closed
+# proprietary path requested by the appliance.
+make -C "$src/kernel" SYSSRC="$KERNELSRC" module
+
+moddir="$INSTALLDIR/usr/lib64/modules/$KERNVER/extra/nvidia"
+rm -rf "$INSTALLDIR/usr/lib/modules" "$INSTALLDIR/usr/lib64/modules"
+mkdir -p "$moddir"
+
+# nvidia-modprobe is the only NVIDIA userspace binary kept on the host. It is
+# invoked as root by systemd to create device nodes; it is deliberately not
+# installed setuid and no CUDA/NVML/graphics libraries are copied here.
+mkdir -p "$INSTALLDIR/usr/bin"
+cp -a "$src/nvidia-modprobe" "$INSTALLDIR/usr/bin/nvidia-modprobe"
+chmod 0755 "$INSTALLDIR/usr/bin/nvidia-modprobe"
+
+for module in nvidia nvidia-modeset nvidia-drm nvidia-uvm; do
+    ko="$src/kernel/$module.ko"
+    [ -s "$ko" ] || {
+        echo "Expected NVIDIA module was not built: $ko" >&2
+        exit 1
+    }
+    cp -a "$ko" "$moddir/$module.ko"
+done
+
+# Strip before optional signing. Sign when the ThinStation signing key is
+# available; unsigned modules remain valid on builds without SIG_FORCE/Secure
+# Boot enforcement.
+for ko in "$moddir"/*.ko; do
+    strip --strip-debug "$ko" 2>/dev/null || true
+    if [ -r /etc/ssl/keys/kernel.key ] && [ -r /etc/ssl/certs/kernel.crt ]; then
+        "$KERNELSRC/scripts/sign-file" sha256 \
+            /etc/ssl/keys/kernel.key \
+            /etc/ssl/certs/kernel.crt \
+            "$ko"
+    fi
+done
+
+printf '%s\n' "$KERNVER" > "$INSTALLDIR/build/kernel-version"
+printf '%s\n' "$(basename "$archive")" > "$INSTALLDIR/build/driver-source"
+
+# Keep the package kernel-only: no libcuda, GL/Vulkan, Xorg, nvidia-settings,
+# nvidia-smi, or other userspace payload is copied into the appliance image.

@@ -1,0 +1,14 @@
+[Unit]
+Description=MCP appliance management web console
+After=network-online.target mcp-appliance-init.service mcp-sshd-hostkey.service nftables.service
+Wants=network-online.target
+Requires=mcp-appliance-init.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/bin/mcp-operator-web
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+[ "$#" -eq 2 ] || { echo "usage: mcp-vault-check SCOPE CREDENTIAL" >&2; exit 2; }
+exec /usr/bin/mcp-vault-run "$1" "$2" MCP_VAULT_FILE -- /usr/bin/true

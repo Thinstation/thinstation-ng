@@ -1,0 +1,78 @@
+#!/usr/bin/python3
+from mcp_inventory import Inventory
+import os, re, secrets, socket, subprocess
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance')
+DNF_RELEASEVER='44'
+
+def buildtime_value(name):
+    path=Path('/etc/thinstation.defaults')
+    try:
+        lines=path.read_text().splitlines()
+    except Exception:
+        return ''
+    value=''
+    prefix=name+'='
+    for line in lines:
+        if line.startswith(prefix):
+            value=line[len(prefix):].strip()
+    if len(value)>=2 and value[0]==value[-1] and value[0] in ("'", '"'):
+        value=value[1:-1]
+    return value
+
+def apply_buildtime_identity():
+    host=buildtime_value('NET_HOSTNAME')
+    if host and '*' not in host and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,252}',host):
+        Path('/etc/hostname').write_text(host+'\n')
+        subprocess.run(['/usr/bin/hostname',host],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+    zone=buildtime_value('TIME_ZONE')
+    zonefile=Path('/usr/share/zoneinfo')/zone if zone else None
+    if zonefile and zonefile.is_file():
+        localtime=Path('/etc/localtime')
+        localtime.unlink(missing_ok=True)
+        localtime.symlink_to(zonefile)
+        Path('/etc/timezone').write_text(zone+'\n')
+
+apply_buildtime_identity()
+for name in ('config','identity','trust','secrets','env','work','cache','log','state','mcp',
+             'chroots','chroot-images','chroot-cache'):
+    (BASE/name).mkdir(parents=True, exist_ok=True)
+
+# The appliance MCP runs as root. Normalize only the persistent control-plane
+# and workspace roots; do not recursively rewrite ownership inside chroots.
+os.chown(BASE,0,0)
+for name in ('config','identity','trust','secrets','env','work','cache','log','state','mcp',
+             'chroots','chroot-images','chroot-cache','connections','components','releases','tests','vault'):
+    path=BASE/name
+    if path.exists():
+        os.chown(path,0,0)
+
+Inventory().ensure()
+token=BASE/'secrets/web.token'
+if not token.exists():
+    token.write_text(secrets.token_urlsafe(32)+'\n'); token.chmod(0o600)
+mcp_token=BASE/'secrets/mcp.token'
+if not mcp_token.exists():
+    mcp_token.write_text(secrets.token_urlsafe(32)+'\n'); mcp_token.chmod(0o600)
+cert=BASE/'identity/web.crt'; key=BASE/'identity/web.key'
+
+def output(argv):
+    p=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+    return p.returncode,p.stdout
+
+def valid_pair():
+    if not cert.is_file() or not key.is_file(): return False
+    rc,cert_pub=output(['/usr/bin/openssl','x509','-in',str(cert),'-pubkey','-noout'])
+    if rc: return False
+    rc,key_pub=output(['/usr/bin/openssl','pkey','-in',str(key),'-pubout'])
+    return rc==0 and cert_pub==key_pub
+
+def generate_pair():
+    host=socket.getfqdn() or socket.gethostname() or 'mcp-appliance'
+    new_cert=cert.with_name(cert.name+'.new'); new_key=key.with_name(key.name+'.new')
+    new_cert.unlink(missing_ok=True); new_key.unlink(missing_ok=True)
+    subprocess.run(['/usr/bin/openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(new_key),'-out',str(new_cert),'-days','30','-subj',f'/CN={host}','-addext',f'subjectAltName=DNS:{host}'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    new_key.chmod(0o600)
+    os.replace(new_key,key); os.replace(new_cert,cert)
+
+if not valid_pair(): generate_pair()

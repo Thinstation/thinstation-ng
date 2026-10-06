@@ -1,0 +1,96 @@
+#!/usr/bin/python3
+import json, os, subprocess, sys, tempfile, time
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance/vault'); RUN=Path('/run/mcp-appliance/vault')
+CREDS=BASE/'credentials'; META=BASE/'metadata'; LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'; AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
+
+def load(path,default):
+    try:return json.loads(path.read_text())
+    except Exception:return default
+
+def audit(event, **fields):
+    AUDIT.parent.mkdir(parents=True,exist_ok=True); row={'time':int(time.time()),'event':event}; row.update(fields)
+    with AUDIT.open('a') as f:f.write(json.dumps(row,sort_keys=True)+'\n')
+    os.chmod(AUDIT,0o600)
+
+def good_name(n):return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
+
+def authorize(scope,name):
+    m=load(META/(name+'.json'),{})
+    cs=set(m.get('scopes',[]))
+    if cs and '*' not in cs and scope not in cs: raise SystemExit('credential scope denied')
+    now=int(time.time()); l=load(LEASE,{})
+    if int(l.get('expires',0))>now:
+        ls=set(l.get('scopes',[]))
+        if '*' in ls or scope in ls:return ('lease',None,m)
+    GRANTS.mkdir(parents=True,exist_ok=True); os.chmod(GRANTS,0o700)
+    for gp in sorted(GRANTS.glob('*.json')):
+        d=load(gp,{})
+        if int(d.get('expires',0))<=now:gp.unlink(missing_ok=True);continue
+        if d.get('scope')==scope and d.get('credential')==name:
+            used=gp.with_suffix('.used')
+            try:os.replace(gp,used)
+            except FileNotFoundError:continue
+            audit('grant_consume',grant=gp.stem,scope=scope,credential=name);used.unlink(missing_ok=True)
+            return ('grant',gp.stem,m)
+    raise SystemExit('vault is locked or no matching one-shot grant')
+
+def decrypt(name,dst):
+    src=CREDS/(name+'.cred')
+    if not src.is_file():raise SystemExit('credential field not found')
+    p=subprocess.run(['/usr/bin/systemd-creds','decrypt','--name='+name,str(src),str(dst)])
+    if p.returncode:raise SystemExit(p.returncode)
+    os.chmod(dst,0o400)
+
+
+def ssh_destination(args):
+    forbidden_prefixes=('ProxyCommand=','ProxyJump=','LocalCommand=','IdentityFile=','IdentityAgent=','ForwardAgent=','LocalForward=','RemoteForward=','DynamicForward=','PermitLocalCommand=','UserKnownHostsFile=','GlobalKnownHostsFile=','Hostname=','CanonicalizeHostname=')
+    dest=None; i=0
+    while i < len(args):
+        a=args[i]
+        if a in ('-F','-J','-L','-R','-D','-W'): raise SystemExit('SSH proxy/forward/config options are not allowed')
+        if a=='-o':
+            if i+1>=len(args): raise SystemExit('missing SSH option value')
+            opt=args[i+1]
+            if opt.startswith(forbidden_prefixes): raise SystemExit('SSH option denied by vault policy')
+            i+=2; continue
+        if a.startswith('-'):
+            if a in ('-p','-l','-c','-m','-E','-S','-b','-B','-Q'):
+                if i+1>=len(args): raise SystemExit('missing SSH option value')
+                i+=2; continue
+            i+=1; continue
+        dest=a; break
+    if not dest: raise SystemExit('SSH destination is required')
+    host=dest.rsplit('@',1)[-1]
+    if host.startswith('[') and ']' in host: host=host[1:host.index(']')]
+    elif host.count(':')==1 and host.rsplit(':',1)[1].isdigit(): host=host.rsplit(':',1)[0]
+    return host.lower().rstrip('.')
+
+def main(a):
+    if len(a)<4 or a[2]!='--':raise SystemExit('usage: mcp-vault-ssh SCOPE CREDENTIAL -- SSH_ARGS...')
+    scope,name=a[:2]; sshargs=a[3:]
+    if not good_name(name):raise SystemExit('invalid credential name')
+    dest=ssh_destination(sshargs)
+    meta=load(META/(name+'.json'),{})
+    if meta.get('type')!='ssh-key':raise SystemExit('credential is not an SSH key')
+    allowed=[str(x).lower().rstrip('.') for x in meta.get('allowed_hosts',[]) if str(x)]
+    if allowed and dest not in allowed: raise SystemExit('destination host denied by credential policy')
+    kind,gid,meta=authorize(scope,name)
+    RUN.mkdir(parents=True,exist_ok=True);os.chmod(RUN,0o700)
+    work=Path(tempfile.mkdtemp(prefix='ssh-',dir=RUN));os.chmod(work,0o700)
+    key=work/'identity'; ask=work/'askpass'; pp=work/'passphrase'
+    try:
+        decrypt(name,key); env=os.environ.copy()
+        passname=meta.get('passphrase_credential')
+        if passname:
+            decrypt(passname,pp)
+            ask.write_text('#!/bin/sh\ncat "$MCP_SSH_PASSPHRASE_FILE"\n');os.chmod(ask,0o500)
+            env.update({'SSH_ASKPASS':str(ask),'SSH_ASKPASS_REQUIRE':'force','DISPLAY':':0','MCP_SSH_PASSPHRASE_FILE':str(pp)})
+        audit('ssh_use',scope=scope,credential=name,destination=dest,authorization=kind,grant=gid)
+        cmd=['/usr/bin/ssh','-F','/dev/null','-o','IdentityAgent=none','-o','ForwardAgent=no','-o','AddKeysToAgent=no','-o','IdentitiesOnly=yes','-i',str(key),*sshargs]
+        raise SystemExit(subprocess.run(cmd,env=env).returncode)
+    finally:
+        for f in (key,ask,pp):f.unlink(missing_ok=True)
+        try:work.rmdir()
+        except Exception:pass
+main(sys.argv[1:])

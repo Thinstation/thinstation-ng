@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+CONF=/etc/mcp-appliance/mail.conf
+[ -r "$CONF" ] || { echo "mail configuration missing: $CONF" >&2; exit 2; }
+. "$CONF"
+[ "${MAIL_ENABLED:-false}" = true ] || { echo "mail is disabled" >&2; exit 2; }
+: "${MAIL_SMTP_HOST:?MAIL_SMTP_HOST is required}"
+: "${MAIL_FROM:?MAIL_FROM is required}"
+to=${MAIL_TO:-}
+if [ "${1:-}" = "--to" ]; then
+  [ $# -ge 3 ] || { echo "usage: mcp-mail [--to ADDRESS] SUBJECT [BODYFILE]" >&2; exit 2; }
+  to=$2
+  shift 2
+fi
+[ -n "$to" ] || { echo "mail recipient is required" >&2; exit 2; }
+subject=${1:-MCP appliance notification}
+bodyfile=${2:-}
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+{
+  printf 'From: %s\n' "$MAIL_FROM"
+  printf 'To: %s\n' "$to"
+  printf 'Subject: %s\n' "$subject"
+  printf '\n'
+  if [ -n "$bodyfile" ] && [ -r "$bodyfile" ]; then
+    cat "$bodyfile"
+  else
+    cat
+  fi
+} > "$tmp"
+set -- -S mta="smtp://$MAIL_SMTP_HOST:${MAIL_SMTP_PORT:-587}" -S from="$MAIL_FROM"
+[ "${MAIL_STARTTLS:-true}" = true ] && set -- "$@" -S smtp-use-starttls
+if [ -n "${MAIL_USER:-}" ]; then
+  set -- "$@" -S smtp-auth=login -S smtp-auth-user="$MAIL_USER" -S smtp-auth-password="$MAIL_PASS"
+fi
+exec s-nail "$@" -s "$subject" "$to" < "$tmp"

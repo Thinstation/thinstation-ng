@@ -1,0 +1,59 @@
+#!/bin/sh
+set -eu
+
+# The MCP appliance is a headless NVIDIA compute host.  Load only the kernel
+# modules needed for CUDA/compute and create the standard character devices
+# from the majors registered by the driver.  Compute userspace stays in a
+# chroot/container and consumes these host device nodes.
+
+modprobe nvidia
+modprobe nvidia-uvm
+
+major_for() {
+    awk -v name="$1" '$2 == name { print $1; exit }' /proc/devices
+}
+
+nvidia_major="$(major_for nvidia)"
+uvm_major="$(major_for nvidia-uvm)"
+
+[ -n "$nvidia_major" ] || {
+    echo "NVIDIA character-device major is not registered" >&2
+    exit 1
+}
+[ -n "$uvm_major" ] || {
+    echo "NVIDIA UVM character-device major is not registered" >&2
+    exit 1
+}
+
+mknod_if_missing() {
+    path="$1"
+    major="$2"
+    minor="$3"
+    if [ ! -e "$path" ]; then
+        mknod "$path" c "$major" "$minor"
+    fi
+    chown root:root "$path"
+    chmod 0666 "$path"
+}
+
+# NVIDIA reserves minor 255 for the control node.
+mknod_if_missing /dev/nvidiactl "$nvidia_major" 255
+
+# Create one device node for each enumerated GPU using the Device Minor value
+# exported by the kernel driver rather than assuming contiguous PCI numbering.
+for info in /proc/driver/nvidia/gpus/*/information; do
+    [ -r "$info" ] || continue
+    minor="$(awk -F: '/^Device Minor:/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$info")"
+    [ -n "$minor" ] || continue
+    mknod_if_missing "/dev/nvidia$minor" "$nvidia_major" "$minor"
+done
+
+# UVM uses minors 0 and 1 for the runtime and tools interfaces.
+mknod_if_missing /dev/nvidia-uvm "$uvm_major" 0
+mknod_if_missing /dev/nvidia-uvm-tools "$uvm_major" 1
+
+# Keep NVIDIA's small helper as a compatibility fallback, but it is installed
+# non-setuid and is never required by the compute chroot.
+if [ -x /usr/bin/nvidia-modprobe ]; then
+    /usr/bin/nvidia-modprobe -u >/dev/null 2>&1 || true
+fi

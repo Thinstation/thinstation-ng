@@ -1,0 +1,14 @@
+[Unit]
+Description=Initialize persistent MCP appliance state
+After=local-fs.target mcp-persistence.service
+Wants=mcp-persistence.service
+Before=mcp-runtime.service mcp-appliance-web.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mcp-appliance-init
+ExecStartPost=/usr/bin/systemctl start mcp-acme-update.timer
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+[Unit]
+Description=Dedicated appliance OpenAI MCP tunnel
+After=network-online.target mcp-appliance-init.service mcp-runtime.service
+Wants=network-online.target
+RequiresMountsFor=/var/prstnt/mcp-appliance
+ConditionPathExists=/var/prstnt/mcp-appliance/connections/openai/enabled
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/bin/mcp_openai.py --run
+LoadCredentialEncrypted=openai-api-key:/var/prstnt/mcp-appliance/connections/openai/current/api-key.cred
+LoadCredential=openai-profile:/var/prstnt/mcp-appliance/connections/openai/current/profile.json
+RuntimeDirectory=mcp-openai-tunnel
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

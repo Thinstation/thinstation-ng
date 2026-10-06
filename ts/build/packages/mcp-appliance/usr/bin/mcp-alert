@@ -1,0 +1,23 @@
+#!/usr/bin/python3
+import json, subprocess, sys
+from pathlib import Path
+USERS=Path('/var/prstnt/mcp-appliance/config/users.json')
+
+def main():
+    if len(sys.argv)<3:
+        print('usage: mcp-alert SEVERITY SUBJECT',file=sys.stderr); return 2
+    severity=sys.argv[1].strip().lower(); subject=sys.argv[2].strip(); body=sys.stdin.read()
+    try: users=json.loads(USERS.read_text()).get('users',[])
+    except Exception: users=[]
+    recipients=[]
+    for u in users:
+        email=str(u.get('email','')).strip()
+        if u.get('enabled',True) and u.get('role')=='admin' and email and email not in recipients: recipients.append(email)
+    if not recipients:return 0
+    rc=0
+    full=f'[MCP appliance] {severity.upper()}: {subject}'
+    for email in recipients:
+        p=subprocess.run(['/usr/bin/mcp-mail','--to',email,full],input=body,text=True,capture_output=True)
+        if p.returncode: rc=p.returncode
+    return rc
+raise SystemExit(main())

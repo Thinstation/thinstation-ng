@@ -1,0 +1,18 @@
+#!/bin/sh
+set -u
+mkdir -p /var/prstnt
+mountpoint -q /var/prstnt && exit 0
+n=0
+while [ "$n" -lt 5 ]; do
+    dev=$(blkid -L prstnt 2>/dev/null || true)
+    if [ -n "$dev" ]; then
+        if mount "$dev" /var/prstnt; then
+            echo "Mounted persistent storage from $dev"
+            exit 0
+        fi
+    fi
+    n=$((n + 1))
+    sleep 1
+done
+echo "Persistent storage LABEL=prstnt unavailable; continuing in degraded mode"
+exit 0

@@ -1,0 +1,3 @@
+#!/bin/sh
+export PACKAGE="tpm2-tss-minimal"
+repackage -c

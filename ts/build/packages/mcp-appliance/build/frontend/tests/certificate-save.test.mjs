@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {acknowledgement,invalidFields,timedRequest} from '../src/lib/certificate-save.js';
+const cfg={primary_domain:'mcp.example.test',directory_url:'https://ca.example.test/directory',challenge:'tls-alpn-01',alternative_names:[]};
+test('save needs an explicit successful acknowledgement',()=>{for(const r of [null,{}, {ok:false},{ok:true}])assert.throws(()=>acknowledgement(r));});
+test('confirmed config works even when diagnostics failed',()=>assert.equal(acknowledgement({ok:true,config:cfg,status:null}),cfg));
+test('compatibility uses acknowledged status config',()=>assert.equal(acknowledgement({ok:true,status:{config:cfg}}),cfg));
+test('malformed config is not accepted as saved',()=>assert.throws(()=>acknowledgement({ok:true,config:{...cfg,alternative_names:'wrong'}})));
+test('native invalid control gets a visible field label',()=>assert.deepEqual(invalidFields({elements:[{willValidate:true,validity:{valid:false},getAttribute:()=>null,labels:[{querySelector:()=>({textContent:'Account email'})}],validationMessage:'Enter an email address.'}]}),['Account email: Enter an email address.']));
+test('hidden disabled fields cannot block a save',()=>assert.deepEqual(invalidFields({elements:[{willValidate:false,validity:{valid:false}}]}),[]));
+test('successful requests return acknowledgement',async()=>assert.equal(await timedRequest(async()=>cfg,100),cfg));
+test('timeouts describe uncertainty without clearing the draft',async()=>{await assert.rejects(timedRequest(signal=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')))),5),/may still have received/);});

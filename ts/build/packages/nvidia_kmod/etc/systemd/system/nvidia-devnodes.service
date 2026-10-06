@@ -1,0 +1,13 @@
+[Unit]
+Description=Create NVIDIA device nodes for compute workloads
+After=systemd-modules-load.service
+Before=mcp-runtime.service
+ConditionPathExists=/proc/driver/nvidia
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nvidia-device-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=tsinit.target

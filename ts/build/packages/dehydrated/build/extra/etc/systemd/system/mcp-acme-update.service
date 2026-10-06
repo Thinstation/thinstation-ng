@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew MCP appliance ACME certificates
+After=network-online.target mcp-appliance-init.service
+Wants=network-online.target
+ConditionPathExists=/etc/mcp-appliance/acme.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mcp-acme-update --scheduled
+TimeoutStartSec=15min
+UMask=0077

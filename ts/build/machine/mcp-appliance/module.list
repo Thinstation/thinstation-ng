@@ -1,0 +1,10 @@
+# Minimal virtual hardware profile for the MCP appliance.
+# Prefer VirtIO and modern QEMU/KVM devices; no display, sound, floppy,
+# parallel-port, or legacy NIC drivers are required for a headless appliance.
+module virtio_blk
+module virtio_scsi
+module virtio_net
+module virtio_console
+module virtio_balloon
+module virtio_rng
+module qemu_fw_cfg

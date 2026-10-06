@@ -1,0 +1,14 @@
+[Unit]
+Description=Initialize persistent OpenSSH host identity
+After=mcp-persistence.service NetworkManager-wait-online.service nftables.service
+Requires=mcp-persistence.service
+# Appliance services are pulled in here by the socket-activated SSH identity
+# prerequisite. Do not rely solely on build-time systemctl enable symlinks.
+# The OpenAI unit remains skipped until its persistent enabled marker exists.
+Wants=NetworkManager.service NetworkManager-wait-online.service nftables.service mcp-appliance-init.service mcp-selector.service mcp-runtime.service mcp-appliance-web.service mcp-appliance-info.service mcp-openai-tunnel.service
+Before=sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mcp-sshd-hostkey-init
+RemainAfterExit=yes

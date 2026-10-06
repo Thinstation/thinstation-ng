@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+. /etc/mcp-appliance/lego.conf
+: "${LEGO_PRIMARY_DOMAIN:?LEGO_PRIMARY_DOMAIN is required for deployment}"
+SRC="${LEGO_PATH:-/var/lib/lego}/certificates"
+DST=/var/prstnt/mcp-appliance/identity
+install -m 0644 "$SRC/$LEGO_PRIMARY_DOMAIN.crt" "$DST/web.crt.new"
+install -m 0600 "$SRC/$LEGO_PRIMARY_DOMAIN.key" "$DST/web.key.new"
+openssl x509 -in "$DST/web.crt.new" -noout >/dev/null
+openssl pkey -in "$DST/web.key.new" -noout >/dev/null
+mv -f "$DST/web.crt.new" "$DST/web.crt"
+mv -f "$DST/web.key.new" "$DST/web.key"
+systemctl restart mcp-appliance-web.service

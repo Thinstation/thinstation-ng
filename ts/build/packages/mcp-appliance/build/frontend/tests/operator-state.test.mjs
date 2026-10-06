@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {runtimeView,updateView,connectionView} from '../src/lib/operator-state.js';
+const now=Date.now()/1000;
+const snapshot={timestamp:now,service:'active',active:'thinstation-mcp-build-178',versions:[{generation:'thinstation-mcp-build-178'}]};
+test('runtime state is not protocol readiness',()=>{const r=runtimeView(snapshot);assert.equal(r.label,'Running');assert.equal(r.start,false);assert.equal(r.stop,true)});
+test('missing and stale health never become stopped',()=>{assert.equal(runtimeView(null).label,'Checking');assert.equal(runtimeView({...snapshot,timestamp:now-70}).label,'Status unavailable');assert.equal(runtimeView(snapshot,'',true).start,false)});
+test('stopped service reverses enabled controls',()=>{const r=runtimeView({...snapshot,service:'inactive'});assert.equal(r.start,true);assert.equal(r.stop,false);assert.equal(r.restart,false)});
+test('transitions disable all actions',()=>{const r=runtimeView(snapshot,'runtime:restart');assert.equal(r.label,'Restarting');assert.equal(r.start||r.stop||r.restart,false)});
+test('failed protocol check is not a stopped process',()=>{const r=runtimeView({...snapshot,probe:{checked_at:now,responding:false,error:'timeout'}});assert.equal(r.label,'Running');assert.equal(r.stop,true)});
+test('unrelated catalog entries are not updates',()=>{const r=updateView({available:true,mcps:[{generation:'thinstation-mcp-build-178'},{generation:'other-mcp-build-999'}]},snapshot);assert.equal(r.label,'Up to date')});
+test('older builds are not updates',()=>assert.equal(updateView({available:true,mcps:[{generation:'thinstation-mcp-build-177'}]},snapshot).label,'No newer build listed'));
+test('downloaded update can be applied',()=>{const r=updateView({available:true,mcps:[{generation:'thinstation-mcp-build-179'}]},{...snapshot,versions:[...snapshot.versions,{generation:'thinstation-mcp-build-179'}]});assert.equal(r.label,'Update ready to apply')});
+test('quiet clients are not called disconnected',()=>assert.equal(connectionView({last_request_at:now-86400,last_http_status:200}).label,'Request observed'));
+test('revocation overrides past request success',()=>assert.equal(connectionView({revoked_at:now,last_request_at:now,last_http_status:200}).label,'Access revoked'));

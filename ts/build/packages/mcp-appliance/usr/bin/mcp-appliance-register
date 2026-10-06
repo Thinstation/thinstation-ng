@@ -1,0 +1,48 @@
+#!/usr/bin/python3
+import getpass, hashlib, json, os, re, secrets, subprocess, sys, time
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance'); TOKEN=BASE/'secrets/web.token'; REG=BASE/'state/registered.json'; USERS=BASE/'config/users.json'
+
+def atomic(path,text,mode=0o600):
+    path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+'.new')
+    tmp.write_text(text); os.chmod(tmp,mode); os.replace(tmp,path)
+
+def password_hash(password):
+    if len(password)<12: raise ValueError('password must be at least 12 characters')
+    salt=os.urandom(16); n=1<<15; r=8; p=1
+    dk=hashlib.scrypt(password.encode(),salt=salt,n=n,r=r,p=p,dklen=32,maxmem=64*1024*1024)
+    return {'scheme':'scrypt','n':n,'r':r,'p':p,'salt':salt.hex(),'hash':dk.hex()}
+
+def validate(body):
+    username=str(body.get('username','')).strip().lower(); display=str(body.get('display_name','')).strip(); email=str(body.get('email','')).strip().lower(); password=str(body.get('password',''))
+    if not re.fullmatch(r'[a-z][a-z0-9._-]{2,31}',username): raise ValueError('username must be 3-32 lowercase letters, numbers, dot, dash or underscore')
+    if not display or len(display)>80: raise ValueError('display name is required and must be 80 characters or less')
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',email) or len(email)>254: raise ValueError('valid email address is required')
+    ph=password_hash(password); password=''
+    return username,display,email,ph
+
+def main():
+    if REG.exists():
+        print(json.dumps({'ok':False,'registered':True,'error':'already registered'}) if '--json' in sys.argv else 'already registered'); return 2
+    if '--json' in sys.argv:
+        try: body=json.load(sys.stdin)
+        except Exception: body={}
+    else:
+        print('ThinStation MCP Appliance - create first administrator')
+        body={'username':input('Username: ').strip(),'display_name':input('Display name: ').strip(),'email':input('Email address: ').strip()}
+        p1=getpass.getpass('Password (12+ characters): '); p2=getpass.getpass('Confirm password: ')
+        if p1!=p2: print('passwords do not match'); return 2
+        body['password']=p1; p1=p2=''
+    try: username,display,email,ph=validate(body)
+    except Exception as e:
+        print(json.dumps({'ok':False,'error':str(e)}) if '--json' in sys.argv else str(e)); return 2
+    now=int(time.time())
+    user={'username':username,'display_name':display,'email':email,'role':'admin','enabled':True,'created':now,'password':ph}
+    atomic(USERS,json.dumps({'version':1,'users':[user]},indent=2)+'\n',0o600)
+    new=secrets.token_urlsafe(32); atomic(TOKEN,new+'\n',0o600)
+    atomic(REG,json.dumps({'registered':True,'time':now,'admin':username},indent=2)+'\n',0o600)
+    subprocess.run(['/usr/bin/mcp-appliance-info','--refresh','--reset-getty'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    result={'ok':True,'registered':True,'username':username,'display_name':display,'email':email}
+    print(json.dumps(result) if '--json' in sys.argv else 'registration complete; bootstrap access disabled; console refreshed')
+    return 0
+raise SystemExit(main())

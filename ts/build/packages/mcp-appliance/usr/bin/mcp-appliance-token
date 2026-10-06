@@ -1,0 +1,2 @@
+#!/bin/sh
+exec cat /var/prstnt/mcp-appliance/secrets/web.token

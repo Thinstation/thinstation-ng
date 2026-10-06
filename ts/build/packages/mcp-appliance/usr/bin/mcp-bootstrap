@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+CONF=/etc/mcp-appliance/update.conf
+[ -r "$CONF" ] && . "$CONF"
+: "${MCP_BOOTSTRAP_MODE:=off}"
+: "${MCP_BOOTSTRAP_GENERATION:=bootstrap}"
+: "${MCP_CHANNEL_URL:=}"
+
+# Existing persistent selection wins. Bootstrap is first-run assistance,
+# not an update policy.
+if [ -L /var/prstnt/mcp-appliance/mcp/active ]; then
+    exit 0
+fi
+
+seed_recovery() {
+    /usr/bin/mcp-generation seed-recovery "$MCP_BOOTSTRAP_GENERATION"
+}
+
+fetch_channel() {
+    [ -n "$MCP_CHANNEL_URL" ] || return 1
+    /usr/bin/mcp-generation fetch-channel "$MCP_CHANNEL_URL" "$MCP_BOOTSTRAP_GENERATION"
+}
+
+case "$MCP_BOOTSTRAP_MODE" in
+    off)
+        exit 0
+        ;;
+    recovery)
+        seed_recovery
+        ;;
+    channel)
+        fetch_channel
+        ;;
+    auto)
+        fetch_channel
+        ;;
+    *)
+        exit 0
+        ;;
+esac

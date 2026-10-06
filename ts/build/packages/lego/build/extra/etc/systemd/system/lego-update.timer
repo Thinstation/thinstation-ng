@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic ACME certificate renewal
+
+[Timer]
+OnBootSec=10m
+OnUnitActiveSec=12h
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
