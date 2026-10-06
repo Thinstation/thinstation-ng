@@ -49,6 +49,14 @@ class LoginTests(unittest.TestCase):
   secret=json.dumps({'domain':'example.test','username':'service','password':'fixture-only'})
   with patch.object(self.m,'decrypt_to_file',side_effect=lambda n,p:p.write_text(secret)):result=self.capture(self.m.materialize_ssh,'one','ad','ssh')
   self.assertEqual(result['username'],'service@example.test');self.assertEqual(result['authentication'],'password');self.assertNotIn('fixture-only',json.dumps(result));self.assertFalse((Path(result['materialized'])/'credential.json').exists());self.m.cleanup_materialized(result['materialized'])
+ def test_password_login_resolves_for_rdp_scope(self):
+  self.credential('one',ctype='active-directory',targets=['host:ad'],username='stale');self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']})
+  self.assertEqual(self.capture(self.m.resolve_credential,'ad','rdp','password-login')['name'],'one')
+ def test_materialize_login_returns_file_not_secret(self):
+  self.credential('one',ctype='active-directory',targets=['host:ad']);self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']});self.m.LEASE.write_text(json.dumps({'expires':time.time()+60,'scopes':['rdp']}))
+  secret=json.dumps({'domain':'example.test','username':'service','password':'fixture-only'})
+  with patch.object(self.m,'decrypt_to_file',side_effect=lambda n,p:p.write_text(secret)):result=self.capture(self.m.materialize_login,'one','ad','rdp')
+  self.assertEqual(result['username'],'service@example.test');self.assertEqual(Path(result['password_file']).read_text(),'fixture-only');self.assertNotIn('fixture-only',json.dumps(result));self.m.cleanup_materialized(result['materialized'])
  def test_locked_stays_locked(self):
   self.credential('one')
   with patch.object(self.m,'decrypt_to_file') as decrypt,self.assertRaisesRegex(SystemExit,'locked'):self.m.materialize_ssh('one','ad','ssh')

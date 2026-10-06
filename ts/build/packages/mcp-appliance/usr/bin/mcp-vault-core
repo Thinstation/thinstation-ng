@@ -299,6 +299,8 @@ def resolve_credential(target,scope,ctype):
         m=read_meta(p.stem)
         if ctype == 'ssh-login':
             if m.get('type') not in LOGIN_TYPES: continue
+        elif ctype == 'password-login':
+            if m.get('type') not in ('active-directory','password'): continue
         elif ctype and str(m.get('type','secret'))!=ctype: continue
         if not scope_allowed(m,scope): continue
         specificity=target_specificity(m,target)
@@ -368,6 +370,35 @@ def materialize_ssh(name,target,scope):
         work.rmdir()
         raise
 
+def materialize_login(name,target,scope):
+    ensure();MATERIALIZED.mkdir(parents=True,exist_ok=True);os.chmod(MATERIALIZED,0o700)
+    if not good_name(name): raise SystemExit('invalid credential name')
+    if not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name);ctype=m.get('type')
+    if ctype not in ('active-directory','password'): raise SystemExit('credential is not compatible with password login')
+    if not scope_allowed(m,scope): raise SystemExit('credential scope does not allow this operation')
+    if target_specificity(m,target)<0: raise SystemExit('credential target does not allow this host')
+    auth,gp=authorization(name,scope)
+    if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
+    work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
+    try:
+        source=work/'credential.json';decrypt_to_file(name,source)
+        try: identity=password_identity(source.read_text(),ctype)
+        finally: source.unlink(missing_ok=True)
+        password=work/'password';password.write_text(identity['password']);password.chmod(0o400)
+        result={'credential':name,'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'authorization':auth,'materialized':str(work),'username':identity['username'],'domain':identity.get('domain',''),'password_file':str(password),'authentication':'password'}
+        identity['password']=''
+        if gp is not None:
+            used=gp.with_suffix('.used')
+            try: os.replace(gp,used)
+            except FileNotFoundError: raise SystemExit('one-shot grant was already consumed')
+            used.unlink(missing_ok=True);audit('grant_consume',credential=name,scope=scope)
+        audit('materialize',credential=name,provider=m.get('provider','local'),target=target,scope=scope,authorization=auth)
+        print(json.dumps(result))
+    except BaseException:
+        for child in work.iterdir(): child.unlink(missing_ok=True)
+        work.rmdir()
+        raise
 def cleanup_materialized(path):
     p=Path(path)
     try:p.resolve().relative_to(MATERIALIZED.resolve())
@@ -394,5 +425,6 @@ elif args[0]=='rename' and len(args)==3: rename_credential(args[1],args[2])
 elif args[0]=='login' and len(args)==3: set_login(args[1],args[2])
 elif args[0]=='resolve' and len(args)==4: resolve_credential(args[1],args[2],args[3])
 elif args[0]=='materialize-ssh' and len(args)==4: materialize_ssh(args[1],args[2],args[3])
+elif args[0]=='materialize-login' and len(args)==4: materialize_login(args[1],args[2],args[3])
 elif args[0]=='cleanup' and len(args)==2: cleanup_materialized(args[1])
-else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|put-bootstrap NAME [SCOPES...]|pin-local NAME|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|cleanup PATH')
+else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|put-bootstrap NAME [SCOPES...]|pin-local NAME|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|materialize-login NAME TARGET SCOPE|cleanup PATH')
