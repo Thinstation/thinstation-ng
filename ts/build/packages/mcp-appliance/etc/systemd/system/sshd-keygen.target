@@ -1,0 +1,4 @@
+[Unit]
+Description=OpenSSH host key generation handled by MCP appliance identity service
+PartOf=sshd.service
+After=mcp-sshd-hostkey.service

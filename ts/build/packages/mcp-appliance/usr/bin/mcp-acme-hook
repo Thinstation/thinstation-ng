@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+CONF=/etc/mcp-appliance/acme.conf
+[ -r "$CONF" ] && . "$CONF"
+case "${1:-}" in
+  deploy_challenge)
+    echo "ACME DNS hook is not configured for this site" >&2
+    exit 1
+    ;;
+  clean_challenge)
+    exit 0
+    ;;
+  deploy_cert)
+    domain=$2
+    keyfile=$3
+    certfile=$4
+    fullchain=$5
+    dst=/var/prstnt/mcp-appliance/identity
+    primary=${ACME_PRIMARY_DOMAIN:-$domain}
+    [ "$domain" = "$primary" ] || exit 0
+    install -m 0644 "$fullchain" "$dst/web.crt.new"
+    install -m 0600 "$keyfile" "$dst/web.key.new"
+    openssl x509 -in "$dst/web.crt.new" -noout >/dev/null
+    openssl pkey -in "$dst/web.key.new" -noout >/dev/null
+    mv -f "$dst/web.crt.new" "$dst/web.crt"
+    mv -f "$dst/web.key.new" "$dst/web.key"
+    systemctl restart mcp-appliance-web.service
+    ;;
+  unchanged_cert|invalid_challenge|request_failure|exit_hook|generate_csr)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
