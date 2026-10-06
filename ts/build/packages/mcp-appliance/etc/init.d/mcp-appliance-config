@@ -1,0 +1,34 @@
+#!/bin/sh
+. /etc/init.d/common
+
+OUT=/etc/mcp-appliance/update.conf
+LOCAL=/var/prstnt/mcp-appliance/config/update.conf.local
+
+# Build-time defaults arrive through /etc/thinstation.global.
+: "${MCP_BOOTSTRAP_MODE:=off}"
+: "${MCP_BOOTSTRAP_GENERATION:=bootstrap}"
+: "${MCP_CHANNEL_URL:=https://distro.thinstation.org/files/thinstation-mcp/mcp/catalog.json}"
+
+# Persistent site/local policy overrides build-time defaults.
+if [ -r "$LOCAL" ]; then
+    . "$LOCAL"
+fi
+
+case "$MCP_BOOTSTRAP_MODE" in
+    auto|channel|recovery|off) ;;
+    *) MCP_BOOTSTRAP_MODE=off ;;
+esac
+
+quote() {
+    printf "%s" "$1" | sed "s/'/'\\\\''/g"
+}
+
+mkdir -p /etc/mcp-appliance
+tmp="$OUT.new"
+{
+    printf "MCP_BOOTSTRAP_MODE='%s'\n" "$(quote "$MCP_BOOTSTRAP_MODE")"
+    printf "MCP_BOOTSTRAP_GENERATION='%s'\n" "$(quote "$MCP_BOOTSTRAP_GENERATION")"
+    printf "MCP_CHANNEL_URL='%s'\n" "$(quote "$MCP_CHANNEL_URL")"
+} > "$tmp"
+chmod 0644 "$tmp"
+mv -f "$tmp" "$OUT"

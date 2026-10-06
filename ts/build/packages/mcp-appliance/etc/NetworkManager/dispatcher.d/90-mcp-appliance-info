@@ -1,0 +1,2 @@
+#!/bin/sh
+case "$2" in up|dhcp4-change|dhcp6-change|connectivity-change) /usr/bin/mcp-appliance-info --refresh --reset-getty >/dev/null 2>&1 || true ;; esac
