@@ -1,0 +1,4 @@
+export const GiB=1024**3;
+export function bytes(value){if(value===null||value===undefined||!Number.isFinite(Number(value)))return 'Unavailable';const units=['B','KiB','MiB','GiB','TiB','PiB'];let n=Number(value),i=0;while(n>=1024&&i<units.length-1){n/=1024;i++}return n.toFixed(i?2:0)+' '+units[i];}
+export function allocationBytes(value){const text=String(value).trim();if(!/^\d+(?:\.\d{1,6})?$/.test(text))throw new Error('Enter a positive GiB amount, with at most six decimal places.');const result=Math.ceil(Number(text)*GiB);if(!Number.isSafeInteger(result)||result<=0)throw new Error('The allocation is empty or too large.');return result;}
+export function usedPercent(mount){const size=Number(mount.total_bytes),used=Number(mount.used_bytes);return size>0&&Number.isFinite(used)?Math.max(0,Math.min(100,100*used/size)):0;}
