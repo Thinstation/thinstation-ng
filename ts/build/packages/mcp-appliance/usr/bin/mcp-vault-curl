@@ -1,0 +1,90 @@
+#!/usr/bin/python3
+import json, os, subprocess, sys, tempfile, time
+from pathlib import Path
+from urllib.parse import urlparse
+BASE=Path('/var/prstnt/mcp-appliance/vault'); RUN=Path('/run/mcp-appliance/vault')
+CREDS=BASE/'credentials'; META=BASE/'metadata'; LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'; AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
+
+def load(path,default):
+    try:return json.loads(path.read_text())
+    except Exception:return default
+
+def audit(event, **fields):
+    AUDIT.parent.mkdir(parents=True,exist_ok=True); row={'time':int(time.time()),'event':event}; row.update(fields)
+    with AUDIT.open('a') as f:f.write(json.dumps(row,sort_keys=True)+'\n')
+    os.chmod(AUDIT,0o600)
+
+def good_name(n):return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
+
+def authorize(scope,name):
+    m=load(META/(name+'.json'),{})
+    cs=set(m.get('scopes',[]))
+    if cs and '*' not in cs and scope not in cs: raise SystemExit('credential scope denied')
+    now=int(time.time()); l=load(LEASE,{})
+    if int(l.get('expires',0))>now:
+        ls=set(l.get('scopes',[]))
+        if '*' in ls or scope in ls:return ('lease',None,m)
+    GRANTS.mkdir(parents=True,exist_ok=True); os.chmod(GRANTS,0o700)
+    for gp in sorted(GRANTS.glob('*.json')):
+        d=load(gp,{})
+        if int(d.get('expires',0))<=now:gp.unlink(missing_ok=True);continue
+        if d.get('scope')==scope and d.get('credential')==name:
+            used=gp.with_suffix('.used')
+            try:os.replace(gp,used)
+            except FileNotFoundError:continue
+            audit('grant_consume',grant=gp.stem,scope=scope,credential=name);used.unlink(missing_ok=True)
+            return ('grant',gp.stem,m)
+    raise SystemExit('vault is locked or no matching one-shot grant')
+
+def decrypt(name,dst):
+    src=CREDS/(name+'.cred')
+    if not src.is_file():raise SystemExit('credential not found')
+    p=subprocess.run(['/usr/bin/systemd-creds','decrypt','--name='+name,str(src),str(dst)])
+    if p.returncode:raise SystemExit(p.returncode)
+    os.chmod(dst,0o400)
+
+def destination(args):
+    for a in args:
+        if a.startswith(('http://','https://')):
+            u=urlparse(a); return u.hostname or ''
+    return ''
+
+def main(a):
+    if len(a)<5 or a[3]!='--':raise SystemExit('usage: mcp-vault-curl SCOPE CREDENTIAL MODE -- CURL_ARGS...')
+    scope,name,mode=a[:3]; cargs=a[4:]
+    if not good_name(name):raise SystemExit('invalid credential name')
+    if mode not in ('bearer','header','netrc','client-pem'):raise SystemExit('mode must be bearer|header|netrc|client-pem')
+    dest=destination(cargs)
+    if not dest: raise SystemExit('exactly one http/https destination URL is required')
+    urls=[x for x in cargs if x.startswith(('http://','https://'))]
+    if len(urls)!=1: raise SystemExit('exactly one http/https destination URL is required')
+    forbidden={'--config','-K','--location','-L','--location-trusted'}
+    if any(x in forbidden for x in cargs): raise SystemExit('redirect/config-file options are not allowed for vault-authenticated curl')
+    meta=load(META/(name+'.json'),{})
+    allowed=[str(x).lower().rstrip('.') for x in meta.get('allowed_hosts',[]) if str(x)]
+    if allowed and dest.lower().rstrip('.') not in allowed: raise SystemExit('destination host denied by credential policy')
+    kind,gid,meta=authorize(scope,name)
+    RUN.mkdir(parents=True,exist_ok=True);os.chmod(RUN,0o700)
+    work=Path(tempfile.mkdtemp(prefix='curl-',dir=RUN));os.chmod(work,0o700)
+    secret=work/'secret'; helper=work/'auth'
+    try:
+        decrypt(name,secret)
+        cmd=['/usr/bin/curl','--fail-with-body','--show-error']
+        if mode=='netrc':
+            cmd += ['--netrc-file',str(secret)]
+        elif mode=='header':
+            cmd += ['--header','@'+str(secret)]
+        elif mode=='client-pem':
+            cmd += ['--cert',str(secret)]
+        elif mode=='bearer':
+            token=secret.read_text().strip()
+            if '\n' in token or '\r' in token:raise SystemExit('invalid bearer token')
+            helper.write_text('Authorization: Bearer '+token+'\n');os.chmod(helper,0o400);token=''
+            cmd += ['--header','@'+str(helper)]
+        audit('curl_use',scope=scope,credential=name,mode=mode,destination=dest,authorization=kind,grant=gid)
+        raise SystemExit(subprocess.run(cmd+cargs).returncode)
+    finally:
+        for f in (secret,helper):f.unlink(missing_ok=True)
+        try:work.rmdir()
+        except Exception:pass
+main(sys.argv[1:])

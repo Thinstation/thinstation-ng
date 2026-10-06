@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+import json, os, subprocess, sys, tempfile, time
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance/vault'); RUN=Path('/run/mcp-appliance/vault')
+CREDS=BASE/'credentials'; META=BASE/'metadata'; LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'; AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
+
+
+def audit(event, **fields):
+    AUDIT.parent.mkdir(parents=True,exist_ok=True)
+    row={'time':int(time.time()),'event':event}; row.update(fields)
+    with AUDIT.open('a') as f: f.write(json.dumps(row,sort_keys=True)+'\n')
+    os.chmod(AUDIT,0o600)
+
+def good_name(n): return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
+def load(path,default):
+    try:return json.loads(path.read_text())
+    except Exception:return default
+
+def authorize(scope,name,envvar=None,command=None):
+    m=load(META/(name+'.json'),{})
+    cs=set(m.get('scopes',[]))
+    if cs and '*' not in cs and scope not in cs: raise SystemExit('credential scope denied')
+    now=int(time.time())
+    l=load(LEASE,{})
+    if int(l.get('expires',0))>now:
+        ls=set(l.get('scopes',[]))
+        if '*' in ls or scope in ls: return ('lease',None)
+    GRANTS.mkdir(parents=True,exist_ok=True); os.chmod(GRANTS,0o700)
+    for gp in sorted(GRANTS.glob('*.json')):
+        d=load(gp,{})
+        if int(d.get('expires',0))<=now:
+            gp.unlink(missing_ok=True); continue
+        if d.get('scope')==scope and d.get('credential')==name:
+            used=gp.with_suffix('.used')
+            try: os.replace(gp,used)
+            except FileNotFoundError: continue
+            audit('grant_consume',grant=gp.stem,scope=scope,credential=name)
+            used.unlink(missing_ok=True)
+            return ('grant',gp.stem)
+    if envvar is not None and command is not None:
+        try:
+            from mcp_acme_authorization import scheduled_worker_authorized
+            if scheduled_worker_authorized(scope,name,envvar,command):
+                return ('service',None)
+        except Exception:
+            pass
+    raise SystemExit('vault is locked or no matching one-shot grant')
+
+def main(a):
+    if len(a)<5 or a[3]!='--': raise SystemExit('usage: mcp-vault-run SCOPE CREDENTIAL ENVVAR -- COMMAND...')
+    scope,name,envvar=a[:3]; command=a[4:]
+    if not good_name(name): raise SystemExit('invalid credential name')
+    auth_kind,grant_id=authorize(scope,name,envvar,command); audit('use',scope=scope,credential=name,command=Path(command[0]).name,authorization=auth_kind,grant=grant_id)
+    src=CREDS/(name+'.cred')
+    if not src.is_file(): raise SystemExit('credential not found')
+    RUN.mkdir(parents=True,exist_ok=True); os.chmod(RUN,0o700)
+    work=Path(tempfile.mkdtemp(prefix='lease-',dir=RUN)); os.chmod(work,0o700)
+    secretfile=work/'secret'
+    try:
+        p=subprocess.run(['/usr/bin/systemd-creds','decrypt','--name='+name,str(src),str(secretfile)])
+        if p.returncode: raise SystemExit(p.returncode)
+        os.chmod(secretfile,0o400)
+        env=os.environ.copy(); env[envvar]=str(secretfile)
+        raise SystemExit(subprocess.run(command,env=env).returncode)
+    finally:
+        try: secretfile.unlink(missing_ok=True); work.rmdir()
+        except Exception: pass
+main(sys.argv[1:])
