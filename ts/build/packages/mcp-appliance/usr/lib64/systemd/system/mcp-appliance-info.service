@@ -1,0 +1,11 @@
+[Unit]
+Description=Render MCP appliance console registration banner
+After=network-online.target mcp-appliance-init.service mcp-selector.service mcp-sshd-hostkey.service nftables.service
+Wants=network-online.target
+Requires=mcp-appliance-init.service
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mcp-appliance-info --refresh
+RemainAfterExit=yes
