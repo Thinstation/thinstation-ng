@@ -2,11 +2,52 @@
 export INSTANCE=$$
 umask 022
 
+validate_sysusers_ids()
+{
+	local failed=0
+	local file type name id rest uid
+	declare -A name_uid uid_name
+
+	while IFS= read -r file; do
+		while read -r type name id rest; do
+			case "$type" in
+				""|\#*) continue ;;
+				u|u!) ;;
+				*) continue ;;
+			esac
+
+			if [[ ! "$id" =~ ^[0-9]+(:[0-9]+)?$ ]]; then
+				echo "ERROR: $file: sysusers user '$name' must use a fixed numeric UID (or UID:GID), got '$id'." >&2
+				failed=1
+				continue
+			fi
+
+			uid=${id%%:*}
+			if [[ -n "${name_uid[$name]+x}" && "${name_uid[$name]}" != "$uid" ]]; then
+				echo "ERROR: sysusers user '$name' has conflicting UIDs ${name_uid[$name]} and $uid." >&2
+				failed=1
+			fi
+			if [[ -n "${uid_name[$uid]+x}" && "${uid_name[$uid]}" != "$name" ]]; then
+				echo "ERROR: sysusers UID $uid is assigned to both '${uid_name[$uid]}' and '$name'." >&2
+				failed=1
+			fi
+			name_uid[$name]=$uid
+			uid_name[$uid]=$name
+		done < "$file"
+	done < <(find ts/build/packages -type f -path '*/sysusers.d/*.conf' -print | sort)
+
+	if [ "$failed" -ne 0 ]; then
+		echo "Refusing to continue: sysusers user IDs must be stable across builds." >&2
+		return 1
+	fi
+}
+
 state_checks()
 {
 	test $(id -u) -ne 0 && echo "please run as root" && exit 1
 	test ! -e setup-chroot  && echo "This utility must be run in the directory in which it exists." && exit 1
 	test "$PWD" == "/" && echo "You have already started the session." && exit 1
+	validate_sysusers_ids || exit 1
 	# Default architecture = host
 	if [ -z "$TARGET_ARCH" ]; then
 		TARGET_ARCH=$(uname -m)

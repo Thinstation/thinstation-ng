@@ -73,6 +73,14 @@ Use shadow-utils (`usermod`, `groupmod`, `useradd`, `userdel`) and ensure the ne
 
 Prefer renaming the built-in `tsuser` with `groupmod`/`usermod` so it retains intended supplemental groups. Do not casually delete and recreate it.
 
+### Stable system identities
+
+Every `systemd-sysusers` user declaration (`u` or `u!`) must specify a fixed numeric UID, or an explicit `UID:GID` pair. Never use `-` for a service user's ID. Dynamic allocation makes file ownership depend on package/build order and can silently change across ISO rebuilds or persistent upgrades.
+
+When a ThinStation package mirrors a Fedora service account, use Fedora's established UID/GID when practical so packaged file ownership and the runtime identity agree. For ThinStation-owned service accounts, reserve a stable numeric ID and keep it unchanged once published.
+
+`setup-chroot` validates all package `sysusers.d/*.conf` user entries before entering or installing the chroot. It rejects dynamic user IDs, conflicting UIDs for the same account, and reuse of one UID by different sysusers accounts.
+
 A sudoers line for a user is:
 
 ```text
