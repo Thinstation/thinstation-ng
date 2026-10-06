@@ -1,0 +1,14 @@
+[Unit]
+Description=Select viable persistent or recovery MCP runtime
+After=local-fs.target mcp-appliance-init.service mcp-bootstrap.service
+Requires=mcp-appliance-init.service
+Wants=mcp-bootstrap.service
+Before=mcp-runtime.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mcp-selector
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
