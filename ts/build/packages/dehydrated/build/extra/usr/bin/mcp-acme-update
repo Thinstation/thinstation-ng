@@ -1,0 +1,10 @@
+#!/bin/sh
+# Managed certificate configuration, vault policy, locking and safe deployment.
+set -eu
+case "${1:-}" in
+  --scheduled) action=scheduled ;;
+  -f|--force) action=force ;;
+  '') action=renew ;;
+  *) echo 'usage: mcp-acme-update [--scheduled|--force]' >&2; exit 2 ;;
+esac
+exec /usr/bin/python3 /usr/bin/mcp_acme.py --run "$action"

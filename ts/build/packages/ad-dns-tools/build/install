@@ -1,0 +1,9 @@
+#!/bin/sh
+# Use the standard ThinStation package workflow; retain upstream licenses.
+set -eu
+export PACKAGE=ad-dns-tools
+export PORTS="bind-utils bind-libs krb5-workstation krb5-libs libkadm5 libuv json-c libnghttp2 libxml2 lmdb-libs fstrm protobuf-c libmaxminddb libidn2 libunistring keyutils-libs libselinux pcre2 xz-libs libcom_err zlib-ng-compat openssl-libs libgcc"
+export DROP_DIRS="usr/share/doc usr/share/man usr/share/examples"
+export DROP_FILES="ksu kadmin"
+export CREATE_EMPTY_DIRS=""
+repackage -e

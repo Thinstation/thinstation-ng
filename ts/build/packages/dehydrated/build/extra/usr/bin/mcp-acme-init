@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+CONF=/etc/mcp-appliance/acme.conf
+[ -r "$CONF" ] || exit 0
+. "$CONF"
+[ "${ACME_ENABLED:-false}" = true ] || exit 0
+: "${ACME_DOMAINS:?ACME_DOMAINS is required}"
+BASE=${ACME_PATH:-/var/prstnt/mcp-appliance/acme}
+mkdir -p "$BASE"
+printf '%s\n' "$ACME_DOMAINS" > "$BASE/domains.txt"
+exec dehydrated --config "$CONF" --register --accept-terms
