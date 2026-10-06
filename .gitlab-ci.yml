@@ -35,6 +35,24 @@ variables:
   BUILD_GITLAB_EE:
     value: "0"
     description: "Set to 1 to build the versioned GitLab EE appliance ISO."
+  BUILD_MCP_APPLIANCE:
+    value: "0"
+    description: "Set to 1 to build and publish the MCP appliance ISO."
+  BUILD_MCP_UI:
+    value: "0"
+    description: "Set to 1 to build and publish only the MCP appliance frontend for dev-web testing."
+  MCP_APPLIANCE_HOSTNAME:
+    value: "mcp-appliance"
+    description: "Hostname stamped into thinstation.conf.buildtime for MCP appliance builds."
+  MCP_APPLIANCE_TIME_ZONE:
+    value: "UTC"
+    description: "Timezone stamped into thinstation.conf.buildtime for MCP appliance builds."
+  MCP_APPLIANCE_CA_BUNDLE_URL:
+    value: "https://distro.thinstation.org/thinstation_ca_bundle.pem"
+    description: "Optional site CA bundle injected into MCP appliance trust at build time. Leave empty for public-CA-only builds."
+  MCP_APPLIANCE_EXTRA_PORTS:
+    value: "NetworkManager NetworkManager-libnm openresolv nftables nftables-services iptables-libs iptables-utils iptables-nft openssh openssh-clients openssh-server curl libcurl-minimal python3 python-unversioned-command python3-libs openssl openssl-libs tpm2-tss json-c libusb1 ca-certificates util-linux util-linux-core qemu-guest-agent dehydrated bind-utils krb5-workstation qrencode qrencode-libs libpng s-nail lvm2 lvm2-libs e2fsprogs xfsprogs kernel-devel zstd libzstd lz4 lz4-libs dnf5 libdnf5 libdnf5-cli rpm rpm-libs rpm-plugin-audit rpm-sequoia fedora-repos-44 fedora-release-common fedora-release-identity-basic fedora-gpg-keys nfs-utils nfs-utils-coreos cifs-utils samba-client sssd sssd-ad sssd-common sssd-krb5 sssd-krb5-common sssd-ldap oddjob oddjob-mkhomedir realmd adcli"
+    description: "Minimal RPM preload required by the MCP appliance package recipes."
   MAX_PARALLEL_DOWNLOADS:
     value: "20"
     description: "Maximum number of concurrent DNF downloads during chroot setup."
@@ -539,3 +557,148 @@ test-usr-merge-prototype:
   after_script:
     - sudo umount build-usr-merge || sudo umount -l build-usr-merge || true
     - sudo rm -rf build-usr-merge
+
+
+build-mcp-ui:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$BUILD_MCP_UI == "1"'
+      when: on_success
+    - when: never
+  script:
+    - cd ts/build/packages/mcp-appliance/build/frontend
+    - npm ci
+    - npm run build
+    - tar -C ../../usr/share/mcp-appliance/web -czf "$CI_PROJECT_DIR/mcp-ui.tar.gz" .
+  artifacts:
+    paths:
+      - mcp-ui.tar.gz
+    expire_in: 2 days
+
+stage-mcp-ui-distro:
+  stage: deploy
+  tags:
+    - distro
+  needs:
+    - job: build-mcp-ui
+      artifacts: true
+  rules:
+    - if: '$BUILD_MCP_UI == "1"'
+      when: on_success
+    - when: never
+  script:
+    - install -d -m 0755 /srv/published/files/mcp-appliance-dev
+    - install -m 0644 mcp-ui.tar.gz /srv/published/files/mcp-appliance-dev/ui.tar.gz
+    - sha256sum /srv/published/files/mcp-appliance-dev/ui.tar.gz > /srv/published/files/mcp-appliance-dev/ui.tar.gz.sha256
+
+build-mcp-appliance:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
+  script:
+    - sudo rm -rf build-mcp-appliance
+    - sudo mkdir build-mcp-appliance
+    - sudo mount -t tmpfs -o size=24G tmpfs build-mcp-appliance
+    - sudo chown gitlab-runner:gitlab-runner build-mcp-appliance
+    - ln -s "$CI_PROJECT_DIR/.git" build-mcp-appliance/.git
+    - cd build-mcp-appliance
+    - git checkout -f "$CI_COMMIT_SHA"
+    - command -v npm >/dev/null 2>&1 || sudo dnf -y install npm
+    - npm --prefix ts/build/packages/mcp-appliance/build/frontend ci
+    - npm --prefix ts/build/packages/mcp-appliance/build/frontend run build
+    - test -s ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/thinstation.svg
+    - grep -q 'thinstation.svg' ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/index.html ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/assets/*.js
+    - |
+      if [[ -n "${MCP_APPLIANCE_CA_BUNDLE_URL:-}" ]]; then
+        anchor_dir="ts/build/packages/site/etc/pki/ca-trust/source/anchors"
+        mkdir -p "$anchor_dir"
+        curl --fail --silent --show-error --location -o "$anchor_dir/mcp-appliance-site-ca.pem" "$MCP_APPLIANCE_CA_BUNDLE_URL"
+        openssl x509 -in "$anchor_dir/mcp-appliance-site-ca.pem" -noout -subject -issuer
+      fi
+    - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" TS_EXTRA_PORTS="$MCP_APPLIANCE_EXTRA_PORTS" ./setup-chroot -i
+    - sudo ./setup-chroot -e cp -a /build/conf/mcp-appliance/build.conf.example /build/build.conf
+    - sudo ./setup-chroot -e cp -a /build/conf/mcp-appliance/thinstation.conf.buildtime /build/thinstation.conf.buildtime
+    - sudo sed -i -E "s#^NET_HOSTNAME=.*#NET_HOSTNAME=${MCP_APPLIANCE_HOSTNAME}#" ts/build/thinstation.conf.buildtime
+    - sudo sed -i -E "s#^TIME_ZONE=.*#TIME_ZONE=${MCP_APPLIANCE_TIME_ZONE}#" ts/build/thinstation.conf.buildtime
+    - sudo ./setup-chroot -e stb
+    - test -s ts/build/boot-images/grub/efi-source/EFI/BOOT/BOOTX64.EFI
+    - test -s ts/build/boot-images/grub/thinstation-efi.iso
+    - cd "$CI_PROJECT_DIR"
+    - STAMP="$(date -u -d "$CI_PIPELINE_CREATED_AT" +%Y%m%dT%H%M%SZ)"
+    - cp "build-mcp-appliance/ts/build/boot-images/grub/thinstation-efi.iso" "mcp-appliance-${STAMP}.iso"
+    - sha256sum "mcp-appliance-${STAMP}.iso" > "mcp-appliance-${STAMP}.iso.sha256"
+    - sudo chown gitlab-runner:gitlab-runner mcp-appliance-*.iso mcp-appliance-*.iso.sha256
+  artifacts:
+    name: "mcp-appliance-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - mcp-appliance-*.iso
+      - mcp-appliance-*.iso.sha256
+    expire_in: 14 days
+  after_script:
+    - sudo umount build-mcp-appliance || sudo umount -l build-mcp-appliance || true
+    - sudo rm -rf build-mcp-appliance
+
+stage-mcp-appliance-distro:
+  stage: deploy
+  tags:
+    - distro
+  needs:
+    - job: build-mcp-appliance
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      incoming="/srv/incoming/mcp-appliance"
+      staging="/srv/incoming/.mcp-appliance-${CI_PIPELINE_ID}"
+      payload="$staging/iso"
+      rm -rf "$staging"
+      install -d -m 0755 "$payload"
+      mapfile -t isos < <(find "$CI_PROJECT_DIR" -maxdepth 1 -type f -name 'mcp-appliance-*.iso' | sort)
+      test "${#isos[@]}" -eq 1
+      iso="${isos[0]}"
+      checksum="${iso}.sha256"
+      test -s "$checksum"
+      install -m 0644 "$iso" "$payload/$(basename "$iso")"
+      install -m 0644 "$checksum" "$payload/$(basename "$checksum")"
+      (
+        cd "$staging"
+        find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      )
+      chmod 0644 "$staging/SHA256SUMS"
+      touch "$staging/.ready"
+      rm -rf "$incoming"
+      mv "$staging" "$incoming"
+      echo "Staged $(basename "$iso") at $incoming"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    - when: never
+
+trigger-publisher-mcp-appliance:
+  extends: .trigger-publisher
+  needs:
+    - job: stage-mcp-appliance-distro
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    - when: never
