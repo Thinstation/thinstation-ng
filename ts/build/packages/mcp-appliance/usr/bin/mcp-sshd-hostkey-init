@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+persist=/var/prstnt/mcp-appliance/identity
+key="$persist/ssh_host_ed25519_key"
+install -d -m 0700 "$persist"
+install -d -m 0755 /etc/ssh
+if [ ! -s "$key" ]; then
+    tmp="${key}.new"
+    rm -f "$tmp" "$tmp.pub"
+    /usr/bin/ssh-keygen -q -t ed25519 -N '' -C "$(hostname)-ssh-host" -f "$tmp"
+    chmod 0600 "$tmp"
+    chmod 0644 "$tmp.pub"
+    mv -f "$tmp" "$key"
+    mv -f "$tmp.pub" "$key.pub"
+    sync
+fi
+chmod 0600 "$key"
+chmod 0644 "$key.pub"
+rm -f /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key.pub
+ln -s "$key" /etc/ssh/ssh_host_ed25519_key
+ln -s "$key.pub" /etc/ssh/ssh_host_ed25519_key.pub

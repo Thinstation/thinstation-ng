@@ -1,0 +1,379 @@
+#!/usr/bin/python3
+import json, os, subprocess, sys, time
+from pathlib import Path
+from mcp_login import LOGIN_TYPES, login_name, password_identity, target_rank
+BASE=Path('/var/prstnt/mcp-appliance/vault')
+CREDS=BASE/'credentials'; META=BASE/'metadata'
+RUN=Path('/run/mcp-appliance/vault'); LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'
+CONF=Path('/etc/mcp-appliance/vault.conf')
+AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
+
+
+def audit(event, **fields):
+    AUDIT.parent.mkdir(parents=True,exist_ok=True)
+    row={'time':int(time.time()),'event':event}; row.update(fields)
+    with AUDIT.open('a') as f: f.write(json.dumps(row,sort_keys=True)+'\n')
+    os.chmod(AUDIT,0o600)
+
+def cfg():
+    d={'VAULT_KEY_MODE':'auto','VAULT_DEFAULT_LEASE_SECONDS':'600','VAULT_MAX_LEASE_SECONDS':'3600','VAULT_DEFAULT_GRANT_SECONDS':'300'}
+    if CONF.exists():
+        for line in CONF.read_text().splitlines():
+            if '=' in line and not line.lstrip().startswith('#'):
+                k,v=line.split('=',1); d[k.strip()]=v.strip()
+    return d
+
+
+def effective_key_mode():
+    mode=cfg()['VAULT_KEY_MODE']
+    if mode!='auto': return mode
+    if Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(): return 'tpm2'
+    return 'host'
+
+def ensure():
+    for p in (BASE,CREDS,META,RUN,GRANTS): p.mkdir(parents=True,exist_ok=True); os.chmod(p,0o700)
+
+def good_name(n): return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
+
+def read_meta(n):
+    try:return json.loads((META/(n+'.json')).read_text())
+    except Exception:return {'name':n,'scopes':[]}
+
+def lease():
+    try:
+        d=json.loads(LEASE.read_text())
+        if int(d.get('expires',0))<=int(time.time()): LEASE.unlink(missing_ok=True); return None
+        return d
+    except Exception:return None
+
+
+def grants_status():
+    ensure_grants=[]
+    GRANTS.mkdir(parents=True,exist_ok=True); os.chmod(GRANTS,0o700)
+    now=int(time.time())
+    for p in sorted(GRANTS.glob('*.json')):
+        try:
+            d=json.loads(p.read_text())
+            if int(d.get('expires',0))<=now:
+                p.unlink(missing_ok=True); continue
+            ensure_grants.append({'id':p.stem,'scope':d.get('scope'),'credential':d.get('credential'),'expires':d.get('expires')})
+        except Exception:
+            p.unlink(missing_ok=True)
+    return ensure_grants
+
+def grant(args):
+    ensure()
+    if len(args)<2: raise SystemExit('usage: grant SCOPE CREDENTIAL [SECONDS]')
+    scope,credential=args[:2]
+    if not good_name(credential): raise SystemExit('invalid credential name')
+    if not (CREDS/(credential+'.cred')).is_file(): raise SystemExit('credential not found')
+    secs=int(args[2]) if len(args)>2 else int(cfg()['VAULT_DEFAULT_GRANT_SECONDS'])
+    secs=max(1,min(secs,int(cfg()['VAULT_MAX_LEASE_SECONDS'])))
+    gid=os.urandom(8).hex(); d={'scope':scope,'credential':credential,'issued':int(time.time()),'expires':int(time.time())+secs}
+    gp=GRANTS/(gid+'.json'); gp.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(gp,0o600)
+    audit('grant',grant=gid,scope=scope,credential=credential,expires=d['expires']); print(json.dumps({'id':gid,**d}))
+
+def revoke_grant(gid):
+    p=GRANTS/(gid+'.json')
+    if p.exists(): p.unlink(); audit('grant_revoke',grant=gid)
+
+def status():
+    ensure(); l=lease(); out=[]
+    for p in sorted(CREDS.glob('*.cred')):
+        if p.stem.endswith('.__passphrase'): continue
+        m=read_meta(p.stem); row={'name':p.stem,'scopes':m.get('scopes',[]),'allowed_hosts':m.get('allowed_hosts',[]),'updated':m.get('updated'),'type':m.get('type','secret')}
+        for field in ('username','domain'):
+            if m.get(field): row[field]=m[field]
+        if m.get('public_key'): row['public_key']=m.get('public_key')
+        if m.get('passphrase_credential'): row['passphrase_protected']=True
+        out.append(row)
+    return {'locked':l is None,'lease':l,'credentials':out,'key_mode_configured':cfg()['VAULT_KEY_MODE'],'key_mode_effective':effective_key_mode(),'tpm_present':Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(),'grants':grants_status()}
+
+
+def write_meta(name, data):
+    mp=META/(name+'.json')
+    mp.write_text(json.dumps(data,indent=2)+'\n'); os.chmod(mp,0o600)
+
+def delete_credential(name):
+    ensure()
+    if not good_name(name): raise SystemExit('invalid credential name')
+    m=read_meta(name); companions=[]
+    if m.get('passphrase_credential'): companions.append(str(m['passphrase_credential']))
+    removed=False
+    for n in [name,*companions]:
+        cp=CREDS/(n+'.cred'); mp=META/(n+'.json')
+        if cp.exists(): cp.unlink(); removed=True
+        mp.unlink(missing_ok=True)
+    for gp in GRANTS.glob('*.json'):
+        try:
+            d=json.loads(gp.read_text())
+            if d.get('credential')==name: gp.unlink(missing_ok=True)
+        except Exception: pass
+    if not removed: raise SystemExit('credential not found')
+    audit('delete',credential=name)
+
+def set_scopes(name, scopes):
+    ensure()
+    if not good_name(name): raise SystemExit('invalid credential name')
+    if not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name); m['name']=name; m['scopes']=scopes; m['updated']=int(time.time()); write_meta(name,m)
+    pp=m.get('passphrase_credential')
+    if pp and (CREDS/(pp+'.cred')).is_file():
+        pm=read_meta(pp); pm['name']=pp; pm['scopes']=scopes; pm['updated']=int(time.time()); write_meta(pp,pm)
+    audit('scopes',credential=name,scopes=scopes)
+
+
+def set_hosts(name, hosts):
+    ensure()
+    if not good_name(name): raise SystemExit('invalid credential name')
+    if not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    clean=[]
+    for h in hosts:
+        h=h.strip().lower().rstrip('.')
+        prefix=''
+        value=h
+        if ':' in h:
+            prefix,value=h.split(':',1)
+            if prefix not in ('host','group'): raise SystemExit('invalid target type')
+        if not value or any(c.isspace() for c in value) or '/' in value or ':' in value: raise SystemExit('invalid allowed target')
+        if not all(c.isalnum() or c in '._-' for c in value): raise SystemExit('invalid allowed target')
+        normalized=(prefix+':' if prefix else '')+value
+        if normalized not in clean: clean.append(normalized)
+    m=read_meta(name); m['name']=name; m['allowed_hosts']=clean; m['updated']=int(time.time()); write_meta(name,m)
+    pp=m.get('passphrase_credential')
+    if pp and (CREDS/(pp+'.cred')).is_file():
+        pm=read_meta(pp); pm['name']=pp; pm['allowed_hosts']=clean; pm['updated']=int(time.time()); write_meta(pp,pm)
+    audit('hosts',credential=name,allowed_hosts=clean)
+
+def reencrypt_name(old,new):
+    src=CREDS/(old+'.cred')
+    if not src.is_file(): raise SystemExit('credential not found')
+    om=read_meta(old); mode=om.get('key_mode') or effective_key_mode()
+    p=subprocess.run(['/usr/bin/systemd-creds','decrypt','--name='+old,str(src),'-'],capture_output=True)
+    if p.returncode: raise SystemExit('credential decrypt failed')
+    secret=p.stdout; tmp=CREDS/(new+'.cred.new')
+    q=subprocess.run(['/usr/bin/systemd-creds','encrypt','--with-key='+mode,'--name='+new,'-',str(tmp)],input=secret)
+    secret=b''
+    if q.returncode: tmp.unlink(missing_ok=True); raise SystemExit('credential re-encrypt failed')
+    os.chmod(tmp,0o600)
+    return tmp,om,mode
+
+def rename_credential(old,new):
+    ensure()
+    if not good_name(old) or not good_name(new): raise SystemExit('invalid credential name')
+    if old==new: return
+    if (CREDS/(new+'.cred')).exists() or (META/(new+'.json')).exists(): raise SystemExit('destination credential already exists')
+    om=read_meta(old); oldpp=om.get('passphrase_credential'); newpp=(new+'.__passphrase') if oldpp else None
+    main_tmp,main_meta,main_mode=reencrypt_name(old,new)
+    pp_tmp=pp_meta=pp_mode=None
+    try:
+        if oldpp:
+            pp_tmp,pp_meta,pp_mode=reencrypt_name(str(oldpp),newpp)
+        os.replace(main_tmp,CREDS/(new+'.cred'))
+        main_meta['name']=new; main_meta['updated']=int(time.time()); main_meta['key_mode']=main_mode
+        if newpp: main_meta['passphrase_credential']=newpp
+        write_meta(new,main_meta)
+        if pp_tmp:
+            os.replace(pp_tmp,CREDS/(newpp+'.cred'))
+            pp_meta['name']=newpp; pp_meta['updated']=int(time.time()); pp_meta['key_mode']=pp_mode
+            write_meta(newpp,pp_meta)
+        (CREDS/(old+'.cred')).unlink(missing_ok=True); (META/(old+'.json')).unlink(missing_ok=True)
+        if oldpp:
+            (CREDS/(str(oldpp)+'.cred')).unlink(missing_ok=True); (META/(str(oldpp)+'.json')).unlink(missing_ok=True)
+        for gp in GRANTS.glob('*.json'):
+            try:
+                d=json.loads(gp.read_text())
+                if d.get('credential')==old:
+                    d['credential']=new; gp.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(gp,0o600)
+            except Exception: pass
+        audit('rename',credential=old,new_credential=new)
+    except Exception:
+        main_tmp.unlink(missing_ok=True)
+        if pp_tmp: pp_tmp.unlink(missing_ok=True)
+        raise
+
+def unlock(args):
+    ensure(); c=cfg(); secs=int(args[0]) if args and args[0].isdigit() else int(c['VAULT_DEFAULT_LEASE_SECONDS'])
+    if args and args[0].isdigit(): args=args[1:]
+    secs=max(1,min(secs,int(c['VAULT_MAX_LEASE_SECONDS']))); scopes=args or ['*']
+    d={'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':scopes}
+    LEASE.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(LEASE,0o600); audit('unlock',expires=d['expires'],scopes=scopes); print(json.dumps(d))
+
+def put(name,scopes):
+    ensure()
+    if not good_name(name): raise SystemExit('invalid credential name')
+    secret=sys.stdin.buffer.read()
+    if not secret: raise SystemExit('empty secret refused')
+    mode=effective_key_mode(); tmp=CREDS/(name+'.cred.new'); dst=CREDS/(name+'.cred')
+    p=subprocess.run(['/usr/bin/systemd-creds','encrypt','--with-key='+mode,'--name='+name,'-',str(tmp)],input=secret)
+    secret=b''
+    if p.returncode: raise SystemExit(p.returncode)
+    os.chmod(tmp,0o600); os.replace(tmp,dst)
+    m=read_meta(name); m.update({'name':name,'scopes':scopes,'updated':int(time.time()),'key_mode':mode}); write_meta(name,m); audit('put',credential=name,scopes=scopes,key_mode=mode)
+
+
+INVENTORY=Path('/var/prstnt/mcp-appliance/config/hosts.json')
+LEGACY_INVENTORY=Path('/etc/mcp-appliance/hosts.json')
+MATERIALIZED=RUN/'materialized'
+
+def inventory_context(target):
+    value=str(target or '').strip().lower().rstrip('.')
+    try:
+        path=INVENTORY if INVENTORY.exists() else LEGACY_INVENTORY
+        doc=json.loads(path.read_text()) if path.exists() else {'hosts':{},'groups':{}}
+        if not isinstance(doc,dict) or not isinstance(doc.get('hosts',{}),dict) or not isinstance(doc.get('groups',{}),dict): raise ValueError()
+    except Exception:
+        raise SystemExit('inventory is unavailable or invalid; credential matching refused')
+    hosts=doc.get('hosts',{}) if isinstance(doc,dict) else {}
+    groups=doc.get('groups',{}) if isinstance(doc,dict) else {}
+    alias=None
+    for name,row in hosts.items():
+        if not isinstance(row,dict): continue
+        identities={str(name).strip().lower(),str(row.get('address','')).strip().lower().rstrip('.'),str(row.get('hostname','')).strip().lower().rstrip('.')}
+        if value in identities:
+            alias=str(name).strip().lower()
+            break
+    if alias is None:
+        alias=value
+    memberships=[]
+    if isinstance(groups,dict):
+        for name,row in groups.items():
+            if isinstance(row,dict) and alias in [str(x).strip().lower() for x in (row.get('hosts') or [])]:
+                memberships.append(str(name).strip().lower())
+    return alias,sorted(set(memberships))
+
+def target_specificity(meta,target):
+    path=INVENTORY if INVENTORY.exists() else LEGACY_INVENTORY
+    try:
+        document=json.loads(path.read_text()) if path.exists() else {'hosts':{},'groups':{}}
+        return target_rank(meta,target,document)
+    except (OSError,ValueError): raise SystemExit('inventory is unavailable or invalid; credential matching refused')
+
+def scope_allowed(meta,scope):
+    scopes=[str(x).strip() for x in meta.get('scopes',[]) if str(x).strip()]
+    return not scopes or '*' in scopes or scope in scopes
+
+def active_grant(name,scope):
+    now=int(time.time())
+    for gp in sorted(GRANTS.glob('*.json')):
+        try:
+            d=json.loads(gp.read_text())
+            if int(d.get('expires',0))<=now:
+                gp.unlink(missing_ok=True);continue
+            if d.get('credential')==name and d.get('scope') in ('*',scope):
+                return gp,d
+        except Exception:
+            gp.unlink(missing_ok=True)
+    return None,None
+
+def authorization(name,scope):
+    l=lease()
+    if l and ('*' in l.get('scopes',[]) or scope in l.get('scopes',[])):
+        return ('lease',None)
+    gp,_=active_grant(name,scope)
+    if gp:return ('grant',gp)
+    return (None,None)
+
+def resolve_credential(target,scope,ctype):
+    ensure()
+    candidates=[]
+    for p in sorted(CREDS.glob('*.cred')):
+        if p.stem.endswith('.__passphrase'): continue
+        m=read_meta(p.stem)
+        if ctype == 'ssh-login':
+            if m.get('type') not in LOGIN_TYPES: continue
+        elif ctype and str(m.get('type','secret'))!=ctype: continue
+        if not scope_allowed(m,scope): continue
+        specificity=target_specificity(m,target)
+        if specificity<0: continue
+        candidates.append((specificity,p.stem,m))
+    if not candidates: raise SystemExit('no eligible credential found')
+    best=max(x[0] for x in candidates)
+    selected=[x for x in candidates if x[0]==best]
+    if len(selected)!=1:
+        raise SystemExit('multiple equally specific credentials match target; narrow host/group assignments')
+    _,name,m=selected[0]
+    print(json.dumps({'name':name,'type':m.get('type','secret'),'specificity':best,'allowed_hosts':m.get('allowed_hosts',[]),'scopes':m.get('scopes',[]),'username':m.get('username',''),'domain':m.get('domain','')}))
+
+def decrypt_to_file(name,dst):
+    src=CREDS/(name+'.cred')
+    p=subprocess.run(['/usr/bin/systemd-creds','decrypt','--name='+name,str(src),str(dst)],capture_output=True)
+    if p.returncode: raise SystemExit('credential decrypt failed')
+    os.chmod(dst,0o400)
+
+def set_login(name,username):
+    ensure()
+    if not good_name(name) or not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name)
+    if m.get('type')!='ssh-key': raise SystemExit('Change password/AD login identity by replacing the credential object.')
+    try: m['username']=login_name(username)
+    except ValueError as exc: raise SystemExit(str(exc))
+    m['updated']=int(time.time());write_meta(name,m);audit('login_identity',credential=name)
+
+def materialize_ssh(name,target,scope):
+    ensure();MATERIALIZED.mkdir(parents=True,exist_ok=True);os.chmod(MATERIALIZED,0o700)
+    if not good_name(name): raise SystemExit('invalid credential name')
+    if not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name);ctype=m.get('type')
+    if ctype not in LOGIN_TYPES: raise SystemExit('credential is not compatible with SSH login')
+    if not scope_allowed(m,scope): raise SystemExit('credential scope does not allow this operation')
+    if target_specificity(m,target)<0: raise SystemExit('credential target does not allow this host')
+    if ctype=='ssh-key':
+        try: username=login_name(m.get('username'))
+        except ValueError as exc: raise SystemExit(str(exc))
+    auth,gp=authorization(name,scope)
+    if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
+    work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
+    try:
+        result={'credential':name,'authorization':auth,'materialized':str(work),'private_key':''}
+        if ctype=='ssh-key':
+            key=work/'identity';decrypt_to_file(name,key)
+            result.update(private_key=str(key),username=username,authentication='publickey')
+            pp=m.get('passphrase_credential')
+            if pp:
+                passfile=work/'passphrase';decrypt_to_file(str(pp),passfile);result['passphrase_file']=str(passfile)
+        else:
+            source=work/'credential.json';decrypt_to_file(name,source)
+            try: identity=password_identity(source.read_text(),ctype)
+            finally: source.unlink(missing_ok=True)
+            password=work/'password';password.write_text(identity['password']);password.chmod(0o400)
+            result.update(username=identity['username'],password_file=str(password),authentication='password')
+            identity['password']=''
+        if gp is not None:
+            used=gp.with_suffix('.used')
+            try: os.replace(gp,used)
+            except FileNotFoundError: raise SystemExit('one-shot grant was already consumed')
+            used.unlink(missing_ok=True);audit('grant_consume',credential=name,scope=scope)
+        audit('materialize',credential=name,target=target,scope=scope,authorization=auth)
+        print(json.dumps(result))
+    except BaseException:
+        for child in work.iterdir(): child.unlink(missing_ok=True)
+        work.rmdir()
+        raise
+
+def cleanup_materialized(path):
+    p=Path(path)
+    try:p.resolve().relative_to(MATERIALIZED.resolve())
+    except Exception: raise SystemExit('invalid materialized path')
+    if p.is_dir():
+        for child in p.iterdir(): child.unlink(missing_ok=True)
+        p.rmdir()
+
+
+args=sys.argv[1:]
+if not args or args[0]=='status': print(json.dumps(status(),indent=2))
+elif args[0]=='init': print(json.dumps(status(),indent=2))
+elif args[0]=='unlock': unlock(args[1:])
+elif args[0]=='lock': LEASE.unlink(missing_ok=True); audit('lock')
+elif args[0]=='put' and len(args)>=2: put(args[1],args[2:])
+elif args[0]=='grant': grant(args[1:])
+elif args[0]=='revoke-grant' and len(args)==2: revoke_grant(args[1])
+elif args[0]=='delete' and len(args)==2: delete_credential(args[1])
+elif args[0]=='scopes' and len(args)>=2: set_scopes(args[1],args[2:])
+elif args[0]=='hosts' and len(args)>=2: set_hosts(args[1],args[2:])
+elif args[0]=='rename' and len(args)==3: rename_credential(args[1],args[2])
+elif args[0]=='login' and len(args)==3: set_login(args[1],args[2])
+elif args[0]=='resolve' and len(args)==4: resolve_credential(args[1],args[2],args[3])
+elif args[0]=='materialize-ssh' and len(args)==4: materialize_ssh(args[1],args[2],args[3])
+elif args[0]=='cleanup' and len(args)==2: cleanup_materialized(args[1])
+else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|cleanup PATH')

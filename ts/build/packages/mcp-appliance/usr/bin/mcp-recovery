@@ -1,0 +1,89 @@
+#!/usr/bin/python3
+import json, os, sys, time
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance'); MCP=BASE/'mcp'; STATE=BASE/'state'
+
+def result(i,v): print(json.dumps({'jsonrpc':'2.0','id':i,'result':v}),flush=True)
+def error(i,code,msg): print(json.dumps({'jsonrpc':'2.0','id':i,'error':{'code':code,'message':msg}}),flush=True)
+def tool_status(_):
+    sel=Path('/run/mcp-appliance/selected.json')
+    return {'mode':'recovery','persist_mounted':os.path.ismount('/var/prstnt'),'selection':json.loads(sel.read_text()) if sel.exists() else None}
+def tool_generations(_):
+    gens=MCP/'generations'; out=[]
+    if gens.exists():
+        for p in sorted(gens.iterdir()):
+            if p.is_dir(): out.append(p.name)
+    def slot(n):
+        try:return (MCP/n).resolve(strict=True).name
+        except Exception:return None
+    return {'generations':out,'active':slot('active'),'previous':slot('previous')}
+def tool_vault_status(_):
+    import subprocess
+    p=subprocess.run(['/usr/bin/mcp-vault-core','status'],text=True,capture_output=True)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'vault status failed')
+    return json.loads(p.stdout)
+
+def tool_request_credential(a):
+    import subprocess
+    p=subprocess.run(['/usr/bin/python3','/usr/bin/mcp-credential-request','request'],input=json.dumps(a),text=True,capture_output=True)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'credential request failed')
+    return json.loads(p.stdout)
+
+def tool_vault_check(a):
+    import subprocess
+    scope=str(a.get('scope','')); credential=str(a.get('credential',''))
+    if not scope or not credential: raise ValueError('scope and credential are required')
+    p=subprocess.run(['/usr/bin/mcp-vault-check',scope,credential],text=True,capture_output=True)
+    return {'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip()}
+
+def tool_activate(a):
+    gen=str(a.get('generation',''))
+    target=MCP/'generations'/gen
+    if not target.is_dir() or not (target/'manifest.json').is_file(): raise ValueError('generation not found or missing manifest')
+    MCP.mkdir(parents=True,exist_ok=True)
+    active=MCP/'active'; previous=MCP/'previous'
+    try: old=active.resolve(strict=True)
+    except Exception: old=None
+    tmp=MCP/'.active.new'
+    try: tmp.unlink()
+    except FileNotFoundError: pass
+    tmp.symlink_to(Path('generations')/gen); os.replace(tmp,active)
+    if old and old!=target:
+        tmp2=MCP/'.previous.new'
+        try: tmp2.unlink()
+        except FileNotFoundError: pass
+        tmp2.symlink_to(Path('generations')/old.name); os.replace(tmp2,previous)
+    return {'active':gen,'previous':old.name if old else None,'reboot_or_restart_required':True}
+TOOLS={
+ 'recovery.status':tool_status,
+ 'recovery.generations':tool_generations,
+ 'recovery.activate_generation':tool_activate,
+ 'recovery.vault_status':tool_vault_status,
+ 'recovery.vault_check':tool_vault_check,
+ 'recovery.request_credential':tool_request_credential,
+}
+handled=False
+for line in sys.stdin:
+    handled=True
+    try:
+        m=json.loads(line); i=m.get('id'); method=m.get('method')
+        if method=='initialize': result(i,{'protocolVersion':'2025-06-18','capabilities':{'tools':{}},'serverInfo':{'name':'thinstation-mcp-recovery','version':'1'}})
+        elif method=='notifications/initialized': pass
+        elif method=='tools/list': result(i,{'tools':[{'name':'recovery.status','description':'Report recovery mode and selected MCP state','inputSchema':{'type':'object','properties':{}}},{'name':'recovery.generations','description':'List persistent MCP generations and slots','inputSchema':{'type':'object','properties':{}}},{'name':'recovery.activate_generation','description':'Atomically select a persistent MCP generation','inputSchema':{'type':'object','properties':{'generation':{'type':'string'}},'required':['generation']}},{'name':'recovery.vault_status','description':'Report vault lock state and credential metadata without revealing secret values','inputSchema':{'type':'object','properties':{}}},{'name':'recovery.vault_check','description':'Check whether a credential can be used for a scope without revealing its value','inputSchema':{'type':'object','properties':{'scope':{'type':'string'},'credential':{'type':'string'}},'required':['scope','credential']}},{'name':'recovery.request_credential','description':'Request a human-supplied credential for a project without collecting the secret','inputSchema':{'type':'object','properties':{'project':{'type':'string'},'name':{'type':'string'},'type':{'type':'string'},'purpose':{'type':'string'},'scopes':{'type':'array','items':{'type':'string'}},'hosts':{'type':'array','items':{'type':'string'}},'instructions':{'type':'string'}},'required':['project','name']}}]})
+        elif method=='tools/call':
+            p=m.get('params',{}); name=p.get('name'); fn=TOOLS.get(name)
+            if not fn: error(i,-32601,'unknown tool')
+            else:
+                try: val=fn(p.get('arguments',{})); result(i,{'content':[{'type':'text','text':json.dumps(val,indent=2)}]})
+                except Exception as e: error(i,-32000,str(e))
+        elif i is not None: error(i,-32601,'method not found')
+    except Exception as e:
+        try:error(None,-32700,str(e))
+        except Exception: pass
+
+# Under the supervisor stdin is /dev/null. Remain resident as the healthy
+# immutable fallback instead of creating a rapid restart loop. Piped MCP
+# sessions still exit normally after processing at least one request.
+if not handled:
+    while True:
+        time.sleep(3600)
