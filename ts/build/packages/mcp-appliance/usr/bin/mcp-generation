@@ -1,0 +1,144 @@
+#!/usr/bin/python3
+import hashlib, json, os, shutil, subprocess, sys, tarfile, tempfile, time
+from pathlib import Path
+BASE=Path('/var/prstnt/mcp-appliance/mcp'); GENS=BASE/'generations'; FAILED=BASE.parent/'state/mcp-failed-generations.json'
+
+def slot(name):
+    try: return (BASE/name).resolve(strict=True).name
+    except Exception: return None
+
+def atomic_slot(name, generation):
+    target=GENS/generation
+    if not target.is_dir(): raise SystemExit(f'generation not found: {generation}')
+    BASE.mkdir(parents=True,exist_ok=True)
+    tmp=BASE/f'.{name}.new'
+    try: tmp.unlink()
+    except FileNotFoundError: pass
+    tmp.symlink_to(Path('generations')/generation)
+    os.replace(tmp,BASE/name)
+
+
+def clear_failure(gen):
+    try: data=json.loads(FAILED.read_text()) if FAILED.exists() else {}
+    except Exception: data={}
+    failed=set(data.get('failed',[])); failed.discard(gen)
+    FAILED.parent.mkdir(parents=True,exist_ok=True)
+    FAILED.write_text(json.dumps({'failed':sorted(failed)},indent=2)+'\n')
+
+def status():
+    print(json.dumps({'active':slot('active'),'previous':slot('previous'),'generations':sorted([p.name for p in GENS.iterdir() if p.is_dir()]) if GENS.exists() else []},indent=2))
+
+def activate(gen):
+    clear_failure(gen)
+    old=slot('active')
+    atomic_slot('active',gen)
+    if old and old!=gen: atomic_slot('previous',old)
+    status()
+
+def rollback():
+    prev=slot('previous')
+    if not prev: raise SystemExit('no previous generation')
+    activate(prev)
+
+def re_full_sha(v):
+    return len(v)==64 and all(c in '0123456789abcdef' for c in v)
+
+def seed_recovery(gen=None):
+    if not gen:
+        gen='bootstrap-'+time.strftime('%Y%m%d-%H%M%S',time.gmtime())
+    if not all(c.isalnum() or c in '._-' for c in gen): raise SystemExit('invalid generation name')
+    GENS.mkdir(parents=True,exist_ok=True)
+    dst=GENS/gen
+    if dst.exists(): raise SystemExit(f'generation already exists: {gen}')
+    tmp=GENS/f'.{gen}.new'
+    if tmp.exists(): shutil.rmtree(tmp)
+    tmp.mkdir(parents=True)
+    shutil.copy2('/usr/bin/mcp-recovery',tmp/'mcp-recovery')
+    os.chmod(tmp/'mcp-recovery',0o755)
+    digest=hashlib.sha256((tmp/'mcp-recovery').read_bytes()).hexdigest()
+    manifest={'name':gen,'source':'immutable-recovery-seed','command':'./mcp-recovery','working_directory':'.','sha256':{'mcp-recovery':digest}}
+    (tmp/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+    os.replace(tmp,dst)
+    activate(gen)
+
+def fetch_channel(url, preferred_generation=''):
+    if not str(url).startswith(('https://','http://')): raise SystemExit('channel URL must be http(s)')
+    BASE.mkdir(parents=True,exist_ok=True)
+    work=Path(tempfile.mkdtemp(prefix='mcp-fetch-',dir=str(BASE)))
+    try:
+        channel=work/'channel.json'
+        p=subprocess.run(['/usr/bin/curl','-fsSL','--connect-timeout','10','--max-time','60','-o',str(channel),str(url)],text=True,capture_output=True)
+        if p.returncode: raise SystemExit((p.stderr or p.stdout).strip() or 'channel download failed')
+        try: data=json.loads(channel.read_text())
+        except Exception as e: raise SystemExit(f'invalid channel JSON: {e}')
+        if isinstance(data,dict) and isinstance(data.get('mcps'),list):
+            rows=[row for row in data['mcps'] if isinstance(row,dict)]
+            if not rows: raise SystemExit('catalog contains no MCP generations')
+            preferred=str(preferred_generation or '').strip()
+            selected=next((row for row in rows if str(row.get('generation','')).strip()==preferred),None) if preferred else None
+            data=selected or rows[0]
+        gen=str(data.get('generation','')).strip()
+        archive_url=str(data.get('url','')).strip()
+        expected=str(data.get('sha256','')).strip().lower()
+        if not gen or not all(c.isalnum() or c in '._-' for c in gen): raise SystemExit('channel has invalid generation')
+        if not archive_url.startswith(('https://','http://')): raise SystemExit('channel archive URL must be http(s)')
+        if not re_full_sha(expected): raise SystemExit('channel sha256 missing or invalid')
+        archive=work/'generation.tar.gz'
+        p=subprocess.run(['/usr/bin/curl','-fsSL','--connect-timeout','10','--max-time','300','-o',str(archive),archive_url],text=True,capture_output=True)
+        if p.returncode: raise SystemExit((p.stderr or p.stdout).strip() or 'archive download failed')
+        got=hashlib.sha256(archive.read_bytes()).hexdigest()
+        if got!=expected: raise SystemExit('archive sha256 mismatch')
+        src=work/'src'; src.mkdir()
+        with tarfile.open(archive,'r:*') as tf:
+            root_path=src.resolve()
+            members=tf.getmembers()
+            for m in members:
+                target=(src/m.name).resolve()
+                try: target.relative_to(root_path)
+                except ValueError: raise SystemExit('unsafe archive path')
+                if m.ischr() or m.isblk() or m.isfifo():
+                    raise SystemExit('archive contains a special file')
+                if m.issym():
+                    link=m.linkname
+                    if os.path.isabs(link):
+                        allowed={f'/{u}' for u in ('usr/bin/python3','usr/bin/python3.14')}
+                        if link not in allowed or '/.venv/bin/' not in ('/'+m.name):
+                            raise SystemExit('unsafe absolute archive symlink')
+                    else:
+                        linked=(target.parent/link).resolve()
+                        try: linked.relative_to(root_path)
+                        except ValueError: raise SystemExit('unsafe archive symlink')
+                elif m.islnk():
+                    linked=(src/m.linkname).resolve()
+                    try: linked.relative_to(root_path)
+                    except ValueError: raise SystemExit('unsafe archive hardlink')
+            tf.extractall(src,filter='fully_trusted')
+        root=src
+        if not (root/'manifest.json').is_file():
+            dirs=[x for x in src.iterdir() if x.is_dir()]
+            if len(dirs)==1 and (dirs[0]/'manifest.json').is_file(): root=dirs[0]
+        install(root,gen)
+        activate(gen)
+    finally:
+        shutil.rmtree(work,ignore_errors=True)
+
+def install(src, gen):
+    src=Path(src).resolve(); dst=GENS/gen
+    if not (src/'manifest.json').is_file(): raise SystemExit('source missing manifest.json')
+    GENS.mkdir(parents=True,exist_ok=True)
+    if dst.exists(): raise SystemExit(f'generation already exists: {gen}')
+    tmp=GENS/f'.{gen}.new'
+    if tmp.exists(): shutil.rmtree(tmp)
+    shutil.copytree(src,tmp,symlinks=True)
+    os.replace(tmp,dst)
+    print(dst)
+
+args=sys.argv[1:]
+if not args or args[0]=='status': status()
+elif args[0]=='activate' and len(args)==2: activate(args[1])
+elif args[0]=='rollback' and len(args)==1: rollback()
+elif args[0]=='seed-recovery' and len(args) in (1,2): seed_recovery(args[1] if len(args)==2 else None)
+elif args[0]=='fetch-channel' and len(args) in (2,3): fetch_channel(args[1], args[2] if len(args)==3 else '')
+elif args[0]=='install' and len(args)==3: install(args[1],args[2])
+else:
+    raise SystemExit('usage: mcp-generation status | install DIR GENERATION | activate GENERATION | rollback | seed-recovery [GENERATION] | fetch-channel URL [GENERATION]')

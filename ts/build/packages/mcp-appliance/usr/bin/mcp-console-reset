@@ -1,0 +1,6 @@
+#!/bin/sh
+vt="${1:-tty1}"
+case "$vt" in tty[0-9]*) ;; *) exit 2 ;; esac
+[ -w "/dev/$vt" ] || exit 0
+# RIS reset, clear display, home cursor. Keep this local to virtual terminals.
+printf '\033c\033[2J\033[H' > "/dev/$vt"

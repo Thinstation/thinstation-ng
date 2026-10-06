@@ -1,0 +1,1240 @@
+#!/usr/bin/python3
+from mcp_inventory import Inventory, apply_runtime
+from mcp_login import login_name, password_identity
+import configparser, datetime, hashlib, hmac, http.client, json, mimetypes, os, re, secrets, shlex, shutil, socket, ssl, subprocess, tarfile, tempfile, time
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
+from urllib.parse import urlparse
+BASE=Path('/var/prstnt/mcp-appliance'); TOKEN_PATH=BASE/'secrets/web.token'; MCP_TOKEN_PATH=BASE/'secrets/mcp.token'; REG_PATH=BASE/'state/registered.json'; USERS_PATH=BASE/'config/users.json'; RESET_PATH=BASE/'state/password-resets.json'; SESSIONS=Path('/run/mcp-appliance/sessions'); WEB_DEFAULT=Path('/usr/share/mcp-appliance/web'); WEB_DEV=BASE/'dev-web'
+FILES={
+ 'node':Path('/etc/mcp-appliance/node.conf'),
+ 'content':Path('/etc/mcp-appliance/content.conf'),
+ 'hosts':BASE/'config/hosts.json',
+ 'authorized_keys':Path('/root/.ssh/authorized_keys'),
+ 'acme':Path('/etc/mcp-appliance/acme.conf'),
+ 'mail':Path('/etc/mcp-appliance/mail.conf'),
+ 'issue':Path('/etc/mcp-appliance/issue.txt'),
+}
+UPDATE_LOCAL=BASE/'config/update.conf.local'
+UPDATE_RUNTIME=Path('/etc/mcp-appliance/update.conf')
+CRED_REQUESTS=BASE/'state/credential-requests.json'
+MAX_BODY=65536
+INVENTORY=Inventory()
+
+
+def current_token():
+    try:return TOKEN_PATH.read_text().strip()
+    except Exception:return ''
+
+def current_mcp_token():
+    try:return MCP_TOKEN_PATH.read_text().strip()
+    except Exception:return ''
+
+def rotate_mcp_token():
+    token=secrets.token_urlsafe(32)
+    atomic_write(MCP_TOKEN_PATH,token+'\n',0o600)
+    return token
+
+def connection_info():
+    return {
+        'url': management_base_url().rstrip('/')+'/mcp',
+        'token': current_mcp_token(),
+        'transport': 'streamable-http',
+        'backend': '127.0.0.1:8000/mcp',
+        'remote_default': 'outbound-tunnel'
+    }
+
+def load_users():
+    try:return json.loads(USERS_PATH.read_text()).get('users',[])
+    except Exception:return []
+
+def find_user(identifier):
+    ident=str(identifier or '').strip().lower()
+    for u in load_users():
+        if u.get('enabled',True) and (u.get('username','').lower()==ident or u.get('email','').lower()==ident): return u
+    return None
+
+def verify_password(user,password):
+    try:
+        ph=user['password']; salt=bytes.fromhex(ph['salt']); expected=bytes.fromhex(ph['hash'])
+        got=hashlib.scrypt(password.encode(),salt=salt,n=int(ph['n']),r=int(ph['r']),p=int(ph['p']),dklen=len(expected),maxmem=64*1024*1024)
+        return hmac.compare_digest(got,expected)
+    except Exception:return False
+
+def password_hash(password):
+    if len(password)<12: raise ValueError('password must be at least 12 characters')
+    salt=os.urandom(16); n=1<<15; r=8; pp=1
+    dk=hashlib.scrypt(password.encode(),salt=salt,n=n,r=r,p=pp,dklen=32,maxmem=64*1024*1024)
+    return {'scheme':'scrypt','n':n,'r':r,'p':pp,'salt':salt.hex(),'hash':dk.hex()}
+
+def save_users(users): atomic_write(USERS_PATH,json.dumps({'version':1,'users':users},indent=2)+'\n',0o600)
+
+def session_create(username):
+    SESSIONS.mkdir(parents=True,exist_ok=True); os.chmod(SESSIONS,0o700)
+    sid=secrets.token_urlsafe(32); csrf=secrets.token_urlsafe(24); now=int(time.time()); exp=now+43200
+    key=hashlib.sha256(sid.encode()).hexdigest(); atomic_write(SESSIONS/(key+'.json'),json.dumps({'username':username,'csrf':csrf,'issued':now,'expires':exp})+'\n',0o600)
+    return sid,csrf,exp
+
+def session_from_cookie(cookie):
+    sid=''
+    for part in str(cookie or '').split(';'):
+        k,sep,v=part.strip().partition('=')
+        if sep and k=='mcp_session': sid=v; break
+    if not sid:return None
+    path=SESSIONS/(hashlib.sha256(sid.encode()).hexdigest()+'.json')
+    try:d=json.loads(path.read_text())
+    except Exception:return None
+    if int(d.get('expires',0))<=int(time.time()): path.unlink(missing_ok=True); return None
+    if not find_user(d.get('username')): path.unlink(missing_ok=True); return None
+    d['_path']=str(path); return d
+
+def session_delete(cookie):
+    d=session_from_cookie(cookie)
+    if d: Path(d['_path']).unlink(missing_ok=True)
+
+def management_base_url():
+    fqdn=socket.getfqdn() or socket.gethostname()
+    if fqdn and fqdn not in ('localhost','localhost.localdomain') and '.' in fqdn: host=fqdn
+    else:
+        host=socket.gethostname() or 'mcp-appliance'
+        rc,out=run_text(['/usr/bin/ip','-o','-4','address','show']) if 'run_text' in globals() else (1,'')
+        if rc==0:
+            for line in out.splitlines():
+                p=line.split()
+                if len(p)>=4 and p[1].rstrip(':')!='lo': host=p[3].split('/')[0]; break
+    return f'https://{host}:8443/'
+
+def mail_user(email,subject,body):
+    p=subprocess.run(['/usr/bin/mcp-mail','--to',email,subject],input=body,text=True,capture_output=True)
+    return p.returncode==0,(p.stdout+p.stderr).strip()
+
+def issue_password_reset(identifier):
+    user=find_user(identifier)
+    if not user:return False
+    token=secrets.token_urlsafe(32); digest=hashlib.sha256(token.encode()).hexdigest(); now=int(time.time())
+    try:d=json.loads(RESET_PATH.read_text())
+    except Exception:d={'tokens':[]}
+    live=[x for x in d.get('tokens',[]) if int(x.get('expires',0))>now and x.get('username')!=user['username']]
+    live.append({'hash':digest,'username':user['username'],'issued':now,'expires':now+1800})
+    atomic_write(RESET_PATH,json.dumps({'tokens':live},indent=2)+'\n',0o600)
+    url=management_base_url()+'#reset='+token
+    ok,_=mail_user(user['email'],'MCP appliance password reset',f'A password reset was requested for {user["username"]}.\n\nOpen this link within 30 minutes:\n{url}\n\nIf you did not request this, no action is required.\n')
+    return ok
+
+def complete_password_reset(token,new_password):
+    digest=hashlib.sha256(str(token).encode()).hexdigest(); now=int(time.time())
+    try:d=json.loads(RESET_PATH.read_text())
+    except Exception:raise ValueError('invalid or expired reset token')
+    match=None; keep=[]
+    for x in d.get('tokens',[]):
+        if int(x.get('expires',0))<=now: continue
+        if hmac.compare_digest(str(x.get('hash','')),digest) and match is None: match=x
+        else: keep.append(x)
+    if not match: raise ValueError('invalid or expired reset token')
+    users=load_users(); found=False
+    for u in users:
+        if u.get('username')==match.get('username'):
+            u['password']=password_hash(new_password); u['password_changed']=now; found=True
+    if not found: raise ValueError('user no longer exists')
+    save_users(users); atomic_write(RESET_PATH,json.dumps({'tokens':keep},indent=2)+'\n',0o600)
+    if SESSIONS.exists():
+        for f in SESSIONS.glob('*.json'):
+            try:
+                sd=json.loads(f.read_text())
+                if sd.get('username')==match.get('username'): f.unlink(missing_ok=True)
+            except Exception: pass
+    user=find_user(match.get('username'))
+    if user: mail_user(user['email'],'MCP appliance password changed',f'The password for {user["username"]} was changed. If this was not you, inspect the appliance immediately.\n')
+    return match.get('username')
+
+def shell_config(path):
+    out={}
+    try:
+        for raw in path.read_text().splitlines():
+            line=raw.strip()
+            if not line or line.startswith('#') or '=' not in line: continue
+            k,v=line.split('=',1); v=v.strip()
+            if len(v)>=2 and v[0]==v[-1] and v[0] in ("'",'"'): v=v[1:-1]
+            out[k.strip()]=v
+    except Exception: pass
+    return out
+
+def update_policy():
+    runtime=shell_config(UPDATE_RUNTIME); local=shell_config(UPDATE_LOCAL)
+    return {'effective':{
+      'mode':runtime.get('MCP_BOOTSTRAP_MODE','auto'),
+      'generation':runtime.get('MCP_BOOTSTRAP_GENERATION','bootstrap'),
+      'channel_url':runtime.get('MCP_CHANNEL_URL','')},
+      'local_override':{
+      'mode':local.get('MCP_BOOTSTRAP_MODE',''),
+      'generation':local.get('MCP_BOOTSTRAP_GENERATION',''),
+      'channel_url':local.get('MCP_CHANNEL_URL','')}}
+
+def save_update_policy(body):
+    if not isinstance(body,dict): raise ValueError('JSON object required')
+    mode=str(body.get('mode','')).strip()
+    generation=str(body.get('generation','')).strip()
+    channel=str(body.get('channel_url','')).strip()
+    if mode and mode not in ('auto','channel','recovery','off'): raise ValueError('invalid bootstrap mode')
+    if generation and not all(c.isalnum() or c in '._-' for c in generation): raise ValueError('invalid generation name')
+    if channel and not channel.startswith(('https://','http://')): raise ValueError('channel URL must be http(s)')
+    def q(v): return "'" + v.replace("'","'\\''") + "'"
+    lines=[]
+    if mode: lines.append('MCP_BOOTSTRAP_MODE='+q(mode))
+    if generation: lines.append('MCP_BOOTSTRAP_GENERATION='+q(generation))
+    if channel: lines.append('MCP_CHANNEL_URL='+q(channel))
+    atomic_write(UPDATE_LOCAL,'\n'.join(lines)+'\n',0o600)
+    p=subprocess.run(['/bin/sh','/etc/init.d/mcp-appliance-config','init'],text=True,capture_output=True)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'config writer failed')
+    return {'ok':True,'policy':update_policy()}
+
+def storage_inventory():
+    """Return persistent-storage state and safe whole-disk provisioning candidates."""
+    mounted=os.path.ismount('/var/prstnt')
+    source=''
+    if mounted:
+        rc,out=run_text(['/usr/bin/findmnt','-n','-o','SOURCE','/var/prstnt'])
+        if rc==0: source=out.strip()
+    p=subprocess.run(
+        ['/usr/bin/lsblk','-J','-b','-o','NAME,PATH,TYPE,SIZE,FSTYPE,LABEL,MOUNTPOINTS,RO,RM,MODEL,SERIAL'],
+        text=True,capture_output=True,timeout=10
+    )
+    devices=[]
+    if p.returncode==0:
+        try:
+            doc=json.loads(p.stdout)
+            for row in doc.get('blockdevices',[]):
+                if not isinstance(row,dict): continue
+                mounts=[x for x in (row.get('mountpoints') or []) if x]
+                children=row.get('children') or []
+                clean=(
+                    row.get('type')=='disk'
+                    and not bool(row.get('ro'))
+                    and not bool(row.get('rm'))
+                    and not row.get('fstype')
+                    and not row.get('label')
+                    and not mounts
+                    and not children
+                )
+                devices.append({
+                    'name':row.get('name'),'path':row.get('path'),'type':row.get('type'),
+                    'size':int(row.get('size') or 0),'fstype':row.get('fstype'),
+                    'label':row.get('label'),'mountpoints':mounts,'read_only':bool(row.get('ro')),
+                    'removable':bool(row.get('rm')),'model':str(row.get('model') or '').strip(),
+                    'serial':str(row.get('serial') or '').strip(),'candidate':bool(clean)
+                })
+        except Exception:
+            pass
+    return {
+        'mounted':mounted,
+        'source':source,
+        'formatter_available':Path('/usr/sbin/mkfs.ext4').exists() or Path('/sbin/mkfs.ext4').exists() or shutil.which('mkfs.ext4') is not None,
+        'devices':devices,
+        'candidates':[x for x in devices if x.get('candidate')]
+    }
+
+def provision_storage(device):
+    """Create LABEL=prstnt on one verified unused whole disk and mount it."""
+    if os.path.ismount('/var/prstnt'):
+        return {'ok':True,'already_mounted':True,'storage':storage_inventory()}
+    device=str(device or '').strip()
+    inv=storage_inventory()
+    row=next((x for x in inv.get('candidates',[]) if x.get('path')==device),None)
+    if not row:
+        raise ValueError('selected disk is not an unused provisioning candidate')
+    formatter=shutil.which('mkfs.ext4')
+    if not formatter:
+        raise ValueError('ext4 formatter is unavailable in this appliance build')
+    real=Path(device).resolve()
+    if not str(real).startswith('/dev/'):
+        raise ValueError('invalid block device')
+    # Re-check immediately before destructive work.
+    current=storage_inventory()
+    if not any(x.get('path')==device for x in current.get('candidates',[])):
+        raise ValueError('disk state changed; refresh storage inventory')
+    p=subprocess.run(['/usr/bin/wipefs','-a',device],text=True,capture_output=True,timeout=30)
+    if p.returncode:
+        raise ValueError((p.stdout+p.stderr).strip() or 'failed to clear disk signatures')
+    # Preserve bootstrap/runtime state currently living on the RAM-backed
+    # /var/prstnt tree so mounting persistence does not invalidate first-run.
+    staging=Path(tempfile.mkdtemp(prefix='mcp-first-run-',dir='/run'))
+    saved=staging/'mcp-appliance'
+    if BASE.exists():
+        shutil.copytree(BASE,saved,symlinks=True)
+    p=subprocess.run([formatter,'-F','-L','prstnt',device],text=True,capture_output=True,timeout=120)
+    if p.returncode:
+        shutil.rmtree(staging,ignore_errors=True)
+        raise ValueError((p.stdout+p.stderr).strip() or 'failed to create persistent filesystem')
+    subprocess.run(['/usr/bin/udevadm','settle'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20)
+    p=subprocess.run(['/usr/bin/mcp-persistence-mount'],text=True,capture_output=True,timeout=30)
+    if p.returncode or not os.path.ismount('/var/prstnt'):
+        shutil.rmtree(staging,ignore_errors=True)
+        raise ValueError((p.stdout+p.stderr).strip() or 'persistent filesystem created but did not mount')
+    BASE.mkdir(parents=True,exist_ok=True)
+    if saved.exists():
+        shutil.copytree(saved,BASE,dirs_exist_ok=True,symlinks=True)
+    shutil.rmtree(staging,ignore_errors=True)
+    # The first-run state was copied onto persistence above. Do not restart
+    # mcp-appliance-init here: mcp-appliance-web depends on it, so doing that
+    # from inside this HTTP request can drop the response after provisioning
+    # has already succeeded.
+    for name in ('config','identity','trust','secrets','env','work','cache','log','state'):
+        (BASE/name).mkdir(parents=True,exist_ok=True)
+    subprocess.run(['/usr/bin/mcp-appliance-info','--refresh','--reset-getty'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return {'ok':True,'device':device,'storage':storage_inventory()}
+
+
+def registration_status():
+    return {'registered':REG_PATH.exists(),'bootstrap':not REG_PATH.exists()}
+
+def configure_registration_mail(body,admin_email):
+    m=body.get('mail') if isinstance(body,dict) else None
+    if not isinstance(m,dict) or not str(m.get('smtp_host','')).strip(): return False
+    host=str(m.get('smtp_host','')).strip(); sender=str(m.get('from','')).strip(); user=str(m.get('user','')).strip(); password=str(m.get('password',''))
+    try: port=int(m.get('smtp_port',587))
+    except Exception: raise ValueError('invalid SMTP port')
+    if not re.fullmatch(r'[A-Za-z0-9._:-]+',host): raise ValueError('invalid SMTP host')
+    if port<1 or port>65535: raise ValueError('invalid SMTP port')
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',sender): raise ValueError('valid mail From address is required')
+    q=shlex.quote
+    data='\n'.join([
+      'MAIL_ENABLED=true',f'MAIL_SMTP_HOST={q(host)}',f'MAIL_SMTP_PORT={port}',
+      'MAIL_STARTTLS='+('true' if bool(m.get('starttls',True)) else 'false'),f'MAIL_FROM={q(sender)}',f'MAIL_TO={q(admin_email)}',
+      f'MAIL_USER={q(user)}',f'MAIL_PASS={q(password)}',''])
+    atomic_write(FILES['mail'],data,0o600); password=''
+    return True
+
+def complete_registration(body):
+    p=subprocess.run(['/usr/bin/mcp-appliance-register','--json'],input=json.dumps(body),text=True,capture_output=True)
+    try:d=json.loads(p.stdout)
+    except Exception: raise ValueError((p.stdout+p.stderr).strip() or 'registration failed')
+    if p.returncode or not d.get('ok'): raise ValueError(d.get('error') or 'registration failed')
+    msg=('Your administrator account '+str(d.get('username',''))+' was created on the MCP appliance.\n\n'
+         +'Management: '+management_base_url()+'\n\n'
+         +'Critical appliance alerts and password recovery notices will be sent to this address.\n')
+    sent,_=mail_user(d['email'],'MCP appliance registration complete',msg)
+    d['confirmation_sent']=sent
+    return d
+
+def status():
+    p=subprocess.run(['/usr/bin/systemctl','is-active','mcp-runtime.service'],text=True,capture_output=True)
+    s=BASE/'state/mcp-runtime.state'
+    sel=Path('/run/mcp-appliance/selected.json')
+    failed=BASE/'state/mcp-failed-generations.json'
+    mcp=BASE/'mcp'
+    def slot(name):
+        try: return (mcp/name).resolve(strict=True).name
+        except Exception: return None
+    try: selected=json.loads(sel.read_text()) if sel.exists() else None
+    except Exception: selected=None
+    try: quarantined=json.loads(failed.read_text()).get('failed',[]) if failed.exists() else []
+    except Exception: quarantined=[]
+    return {
+      'hostname':os.uname().nodename,
+      'mcp_service':p.stdout.strip() or 'unknown',
+      'mcp_runtime':s.read_text().strip() if s.exists() else 'unknown',
+      'mcp_selected':selected,
+      'mcp_active':slot('active'),
+      'mcp_previous':slot('previous'),
+      'mcp_quarantined':quarantined,
+      'persist':os.path.ismount('/var/prstnt'),
+      'certificate':str(BASE/'identity/web.crt')
+    }
+
+
+
+def run_text(argv, timeout=3):
+    try:
+        p=subprocess.run(argv,text=True,capture_output=True,timeout=timeout)
+        return p.returncode,(p.stdout+p.stderr).strip()
+    except Exception as e:
+        return 255,str(e)
+
+def unit_state(name):
+    rc,out=run_text(['/usr/bin/systemctl','is-active',name])
+    return out.splitlines()[0] if out else ('active' if rc==0 else 'unknown')
+
+def meminfo():
+    vals={}
+    try:
+        for line in Path('/proc/meminfo').read_text().splitlines():
+            if ':' in line:
+                k,v=line.split(':',1); vals[k]=int(v.strip().split()[0])*1024
+    except Exception: pass
+    total=vals.get('MemTotal',0); avail=vals.get('MemAvailable',0)
+    return {'total':total,'available':avail,'used':max(0,total-avail)}
+
+def diskinfo(path):
+    try:
+        d=shutil.disk_usage(path)
+        st=os.statvfs(path)
+        return {'total':d.total,'used':d.used,'free':d.free,'free_percent':round(d.free*100/d.total,1) if d.total else 0,
+                'inodes_total':st.f_files,'inodes_free':st.f_ffree}
+    except Exception as e: return {'error':str(e)}
+
+def network_health():
+    out={'interfaces':[],'default_route':None,'dns':[]}
+    by_if={}
+    rc,txt=run_text(['/usr/bin/ip','-o','address','show'])
+    if rc==0:
+        for line in txt.splitlines():
+            parts=line.split()
+            if len(parts)<4: continue
+            name=parts[1].rstrip(':')
+            family=parts[2]
+            if name=='lo' or family not in ('inet','inet6'): continue
+            addr=parts[3].split('/',1)[0]
+            by_if.setdefault(name,[]).append(addr)
+    for name,addrs in sorted(by_if.items()):
+        try: state=(Path('/sys/class/net')/name/'operstate').read_text().strip()
+        except Exception: state='unknown'
+        out['interfaces'].append({'name':name,'state':state,'addresses':addrs})
+    rc,txt=run_text(['/usr/bin/ip','route','show','default'])
+    if rc==0 and txt:
+        parts=txt.splitlines()[0].split()
+        gateway=parts[parts.index('via')+1] if 'via' in parts and parts.index('via')+1<len(parts) else None
+        dev=parts[parts.index('dev')+1] if 'dev' in parts and parts.index('dev')+1<len(parts) else None
+        out['default_route']={'gateway':gateway,'dev':dev}
+    try:
+        for line in Path('/etc/resolv.conf').read_text().splitlines():
+            if line.startswith('nameserver '): out['dns'].append(line.split(None,1)[1])
+    except Exception: pass
+    return out
+
+
+def nm_split(line):
+    out=[]; cur=[]; esc=False
+    for ch in line.rstrip('\n'):
+        if esc:
+            cur.append(ch); esc=False
+        elif ch=='\\':
+            esc=True
+        elif ch==':':
+            out.append(''.join(cur)); cur=[]
+        else:
+            cur.append(ch)
+    out.append(''.join(cur))
+    return out
+
+def nm_value(uuid, field):
+    rc,out=run_text(['/usr/bin/nmcli','-g',field,'connection','show','uuid',uuid],10)
+    return out.strip() if rc==0 else ''
+
+def nm_list_value(value):
+    if not value: return []
+    return [x.strip() for x in re.split(r'\s*[,;\n]+\s*',value) if x.strip()]
+
+def network_config():
+    result={'hostname':socket.gethostname(),'connections':[]}
+    rc,out=run_text(['/usr/bin/nmcli','-t','--escape','yes','-f','NAME,UUID,TYPE,DEVICE,AUTOCONNECT','connection','show'],10)
+    if rc: return result
+    active={}
+    arc,aout=run_text(['/usr/bin/nmcli','-t','--escape','yes','-f','UUID,DEVICE','connection','show','--active'],10)
+    if arc==0:
+        for line in aout.splitlines():
+            row=nm_split(line)
+            if len(row)>=2: active[row[0]]=row[1]
+    for line in out.splitlines():
+        row=nm_split(line)
+        if len(row)<5: continue
+        name,uuid,kind,device,autoconnect=row[:5]
+        if kind in ('loopback','bridge') and device in ('lo','docker0'): continue
+        c={'name':name,'uuid':uuid,'type':kind,'device':device or active.get(uuid,''),
+           'active':uuid in active,'autoconnect':autoconnect.lower()=='yes'}
+        for fam in ('ipv4','ipv6'):
+            c[fam]={
+              'method':nm_value(uuid,fam+'.method') or ('auto' if fam=='ipv4' else 'auto'),
+              'addresses':nm_list_value(nm_value(uuid,fam+'.addresses')),
+              'gateway':nm_value(uuid,fam+'.gateway'),
+              'dns':nm_list_value(nm_value(uuid,fam+'.dns')),
+              'dns_search':nm_list_value(nm_value(uuid,fam+'.dns-search')),
+              'routes':nm_list_value(nm_value(uuid,fam+'.routes')),
+            }
+        result['connections'].append(c)
+    return result
+
+def clean_net_list(value):
+    if isinstance(value,list): vals=value
+    else: vals=re.split(r'[\n,;]+',str(value or ''))
+    return [str(x).strip() for x in vals if str(x).strip()]
+
+def save_network_config(body):
+    if not isinstance(body,dict): raise ValueError('JSON object required')
+    uuid=str(body.get('uuid','')).strip()
+    if not re.fullmatch(r'[0-9a-fA-F-]{36}',uuid): raise ValueError('valid connection UUID required')
+    current={x['uuid']:x for x in network_config().get('connections',[])}
+    if uuid not in current: raise ValueError('connection not found')
+    args=['/usr/bin/nmcli','connection','modify','uuid',uuid]
+    if 'autoconnect' in body: args += ['connection.autoconnect','yes' if bool(body.get('autoconnect')) else 'no']
+    for fam in ('ipv4','ipv6'):
+        cfg=body.get(fam,{})
+        if not isinstance(cfg,dict): continue
+        method=str(cfg.get('method','auto')).strip().lower()
+        allowed=('auto','manual','disabled')
+        if method not in allowed: raise ValueError(f'invalid {fam} method')
+        addresses=clean_net_list(cfg.get('addresses'))
+        gateway=str(cfg.get('gateway','')).strip()
+        dns=clean_net_list(cfg.get('dns'))
+        searches=clean_net_list(cfg.get('dns_search'))
+        routes=clean_net_list(cfg.get('routes'))
+        if method=='manual' and not addresses: raise ValueError(f'{fam} manual mode requires an address')
+        args += [fam+'.method',method,
+                 fam+'.addresses',','.join(addresses) if method=='manual' else '',
+                 fam+'.gateway',gateway if method=='manual' else '',
+                 fam+'.dns',','.join(dns),
+                 fam+'.dns-search',','.join(searches),
+                 fam+'.routes',','.join(routes)]
+    p=subprocess.run(args,text=True,capture_output=True,timeout=20)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'NetworkManager rejected configuration')
+    hostname=str(body.get('hostname','')).strip()
+    if hostname:
+        if len(hostname)>253 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]|[A-Za-z0-9]',hostname):
+            raise ValueError('invalid hostname')
+        hp=subprocess.run(['/usr/bin/hostnamectl','set-hostname',hostname],text=True,capture_output=True,timeout=10)
+        if hp.returncode: raise ValueError((hp.stdout+hp.stderr).strip() or 'failed to set hostname')
+    subprocess.run(['/usr/bin/mcp-appliance-info','--refresh','--reset-getty'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return {'ok':True,'saved':uuid,'hostname':socket.gethostname()}
+
+
+def create_network_checkpoint(uuid, seconds=90):
+    uuid=str(uuid or '').strip()
+    if not re.fullmatch(r'[0-9a-fA-F-]{36}',uuid): raise ValueError('valid connection UUID required')
+    seconds=max(30,min(int(seconds),300))
+    token=secrets.token_hex(8); name='mcp-rollback-'+token
+    p=subprocess.run(['/usr/bin/nmcli','connection','clone','uuid',uuid,name],text=True,capture_output=True,timeout=20)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'failed to create network checkpoint')
+    rc,out=run_text(['/usr/bin/nmcli','-g','connection.uuid','connection','show',name],10)
+    clone_uuid=out.strip() if rc==0 else ''
+    unit='mcp-network-rollback-'+token
+    cmd=['/usr/bin/systemd-run','--unit='+unit,'--on-active='+str(seconds)+'s','--collect',
+         '/usr/bin/nmcli','connection','up',name]
+    sp=subprocess.run(cmd,text=True,capture_output=True,timeout=15)
+    if sp.returncode:
+        subprocess.run(['/usr/bin/nmcli','connection','delete',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        raise ValueError((sp.stdout+sp.stderr).strip() or 'failed to schedule network rollback')
+    return {'ok':True,'token':token,'rollback_name':name,'rollback_uuid':clone_uuid,'seconds':seconds}
+
+def confirm_network_checkpoint(token):
+    token=str(token or '').strip().lower()
+    if not re.fullmatch(r'[0-9a-f]{16}',token): raise ValueError('invalid checkpoint token')
+    name='mcp-rollback-'+token; unit='mcp-network-rollback-'+token
+    subprocess.run(['/usr/bin/systemctl','stop',unit+'.timer'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    subprocess.run(['/usr/bin/systemctl','stop',unit+'.service'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    subprocess.run(['/usr/bin/systemctl','reset-failed',unit+'.service'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    subprocess.run(['/usr/bin/nmcli','connection','delete',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return {'ok':True,'confirmed':True}
+
+def activate_network_connection(uuid):
+    uuid=str(uuid or '').strip()
+    if not re.fullmatch(r'[0-9a-fA-F-]{36}',uuid): raise ValueError('valid connection UUID required')
+    p=subprocess.run(['/usr/bin/nmcli','connection','up','uuid',uuid],text=True,capture_output=True,timeout=30)
+    if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'failed to activate connection')
+    subprocess.run(['/usr/bin/mcp-appliance-info','--refresh','--reset-getty'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return {'ok':True,'uuid':uuid,'message':(p.stdout+p.stderr).strip()}
+
+def certificate_health():
+    cert=BASE/'identity/web.crt'
+    if not cert.exists(): return {'present':False,'valid':False}
+    rc,txt=run_text(['/usr/bin/openssl','x509','-in',str(cert),'-noout','-subject','-issuer','-enddate','-ext','subjectAltName'])
+    out={'present':True,'valid':rc==0,'path':str(cert)}
+    for line in txt.splitlines():
+        line=line.strip()
+        if line.startswith('subject='): out['subject']=line.split('=',1)[1].strip()
+        elif line.startswith('issuer='): out['issuer']=line.split('=',1)[1].strip()
+        elif line.startswith('notAfter='):
+            raw=line.split('=',1)[1].strip(); out['not_after']=raw
+            try:
+                dt=datetime.datetime.strptime(raw,'%b %d %H:%M:%S %Y %Z').replace(tzinfo=datetime.timezone.utc)
+                out['days_remaining']=int((dt-datetime.datetime.now(datetime.timezone.utc)).total_seconds()//86400)
+            except Exception: pass
+        elif 'DNS:' in line: out['sans']=[x.strip().removeprefix('DNS:') for x in line.split(',') if 'DNS:' in x]
+    return out
+
+def config_health():
+    result={}
+    for name,key in [('acme','ACME_ENABLED'),('mail','MAIL_ENABLED')]:
+        p=FILES[name]
+        enabled=False
+        try:
+            for line in p.read_text().splitlines():
+                if line.startswith(key+'='): enabled=line.split('=',1)[1].strip().lower()=='true'
+        except Exception: pass
+        result[name]={'enabled':enabled}
+    cp=configparser.ConfigParser()
+    try: cp.read(FILES['content']); result['content']={'provider':cp.get('content','provider',fallback='unknown'),'baseurl':cp.get('content','baseurl',fallback='')}
+    except Exception: result['content']={'provider':'unknown','baseurl':''}
+    return result
+
+
+
+
+def credential_requests():
+    try:
+        data=json.loads(CRED_REQUESTS.read_text())
+        rows=data.get('requests',[]) if isinstance(data,dict) else []
+    except Exception: rows=[]
+    names={x.get('name') for x in vault_status().get('credentials',[]) if isinstance(x,dict)}
+    out=[]
+    for r in rows:
+        if not isinstance(r,dict): continue
+        row=dict(r)
+        row['satisfied']=bool(row.get('name') and row.get('name') in names)
+        out.append(row)
+    return out
+
+def save_credential_requests(rows):
+    atomic_write(CRED_REQUESTS,json.dumps({'requests':rows},indent=2)+'\n',0o600)
+
+def create_credential_request(body):
+    if not isinstance(body,dict): raise ValueError('JSON object required')
+    project=str(body.get('project','')).strip()
+    name=str(body.get('name','')).strip()
+    ctype=str(body.get('type','secret')).strip() or 'secret'
+    purpose=str(body.get('purpose','')).strip()
+    instructions=str(body.get('instructions','')).strip()
+    scopes=[str(x).strip() for x in body.get('scopes',[]) if str(x).strip()]
+    hosts=[str(x).strip().lower().rstrip('.') for x in body.get('hosts',[]) if str(x).strip()]
+    if not project or not name: raise ValueError('project and credential name are required')
+    if len(project)>120 or len(name)>120 or len(ctype)>80 or len(purpose)>200 or len(instructions)>2000: raise ValueError('credential request field too long')
+    if not all(c.isalnum() or c in '._-:@/' for c in name): raise ValueError('invalid credential name')
+    rows=credential_requests()
+    rows=[r for r in rows if r.get('id')!=str(body.get('id','')).strip()]
+    rid=str(body.get('id','')).strip() or secrets.token_hex(8)
+    row={'id':rid,'project':project,'name':name,'type':ctype,'purpose':purpose,'scopes':scopes,'hosts':hosts,'instructions':instructions,'created':int(time.time())}
+    rows.append(row); save_credential_requests(rows)
+    return row
+
+def dismiss_credential_request(rid):
+    rid=str(rid or '').strip()
+    rows=[r for r in credential_requests() if r.get('id')!=rid]
+    save_credential_requests(rows)
+    return {'ok':True,'id':rid}
+
+def vault_audit(limit=50):
+    path=BASE/'log/vault-audit.jsonl'; rows=[]
+    try:
+        lines=path.read_text().splitlines()[-max(1,min(int(limit),200)):]
+        for line in lines:
+            try: rows.append(json.loads(line))
+            except Exception: pass
+    except Exception: pass
+    return rows
+
+def mcp_catalog():
+    policy=update_policy().get('effective',{})
+    url=str(policy.get('channel_url','')).strip()
+    if not url: return {'available':False,'url':'','mcps':[],'error':'catalog URL is not configured'}
+    p=subprocess.run(['/usr/bin/curl','-fsSL','--connect-timeout','10','--max-time','30',url],text=True,capture_output=True)
+    if p.returncode: return {'available':False,'url':url,'mcps':[],'error':(p.stderr or p.stdout).strip() or 'catalog download failed'}
+    try: data=json.loads(p.stdout)
+    except Exception as e: return {'available':False,'url':url,'mcps':[],'error':'invalid catalog JSON: '+str(e)}
+    rows=data.get('mcps',[]) if isinstance(data,dict) else []
+    valid=[]
+    for row in rows:
+        if not isinstance(row,dict): continue
+        gen=str(row.get('generation','')).strip(); archive=str(row.get('url','')).strip(); sha=str(row.get('sha256','')).strip().lower()
+        if not gen or not all(c.isalnum() or c in '._-' for c in gen): continue
+        if not archive.startswith(('https://','http://')) or len(sha)!=64 or any(c not in '0123456789abcdef' for c in sha): continue
+        valid.append({'name':str(row.get('name') or gen),'generation':gen,'version':str(row.get('version') or ''),'description':str(row.get('description') or ''),'url':archive,'sha256':sha})
+    return {'available':True,'url':url,'mcps':valid}
+
+def install_catalog_generation(generation):
+    cat=mcp_catalog()
+    if not cat.get('available'): raise ValueError(cat.get('error') or 'catalog unavailable')
+    row=next((x for x in cat.get('mcps',[]) if x.get('generation')==generation),None)
+    if not row: raise ValueError('generation not found in catalog')
+    mcp_dir=BASE/'mcp'; mcp_dir.mkdir(parents=True,exist_ok=True)
+    work=Path(tempfile.mkdtemp(prefix='mcp-catalog-',dir=str(mcp_dir)))
+    try:
+        archive=work/'generation.tar.gz'
+        p=subprocess.run(['/usr/bin/curl','-fsSL','--connect-timeout','10','--max-time','300','-o',str(archive),row['url']],text=True,capture_output=True)
+        if p.returncode: raise ValueError((p.stderr or p.stdout).strip() or 'MCP download failed')
+        got=hashlib.sha256(archive.read_bytes()).hexdigest()
+        if got!=row['sha256']: raise ValueError('MCP archive checksum mismatch')
+        src=work/'src'; src.mkdir()
+        with tarfile.open(archive,'r:*') as tf:
+            root_path=src.resolve()
+            members=tf.getmembers()
+            for m in members:
+                target=(src/m.name).resolve()
+                try: target.relative_to(root_path)
+                except ValueError: raise ValueError('unsafe archive path')
+                if m.ischr() or m.isblk() or m.isfifo():
+                    raise ValueError('archive contains a special file')
+                if m.issym():
+                    link=m.linkname
+                    if os.path.isabs(link):
+                        allowed={f'/{u}' for u in ('usr/bin/python3','usr/bin/python3.14')}
+                        if link not in allowed or '/.venv/bin/' not in ('/'+m.name):
+                            raise ValueError('unsafe absolute archive symlink')
+                    else:
+                        linked=(target.parent/link).resolve()
+                        try: linked.relative_to(root_path)
+                        except ValueError: raise ValueError('unsafe archive symlink')
+                elif m.islnk():
+                    linked=(src/m.linkname).resolve()
+                    try: linked.relative_to(root_path)
+                    except ValueError: raise ValueError('unsafe archive hardlink')
+            tf.extractall(src,filter='fully_trusted')
+        root=src
+        if not (root/'manifest.json').is_file():
+            dirs=[x for x in src.iterdir() if x.is_dir()]
+            if len(dirs)==1 and (dirs[0]/'manifest.json').is_file(): root=dirs[0]
+        p=subprocess.run(['/usr/bin/mcp-generation','install',str(root),generation],text=True,capture_output=True)
+        if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'generation install failed')
+        return {'ok':True,'generation':generation,'generations':generation_status()}
+    finally:
+        shutil.rmtree(work,ignore_errors=True)
+
+def generation_status():
+    rc,out=run_text(['/usr/bin/mcp-generation','status'])
+    if rc: return {'available':False,'error':out}
+    try:
+        d=json.loads(out); d['available']=True; return d
+    except Exception:return {'available':False,'error':'invalid generation status'}
+
+def apply_generation_selection():
+    sel=subprocess.run(['/usr/bin/mcp-selector'],text=True,capture_output=True)
+    if sel.returncode: return sel.returncode,(sel.stdout+sel.stderr).strip()
+    p=subprocess.run(['/usr/bin/systemctl','restart','mcp-runtime.service'],text=True,capture_output=True)
+    return p.returncode,(sel.stdout+sel.stderr+p.stdout+p.stderr).strip()
+
+def vault_status():
+    rc,out=run_text(['/usr/bin/mcp-vault-core','status'])
+    if rc: return {'available':False,'error':out}
+    try:
+        d=json.loads(out); d['available']=True; return d
+    except Exception:return {'available':False,'error':'invalid vault status'}
+
+def health():
+    st=status()
+    try: uptime=float(Path('/proc/uptime').read_text().split()[0])
+    except Exception: uptime=0
+    try: loads=list(os.getloadavg())
+    except Exception: loads=[0,0,0]
+    rc,failed=run_text(['/usr/bin/systemctl','--failed','--no-legend','--plain'])
+    failed_units=[] if not failed else [x.split()[0] for x in failed.splitlines() if x.strip() and '0 loaded units listed' not in x]
+    persist_mounted=os.path.ismount('/var/prstnt')
+    recent=[]
+    for fp in [BASE/'state/mcp-runtime.state', BASE/'state/mcp-selection.json']:
+        try:
+            txt=fp.read_text().strip()
+            if txt: recent.append({'source':fp.name,'message':txt[-2000:]})
+        except Exception: pass
+    h={
+      'timestamp':int(time.time()),
+      'system':{'hostname':os.uname().nodename,'kernel':os.uname().release,'uptime_seconds':int(uptime),'load':loads,'memory':meminfo(),'failed_units':failed_units},
+      'storage':{'persist_mounted':persist_mounted,'persist':diskinfo('/var/prstnt') if Path('/var/prstnt').exists() else {'error':'missing'}},
+      'mcp':{'service':st['mcp_service'],'runtime':st['mcp_runtime'],'selected':st['mcp_selected'],'active':st['mcp_active'],'previous':st['mcp_previous'],'quarantined':st['mcp_quarantined']},
+      'network':network_health(),
+      'certificate':certificate_health(),
+      'services':{'ssh':unit_state('sshd.service'),'qemu_guest_agent':unit_state('qemu-guest-agent.service'),'acme_timer':unit_state('mcp-acme-update.timer')},
+      'config':config_health(),
+      'vault':vault_status(),
+      'recent':recent,
+    }
+    problems=[]
+    if not persist_mounted: problems.append('persistent storage is not mounted')
+    if st['mcp_service']!='active': problems.append('MCP runtime service is not active')
+    if st['mcp_selected'] and st['mcp_selected'].get('kind')=='recovery': problems.append('immutable recovery MCP is active')
+    if st['mcp_quarantined']: problems.append('one or more MCP generations are quarantined')
+    if failed_units: problems.append('systemd has failed units')
+    if h['certificate'].get('days_remaining',999)<14: problems.append('management certificate expires soon')
+    if not h['network']['default_route']: problems.append('no default route')
+    if h.get('vault',{}).get('available') and not h['vault'].get('locked',True): problems.append('vault has an active unlock lease')
+    if h.get('vault',{}).get('grants'): problems.append('vault has pending one-shot grants')
+    pd=h['storage'].get('persist',{})
+    if pd.get('inodes_total') and pd.get('inodes_free',0)/pd['inodes_total']<0.05: problems.append('persistent filesystem is low on inodes')
+    if pd.get('free_percent',100)<10: problems.append('persistent filesystem is low on free space')
+    provisioning=[]
+    provisioning.append({'item':'registration','ready':REG_PATH.exists(),'detail':'complete' if REG_PATH.exists() else 'bootstrap registration required'})
+    provisioning.append({'item':'persistent_storage','ready':persist_mounted,'detail':'mounted' if persist_mounted else 'not mounted'})
+    provisioning.append({'item':'network','ready':bool(h['network']['default_route']),'detail':'default route present' if h['network']['default_route'] else 'no default route'})
+    provisioning.append({'item':'ssh_identity','ready':(BASE/'identity/ssh_host_ed25519_key').exists(),'detail':'persistent Ed25519 host identity'})
+    provisioning.append({'item':'management_tls','ready':bool(h['certificate'].get('valid')),'detail':'management certificate valid' if h['certificate'].get('valid') else 'certificate missing or invalid'})
+    provisioning.append({'item':'vault','ready':bool(h.get('vault',{}).get('available')),'detail':h.get('vault',{}).get('key_mode_effective','unavailable')})
+    provisioning.append({'item':'mcp_generation','ready':bool(st['mcp_active']),'detail':st['mcp_active'] or 'using immutable recovery'})
+    h['provisioning']={'complete':all(x['ready'] for x in provisioning),'items':provisioning}
+    h['summary']={'state':'healthy' if not problems else 'attention','problems':problems}
+    return h
+
+def atomic_write(path,data,mode=0o600):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    fd,tmp=tempfile.mkstemp(prefix='.'+path.name+'.',dir=str(path.parent))
+    try:
+        os.write(fd,data.encode()); os.fchmod(fd,mode); os.close(fd); os.replace(tmp,path)
+    except Exception:
+        try: os.close(fd)
+        except OSError: pass
+        try: os.unlink(tmp)
+        except OSError: pass
+        raise
+
+def validate(name,data):
+    if '\x00' in data: raise ValueError('NUL byte not allowed')
+    if name=='hosts': json.loads(data or '{}')
+    if name=='authorized_keys':
+        for line in data.splitlines():
+            line=line.strip()
+            if line and not line.startswith(('ssh-','ecdsa-','sk-')): raise ValueError('invalid public key line')
+    if name in ('node','content') and '[' not in data: raise ValueError('INI configuration expected')
+    if name=='acme' and 'ACME_ENABLED=' not in data: raise ValueError('ACME configuration expected')
+    if name=='mail' and 'MAIL_ENABLED=' not in data: raise ValueError('mail configuration expected')
+    if name=='issue' and len(data)>4096: raise ValueError('issue text too long')
+
+
+def friendly_name(kind='', purpose='', target=''):
+    parts=[]
+    for raw in (kind,purpose,target):
+        val=''.join(c.lower() if c.isalnum() else '-' for c in str(raw)).strip('-')
+        while '--' in val: val=val.replace('--','-')
+        if val: parts.append(val)
+    base='-'.join(parts) or 'credential'
+    names={x.get('name') for x in vault_status().get('credentials',[]) if isinstance(x,dict)}
+    if base not in names: return base
+    n=2
+    while f'{base}-{n}' in names: n+=1
+    return f'{base}-{n}'
+
+def update_vault_metadata(name, ctype=None, allowed_hosts=None, purpose=None, project=None, metadata=None):
+    mp=BASE/'vault/metadata'/(name+'.json')
+    try: meta=json.loads(mp.read_text())
+    except Exception: meta={}
+    meta['name']=name
+    if ctype: meta['type']=str(ctype)
+    if allowed_hosts is not None: meta['allowed_hosts']=[str(x).strip().lower().rstrip('.') for x in allowed_hosts if str(x).strip()]
+    if purpose: meta['purpose']=str(purpose)
+    if project: meta['project']=str(project)
+    if isinstance(metadata,dict):
+        for k,v in metadata.items():
+            if k in ('domain','username') and str(v).strip(): meta[k]=str(v).strip()
+    meta['updated']=int(time.time())
+    atomic_write(mp,json.dumps(meta,indent=2)+'\n',0o600)
+
+def vault_put_secret(name, secret, scopes):
+    p=subprocess.run(['/usr/bin/mcp-vault-core','put',name,*scopes],input=secret,text=True,capture_output=True)
+    return p
+
+def _ssh_askpass_env(work, passphrase):
+    secret=work/'passphrase'; secret.write_text(passphrase); os.chmod(secret,0o400)
+    helper=work/'askpass'; helper.write_text('#!/bin/sh\ncat "$MCP_SSH_PASSPHRASE_FILE"\n'); os.chmod(helper,0o500)
+    env=os.environ.copy(); env.update({'SSH_ASKPASS':str(helper),'SSH_ASKPASS_REQUIRE':'force','DISPLAY':':0','MCP_SSH_PASSPHRASE_FILE':str(secret)})
+    return env
+
+def _write_ssh_meta(name, scopes, public, passphrase_name=None, allowed_hosts=None):
+    mp=BASE/'vault/metadata'/(name+'.json'); mp.parent.mkdir(parents=True,exist_ok=True)
+    try: current=json.loads(mp.read_text())
+    except Exception: current={}
+    current.update({'name':name,'scopes':scopes,'updated':int(time.time()),'type':'ssh-key','public_key':public})
+    if allowed_hosts is not None: current['allowed_hosts']=allowed_hosts
+    if passphrase_name: current['passphrase_credential']=passphrase_name
+    else: current.pop('passphrase_credential',None)
+    atomic_write(mp,json.dumps(current,indent=2)+'\n',0o600)
+
+def _store_ssh_bundle(name, scopes, private_text, public, passphrase='', allowed_hosts=None):
+    vp=vault_put_secret(name,private_text,scopes); private_text=''
+    if vp.returncode: raise ValueError((vp.stdout+vp.stderr).strip() or 'vault store failed')
+    passname=None
+    if passphrase:
+        passname=name+'.__passphrase'; pp=vault_put_secret(passname,passphrase,scopes); passphrase=''
+        if pp.returncode: raise ValueError((pp.stdout+pp.stderr).strip() or 'passphrase vault store failed')
+    _write_ssh_meta(name,scopes,public,passname,allowed_hosts)
+
+def generate_ssh_key(name, scopes, comment='', protect=True, allowed_hosts=None):
+    work=Path(tempfile.mkdtemp(prefix='ssh-key-',dir='/run/mcp-appliance')); private=work/'id_ed25519'
+    passphrase=secrets.token_urlsafe(32) if protect else ''
+    try:
+        env=_ssh_askpass_env(work,passphrase) if protect else os.environ.copy()
+        argv=['/usr/bin/ssh-keygen','-q','-t','ed25519','-f',str(private),'-C',comment or name]
+        if not protect: argv[1:1]=[]; argv += ['-N','']
+        p=subprocess.run(argv,text=True,capture_output=True,env=env,stdin=subprocess.DEVNULL)
+        if p.returncode: raise ValueError((p.stdout+p.stderr).strip() or 'ssh-keygen failed')
+        private_text=private.read_text(); public=(private.with_suffix('.pub')).read_text().strip()
+        _store_ssh_bundle(name,scopes,private_text,public,passphrase,allowed_hosts)
+        return public,bool(passphrase)
+    finally:
+        passphrase=''; shutil.rmtree(work,ignore_errors=True)
+
+def import_ssh_key(name, scopes, private_text, passphrase='', allowed_hosts=None):
+    work=Path(tempfile.mkdtemp(prefix='ssh-import-',dir='/run/mcp-appliance')); private=work/'id_import'
+    try:
+        private.write_text(private_text); os.chmod(private,0o400); private_text=''
+        env=_ssh_askpass_env(work,passphrase) if passphrase else os.environ.copy()
+        p=subprocess.run(['/usr/bin/ssh-keygen','-y','-f',str(private)],text=True,capture_output=True,env=env,stdin=subprocess.DEVNULL)
+        if p.returncode: raise ValueError('private key/passphrase validation failed')
+        public=p.stdout.strip()
+        if not public.startswith(('ssh-','ecdsa-','sk-')): raise ValueError('unsupported SSH public key')
+        stored=private.read_text(); _store_ssh_bundle(name,scopes,stored,public,passphrase,allowed_hosts)
+        return public,bool(passphrase)
+    finally:
+        passphrase=''; shutil.rmtree(work,ignore_errors=True)
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self,*_): pass
+    def mcp_auth(self):
+        tok=current_mcp_token()
+        return bool(tok) and hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+tok)
+    def proxy_mcp(self):
+        if not self.mcp_auth():
+            self.send_response(401)
+            self.send_header('WWW-Authenticate','Bearer')
+            self.send_header('Content-Length','0')
+            self.end_headers()
+            return
+        upstream=None
+        try:
+            n=int(self.headers.get('Content-Length','0') or '0')
+            if n<0 or n>16*1024*1024: raise ValueError('request too large')
+            body=self.rfile.read(n) if n else None
+            headers={}
+            for name in ('Content-Type','Accept','Mcp-Session-Id','MCP-Protocol-Version','Last-Event-ID','User-Agent'):
+                value=self.headers.get(name)
+                if value: headers[name]=value
+            upstream=http.client.HTTPConnection('127.0.0.1',8000,timeout=300)
+            upstream.request(self.command,'/mcp',body=body,headers=headers)
+            resp=upstream.getresponse()
+            self.send_response(resp.status,resp.reason)
+            has_length=False
+            for name,value in resp.getheaders():
+                lname=name.lower()
+                if lname in ('connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'): continue
+                if lname=='content-length': has_length=True
+                self.send_header(name,value)
+            if not has_length:self.send_header('Connection','close')
+            self.end_headers()
+            while True:
+                chunk=resp.read(65536)
+                if not chunk: break
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except Exception as e:
+            try:self.js(502,{'error':'MCP backend unavailable','detail':str(e)})
+            except Exception:pass
+        finally:
+            try:
+                if upstream: upstream.close()
+            except Exception:pass
+    def bearer_auth(self):
+        tok=current_token()
+        return bool(tok) and self.headers.get('Authorization','')=='Bearer '+tok
+    def auth(self,write=False):
+        self.auth_kind=None; self.session=None; self.user=None
+        if self.bearer_auth(): self.auth_kind='token'; return True
+        d=session_from_cookie(self.headers.get('Cookie',''))
+        if not d: return False
+        if write and not hmac.compare_digest(str(self.headers.get('X-CSRF-Token','')),str(d.get('csrf',''))): return False
+        self.auth_kind='session'; self.session=d; self.user=find_user(d.get('username')); return self.user is not None
+    def js(self,code,obj,headers=None):
+        b=json.dumps(obj).encode(); self.send_response(code); self.send_header('Content-Type','application/json'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(b)))
+        for k,v in (headers or {}).items(): self.send_header(k,v)
+        self.end_headers(); self.wfile.write(b)
+    def body(self):
+        n=int(self.headers.get('Content-Length','0'))
+        if n<0 or n>MAX_BODY: raise ValueError('request too large')
+        return self.rfile.read(n).decode()
+    def do_GET(self):
+        path=urlparse(self.path).path
+        if path=='/mcp': self.proxy_mcp(); return
+        if not path.startswith('/api/'):
+            web=WEB_DEV if (WEB_DEV/'index.html').is_file() else WEB_DEFAULT
+            rel='index.html' if path=='/' else path.lstrip('/')
+            target=(web/rel).resolve()
+            try: target.relative_to(web.resolve())
+            except ValueError: self.send_error(404); return
+            if not target.is_file():
+                target=web/'index.html'
+            try: b=target.read_bytes()
+            except OSError: self.send_error(404); return
+            ctype=mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
+            self.send_response(200); self.send_header('Content-Type',ctype+('; charset=utf-8' if ctype.startswith('text/') else ''))
+            self.send_header('Cache-Control','no-store' if target.name=='index.html' else 'public, max-age=31536000, immutable')
+            self.send_header('Content-Length',str(len(b))); self.end_headers(); self.wfile.write(b); return
+        if path=='/api/registration': self.js(200,registration_status()); return
+        if path=='/api/issue':
+            ip=FILES['issue']
+            self.js(200,{'text':ip.read_text() if ip.exists() else ''}); return
+        if path=='/api/storage':
+            if REG_PATH.exists():
+                if not self.auth(): self.js(401,{'error':'unauthorized'}); return
+            elif not self.bearer_auth():
+                self.js(401,{'error':'bootstrap authentication required'}); return
+            self.js(200,storage_inventory()); return
+        if not self.auth(): self.js(401,{'error':'unauthorized'}); return
+        if path=='/api/session':
+            self.js(200,{'authenticated':True,'kind':self.auth_kind,'user':({'username':self.user.get('username'),'display_name':self.user.get('display_name'),'email':self.user.get('email'),'role':self.user.get('role')} if self.user else None),'csrf':self.session.get('csrf') if self.session else None}); return
+        if path=='/api/status': self.js(200,status()); return
+        if path=='/api/vault/status': self.js(200,vault_status()); return
+        if path=='/api/vault/audit': self.js(200,{'events':vault_audit()}); return
+        if path=='/api/vault/credential-requests': self.js(200,{'requests':credential_requests()}); return
+        if path=='/api/mcp/generations': self.js(200,generation_status()); return
+        if path=='/api/mcp/catalog': self.js(200,mcp_catalog()); return
+        if path=='/api/health': self.js(200,health()); return
+        if path=='/api/network/config': self.js(200,network_config()); return
+        if path=='/api/mcp/bootstrap-policy': self.js(200,update_policy()); return
+        if path=='/api/connections': self.js(200,connection_info()); return
+        if path=='/api/config/hosts':
+            try: self.js(200,INVENTORY.read())
+            except (OSError,ValueError): self.js(503,{'error':'Inventory could not be read. Existing data was not changed.'})
+            return
+        if path.startswith('/api/config/'):
+            name=path.rsplit('/',1)[-1]
+            if name not in FILES or name in ('acme','mail'): self.js(404,{'error':'not found'}); return
+            p=FILES[name]; self.js(200,{'name':name,'value':p.read_text() if p.exists() else ''}); return
+        self.js(404,{'error':'not found'})
+    def do_DELETE(self):
+        path=urlparse(self.path).path
+        if path=='/mcp': self.proxy_mcp(); return
+        self.send_error(404)
+    def do_PUT(self):
+        if not self.auth(write=True): self.js(401,{'error':'unauthorized'}); return
+        path=urlparse(self.path).path
+        if not path.startswith('/api/config/'): self.js(404,{'error':'not found'}); return
+        name=path.rsplit('/',1)[-1]
+        if name not in FILES: self.js(404,{'error':'not found'}); return
+        if name=='hosts':
+            try:
+                result=INVENTORY.save(self.body(),self.headers.get('If-Match'))
+                if result['changed']: result['runtime_notice']=apply_runtime()
+                self.js(200,result)
+            except ValueError as exc: self.js(400,{'error':str(exc)})
+            except OSError: self.js(503,{'error':'Inventory could not be saved. Refresh before retrying.'})
+            return
+        try:
+            data=self.body(); validate(name,data); mode=0o600 if name in ('authorized_keys','acme','mail') else 0o644; atomic_write(FILES[name],data,mode)
+            if name=='node': subprocess.run(['/usr/bin/systemctl','restart','mcp-runtime.service'])
+            if name=='issue': subprocess.run(['/usr/bin/mcp-appliance-info','--refresh','--reset-getty'])
+            self.js(200,{'ok':True,'name':name})
+        except Exception as e: self.js(400,{'ok':False,'error':str(e)})
+    def do_POST(self):
+        path=urlparse(self.path).path
+        if path=='/mcp': self.proxy_mcp(); return
+        if path=='/api/login':
+            try:
+                body=json.loads(self.body() or '{}'); ident=str(body.get('username','')).strip(); password=str(body.get('password',''))
+                user=find_user(ident)
+                if not user or not verify_password(user,password):
+                    password=''; time.sleep(.25); self.js(401,{'error':'invalid username or password'}); return
+                password=''; sid,csrf,exp=session_create(user['username'])
+                cookie=f'mcp_session={sid}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200'
+                self.js(200,{'ok':True,'csrf':csrf,'user':{'username':user['username'],'display_name':user.get('display_name'),'email':user.get('email'),'role':user.get('role')}},{'Set-Cookie':cookie}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/password-reset/request':
+            try:
+                body=json.loads(self.body() or '{}'); issue_password_reset(body.get('identifier',''))
+                self.js(200,{'ok':True,'message':'If that account exists and email is configured, a reset link has been sent.'}); return
+            except Exception:self.js(200,{'ok':True,'message':'If that account exists and email is configured, a reset link has been sent.'});return
+        if path=='/api/password-reset/complete':
+            try:
+                body=json.loads(self.body() or '{}'); username=complete_password_reset(body.get('token',''),str(body.get('password','')))
+                user=find_user(username); sid,csrf,exp=session_create(username); cookie=f'mcp_session={sid}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200'
+                self.js(200,{'ok':True,'csrf':csrf,'user':{'username':username,'display_name':user.get('display_name'),'email':user.get('email'),'role':user.get('role')}},{'Set-Cookie':cookie}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/storage/provision':
+            if REG_PATH.exists():
+                if not self.auth(write=True): self.js(401,{'error':'unauthorized'}); return
+            elif not self.bearer_auth():
+                self.js(401,{'error':'bootstrap authentication required'}); return
+            try:
+                body=json.loads(self.body() or '{}')
+                if str(body.get('confirm',''))!='PROVISION':
+                    raise ValueError('explicit provisioning confirmation required')
+                self.js(200,provision_storage(body.get('device'))); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/register':
+            if REG_PATH.exists() or not self.bearer_auth(): self.js(401,{'error':'bootstrap authentication required'}); return
+            try:
+                body=json.loads(self.body() or '{}'); email=str(body.get('email','')).strip().lower(); configure_registration_mail(body,email); d=complete_registration(body); sid,csrf,exp=session_create(d['username'])
+                cookie=f'mcp_session={sid}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200'
+                self.js(200,{'ok':True,'registered':True,'csrf':csrf,'user':{'username':d['username'],'display_name':d.get('display_name'),'email':d.get('email'),'role':'admin'},'confirmation_sent':d.get('confirmation_sent',False)},{'Set-Cookie':cookie}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/logout':
+            if not self.auth(write=True): self.js(401,{'error':'unauthorized'}); return
+            session_delete(self.headers.get('Cookie','')); self.js(200,{'ok':True},{'Set-Cookie':'mcp_session=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0'}); return
+        if not self.auth(write=True): self.js(401,{'error':'unauthorized'}); return
+        if path=='/api/connections/token/rotate':
+            try:
+                rotate_mcp_token(); self.js(200,connection_info()); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/network/checkpoint':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,create_network_checkpoint(body.get('uuid'),body.get('seconds',90))); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/network/confirm':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,confirm_network_checkpoint(body.get('token'))); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/network/config':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,save_network_config(body)); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/network/activate':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,activate_network_connection(body.get('uuid'))); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp/bootstrap-policy':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,save_update_policy(body)); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp/bootstrap-now':
+            try:
+                p=subprocess.run(['/bin/sh','/usr/bin/mcp-bootstrap'],text=True,capture_output=True)
+                if p.returncode:self.js(400,{'ok':False,'message':(p.stdout+p.stderr).strip()});return
+                rc,msg=apply_generation_selection()
+                self.js(200 if rc==0 else 400,{'ok':rc==0,'message':(p.stdout+p.stderr+msg).strip(),'generations':generation_status()});return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp/catalog/install':
+            try:
+                body=json.loads(self.body() or '{}'); gen=str(body.get('generation','')).strip()
+                if not gen: raise ValueError('generation is required')
+                self.js(200,install_catalog_generation(gen)); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp-generation/seed-recovery':
+            try:
+                body=json.loads(self.body() or '{}'); gen=str(body.get('generation','recovery-seed')).strip()
+                p=subprocess.run(['/usr/bin/mcp-generation','seed-recovery',gen],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip(),'generations':generation_status()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp-generation/install':
+            try:
+                body=json.loads(self.body() or '{}'); incoming=str(body.get('incoming','')).strip(); gen=str(body.get('generation','')).strip()
+                if not incoming or not gen: raise ValueError('incoming directory and generation are required')
+                if not all(c.isalnum() or c in '._-' for c in incoming+gen): raise ValueError('invalid incoming directory or generation name')
+                src=BASE/'mcp/incoming'/incoming
+                p=subprocess.run(['/usr/bin/mcp-generation','install',str(src),gen],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip(),'generations':generation_status()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp-generation/activate':
+            try:
+                body=json.loads(self.body() or '{}'); gen=str(body.get('generation','')).strip()
+                if not gen or not all(c.isalnum() or c in '._-' for c in gen): raise ValueError('valid generation is required')
+                p=subprocess.run(['/usr/bin/mcp-generation','activate',gen],text=True,capture_output=True)
+                if p.returncode:self.js(400,{'ok':False,'message':(p.stdout+p.stderr).strip()});return
+                rc,msg=apply_generation_selection(); self.js(200 if rc==0 else 400,{'ok':rc==0,'message':msg,'generations':generation_status()});return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/mcp-generation/rollback':
+            p=subprocess.run(['/usr/bin/mcp-generation','rollback'],text=True,capture_output=True)
+            if p.returncode:self.js(400,{'ok':False,'message':(p.stdout+p.stderr).strip()});return
+            rc,msg=apply_generation_selection(); self.js(200 if rc==0 else 400,{'ok':rc==0,'message':msg,'generations':generation_status()});return
+        if path.startswith('/api/mcp/'):
+            a=path.rsplit('/',1)[-1]
+            if a not in ('start','stop','restart'): self.js(400,{'error':'bad action'}); return
+            p=subprocess.run(['/usr/bin/systemctl',a,'mcp-runtime.service'],text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip()}); return
+        if path=='/api/acme/renew':
+            p=subprocess.run(['/usr/bin/mcp-acme-update'],text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip()}); return
+        if path=='/api/acme/force-renew':
+            p=subprocess.run(['/usr/bin/mcp-acme-update','--force'],text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip()}); return
+        if path=='/api/vault/credential-request':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,{'ok':True,'request':create_credential_request(body),'requests':credential_requests()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/credential-request/dismiss':
+            try:
+                body=json.loads(self.body() or '{}'); self.js(200,dismiss_credential_request(body.get('id'))); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/suggest-name':
+            try:
+                body=json.loads(self.body() or '{}')
+                self.js(200,{'name':friendly_name(body.get('type',''),body.get('purpose',''),body.get('target',''))}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/generate-ssh-key':
+            try:
+                body=json.loads(self.body() or '{}'); scopes=[str(x) for x in body.get('scopes',[]) if str(x)]
+                name=str(body.get('name','')).strip() or friendly_name('ssh',body.get('purpose','admin'),body.get('target',''))
+                target=str(body.get('target','')).strip().lower().rstrip('.'); hosts=[target] if target else []
+                username=login_name(body.get('username',''))
+                public,protected=generate_ssh_key(name,scopes,str(body.get('comment','')).strip(),bool(body.get('protect',True)),hosts)
+                update_vault_metadata(name,metadata={'username':username})
+                self.js(200,{'ok':True,'name':name,'type':'ssh-key','public_key':public,'passphrase_protected':protected,'vault':vault_status()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/import-ssh-key':
+            try:
+                body=json.loads(self.body() or '{}'); scopes=[str(x) for x in body.get('scopes',[]) if str(x)]
+                name=str(body.get('name','')).strip() or friendly_name('ssh',body.get('purpose','admin'),body.get('target',''))
+                private=str(body.get('private_key','')); passphrase=str(body.get('passphrase',''))
+                if not private: raise ValueError('private key is required')
+                target=str(body.get('target','')).strip().lower().rstrip('.'); hosts=[target] if target else []
+                username=login_name(body.get('username',''))
+                public,protected=import_ssh_key(name,scopes,private,passphrase,hosts); private=''; passphrase=''
+                update_vault_metadata(name,metadata={'username':username})
+                self.js(200,{'ok':True,'name':name,'type':'ssh-key','public_key':public,'passphrase_protected':protected,'vault':vault_status()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/put':
+            try:
+                body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip(); secret=str(body.get('secret','')); scopes=[str(x) for x in body.get('scopes',[]) if str(x)]
+                if not name or not secret: raise ValueError('name and secret are required')
+                ctype=body.get('type') or 'secret'
+                if ctype in ('active-directory','password'):
+                    identity=password_identity(secret,ctype)
+                    body['metadata']={'username':identity['username'],'domain':identity['domain']}
+                    identity['password']=''
+                p=subprocess.run(['/usr/bin/mcp-vault-core','put',name,*scopes],input=secret,text=True,capture_output=True)
+                secret=''
+                if p.returncode==0:
+                    update_vault_metadata(name,body.get('type') or 'secret',body.get('hosts',[]),body.get('purpose'),body.get('project'),body.get('metadata'))
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/login':
+            if self.auth_kind!='session' or not self.user or self.user.get('role')!='admin':
+                self.js(403,{'error':'Administrator sign-in required.'});return
+            try:
+                body=json.loads(self.body() or '{}');name=str(body.get('name','')).strip();username=login_name(body.get('username'))
+                p=subprocess.run(['/usr/bin/mcp-vault-core','login',name,username],text=True,capture_output=True,timeout=15)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()});return
+            except Exception as e:self.js(400,{'error':str(e)});return
+        if path=='/api/vault/delete':
+            try:
+                body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip()
+                p=subprocess.run(['/usr/bin/mcp-vault-core','delete',name],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/hosts':
+            try:
+                body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip(); hosts=[str(x) for x in body.get('hosts',[]) if str(x)]
+                p=subprocess.run(['/usr/bin/mcp-vault-core','hosts',name,*hosts],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/scopes':
+            try:
+                body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip(); scopes=[str(x) for x in body.get('scopes',[]) if str(x)]
+                p=subprocess.run(['/usr/bin/mcp-vault-core','scopes',name,*scopes],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/rename':
+            try:
+                body=json.loads(self.body() or '{}'); old=str(body.get('old','')).strip(); new=str(body.get('new','')).strip()
+                p=subprocess.run(['/usr/bin/mcp-vault-core','rename',old,new],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
+        if path=='/api/vault/grant':
+            try:
+                body=json.loads(self.body() or '{}'); scope=str(body.get('scope','')).strip(); credential=str(body.get('credential','')).strip(); seconds=str(int(body.get('seconds',300)))
+                if not scope or not credential: raise ValueError('scope and credential are required')
+                p=subprocess.run(['/usr/bin/mcp-vault-core','grant',scope,credential,seconds],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/revoke-grant':
+            try:
+                body=json.loads(self.body() or '{}'); gid=str(body.get('id','')).strip()
+                if not gid: raise ValueError('grant id is required')
+                p=subprocess.run(['/usr/bin/mcp-vault-core','revoke-grant',gid],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/unlock':
+            try:
+                body=json.loads(self.body() or '{}'); secs=str(int(body.get('seconds',600))); scopes=[str(x) for x in body.get('scopes',[]) if str(x)]
+                p=subprocess.run(['/usr/bin/mcp-vault-core','unlock',secs,*scopes],text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e: self.js(400,{'ok':False,'error':str(e)}); return
+        if path=='/api/vault/lock':
+            p=subprocess.run(['/usr/bin/mcp-vault-core','lock'],text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status()}); return
+        if path=='/api/mail/test':
+            p=subprocess.run(['/usr/bin/mcp-mail','MCP appliance test message'],input='Outbound mail from the ThinStation MCP appliance is working.\n',text=True,capture_output=True); self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'message':(p.stdout+p.stderr).strip()}); return
+        self.js(404,{'error':'not found'})
+def main():
+    srv=ThreadingHTTPServer(('0.0.0.0',8443),H)
+    ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(str(BASE/'identity/web.crt'),str(BASE/'identity/web.key'))
+    srv.socket=ctx.wrap_socket(srv.socket,server_side=True)
+    srv.serve_forever()
+
+if __name__=='__main__':
+    main()
