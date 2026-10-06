@@ -1,0 +1,5 @@
+build/installed
+build/kernel-version
+build/driver-source
+usr/lib/modules/
+usr/lib64/modules/
