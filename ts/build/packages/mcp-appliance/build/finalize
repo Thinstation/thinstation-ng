@@ -1,0 +1,37 @@
+#mcp-appliance 90
+set -eu
+mkdir -p /etc/mcp-appliance \
+  /root/.ssh \
+  /var/prstnt/mcp-appliance/config \
+  /var/prstnt/mcp-appliance/identity \
+  /var/prstnt/mcp-appliance/trust \
+  /var/prstnt/mcp-appliance/secrets \
+  /var/prstnt/mcp-appliance/env \
+  /var/prstnt/mcp-appliance/work \
+  /var/prstnt/mcp-appliance/cache \
+  /var/prstnt/mcp-appliance/chroots \
+  /var/prstnt/mcp-appliance/chroot-images \
+  /var/prstnt/mcp-appliance/chroot-cache \
+  /var/prstnt/mcp-appliance/log \
+  /var/prstnt/mcp-appliance/state
+chmod 0700 /root/.ssh
+chmod 0755 /etc/init.d/mcp-appliance-config /usr/bin/mcp-bootstrap /usr/bin/mcp-credential-request
+chmod 0755 /usr/bin/mcp-generation /usr/bin/mcp-recovery /usr/bin/mcp-appliance-info /usr/bin/mcp-appliance-init /usr/bin/mcp-appliance-register /usr/bin/mcp-appliance-web /usr/bin/mcp-gateway-selftest /usr/bin/mcp-console-reset
+systemctl set-default multi-user.target
+systemctl enable mcp-bootstrap.service
+# The unit is skipped unless a user has explicitly connected this appliance.
+systemctl enable mcp-openai-tunnel.service
+systemctl disable display-manager.service 2>/dev/null || true
+rm -f /etc/systemd/system/display-manager.service
+systemctl enable getty@tty1.service
+rm -f /etc/persistent-files.d/sshd
+thin_list=/etc/mcp-appliance/busybox-thin.list
+if [ -r "$thin_list" ] && [ -x /usr/bin/busybox.shared ]; then
+  while IFS= read -r applet; do
+    case "$applet" in ''|'#'*) continue ;; esac
+    if /usr/bin/busybox.shared --list | grep -qx "$applet"; then
+      rm -f "/usr/bin/$applet"
+    fi
+  done < "$thin_list"
+  /usr/bin/busybox.shared --install -s
+fi
