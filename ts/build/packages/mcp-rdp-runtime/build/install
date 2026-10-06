@@ -1,7 +1,7 @@
 #!/bin/sh
 
 export PACKAGE=mcp-rdp-runtime
-export PORTS="freerdp freerdp-libs xorg-x11-server-Xvfb xdotool"
+export PORTS="freerdp freerdp-libs libwinpr xorg-x11-server-Xvfb xdotool"
 export DROP_FILES=""
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""
