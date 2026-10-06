@@ -1,7 +1,10 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-const root = new URL('../../usr/share/mcp-appliance/web/', import.meta.url).pathname;
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, '../../usr/share/mcp-appliance/web');
+const publicDir = join(here, 'public');
 function walk(dir){
   for(const name of readdirSync(dir)){
     const p=join(dir,name), st=statSync(p);
@@ -10,7 +13,7 @@ function walk(dir){
   }
 }
 walk(root);
-copyFileSync(new URL('public/thinstation.svg', import.meta.url), join(root, 'thinstation.svg'));
+copyFileSync(join(publicDir, 'thinstation.svg'), join(root, 'thinstation.svg'));
 if(process.env.BUILD_MCP_UI==='1'){
   const extra=join(root,'_operator');mkdirSync(extra,{recursive:true});
   for(const name of ['mcp_operator.py','mcp-operator-web','mcp-appliance-web','mcp_inventory.py', 'mcp_login.py','mcp_openai.py','mcp_acme.py', 'mcp_acme_authorization.py', 'mcp_ad_dns.py', 'mcp_http01.py', 'mcp_tlsalpn.py', 'mcp_certificate_form.py', 'mcp_certificate_names.py', 'mcp_storage.py', 'mcp_storage_worker.py'])copyFileSync(new URL('../../usr/bin/'+name,import.meta.url),join(extra,name));
