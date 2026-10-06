@@ -13,11 +13,9 @@ validate_sysusers_ids()
 			case "$type" in
 				""|\#*) continue ;;
 				g)
-					if [[ ! "$id" =~ ^[0-9]+$ ]]; then
-						echo "ERROR: $file: sysusers group '$name' must use a fixed numeric GID, got '$id'." >&2
-						failed=1
-						continue
-					fi
+					# Dynamic group-only declarations are permitted. A user that names an
+					# explicit primary GID is checked below against fixed group declarations.
+					[[ "$id" =~ ^[0-9]+$ ]] || continue
 					if [[ -n "${group_gid[$name]+x}" && "${group_gid[$name]}" != "$id" ]]; then
 						echo "ERROR: sysusers group '$name' has conflicting GIDs ${group_gid[$name]} and $id." >&2
 						failed=1
