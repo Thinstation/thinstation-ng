@@ -1,0 +1,18 @@
+#!/bin/sh
+
+export PACKAGE="nfs-client"
+export PORTS="nfs-utils
+nfs-common-utils
+nfs-client-utils
+nfsv4-client-utils
+libnfsidmap
+keyutils
+rpcbind
+gssproxy"
+export DROP_FILES=""
+export DROP_DIRS=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+
+returnval=$?
+exit $returnval

@@ -1,2 +1,3 @@
 #dnf 40
-sed -i -e 's/$releasever/42/g' /etc/yum.repos.d/*
+releasever="${DNF_VAR_releasever:-${DIST_VER:-44}}"
+sed -i -e "s/\$releasever/${releasever}/g" /etc/yum.repos.d/*

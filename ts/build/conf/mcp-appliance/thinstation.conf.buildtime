@@ -1,0 +1,24 @@
+SESSION_0_TYPE=sh
+SESSION_0_AUTOSTART=off
+NET_USE=BOTH
+NET_USE_DHCP=on
+NET_HOSTNAME=mcp-*
+NET_FILE_ENABLED=Off
+NET_TELNETD_ENABLED=Off
+NET_REMOTE_ACCESS_FROM="0.0.0.0"
+MOUNT_0="LABEL=prstnt /var/prstnt auto X-mount.mkdir,nofail,x-systemd.device-timeout=5s 0 0"
+MOUNT_1="filedrop-nfs.thinstation.org:/mnt/pve/cephfs/filedrop-nfs /mnt/filedrop nfs4 X-mount.mkdir,_netdev,nofail,x-systemd.automount,vers=4.2,proto=tcp 0 0"
+TIME_ZONE=UTC
+
+# MCP persistent-generation bootstrap policy.
+# auto: install from MCP_CHANNEL_URL when set, otherwise seed recovery persistently.
+# channel: require the configured distribution channel.
+# recovery: seed a replaceable persistent generation from immutable recovery.
+# off: remain in immutable recovery until configured manually.
+MCP_BOOTSTRAP_MODE=auto
+MCP_BOOTSTRAP_GENERATION=bootstrap
+MCP_CHANNEL_URL=
+
+# Fedora/DNF release used by appliance package tooling.
+DIST_VER=44
+DNF_VAR_releasever=44
