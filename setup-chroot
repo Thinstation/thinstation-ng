@@ -5,39 +5,66 @@ umask 022
 validate_sysusers_ids()
 {
 	local failed=0
-	local file type name id rest uid
-	declare -A name_uid uid_name
+	local file type name id rest uid gid
+	declare -A name_uid uid_name group_gid gid_group
 
 	while IFS= read -r file; do
 		while read -r type name id rest; do
 			case "$type" in
 				""|\#*) continue ;;
-				u|u!) ;;
-				*) continue ;;
+				g)
+					if [[ ! "$id" =~ ^[0-9]+$ ]]; then
+						echo "ERROR: $file: sysusers group '$name' must use a fixed numeric GID, got '$id'." >&2
+						failed=1
+						continue
+					fi
+					if [[ -n "${group_gid[$name]+x}" && "${group_gid[$name]}" != "$id" ]]; then
+						echo "ERROR: sysusers group '$name' has conflicting GIDs ${group_gid[$name]} and $id." >&2
+						failed=1
+					fi
+					if [[ -n "${gid_group[$id]+x}" && "${gid_group[$id]}" != "$name" ]]; then
+						echo "ERROR: sysusers GID $id is assigned to both '${gid_group[$id]}' and '$name'." >&2
+						failed=1
+					fi
+					group_gid[$name]=$id
+					gid_group[$id]=$name
+					;;
+				u|u!)
+					if [[ ! "$id" =~ ^[0-9]+(:[0-9]+)?$ ]]; then
+						echo "ERROR: $file: sysusers user '$name' must use a fixed numeric UID (or UID:GID), got '$id'." >&2
+						failed=1
+						continue
+					fi
+					uid=${id%%:*}
+					if [[ -n "${name_uid[$name]+x}" && "${name_uid[$name]}" != "$uid" ]]; then
+						echo "ERROR: sysusers user '$name' has conflicting UIDs ${name_uid[$name]} and $uid." >&2
+						failed=1
+					fi
+					if [[ -n "${uid_name[$uid]+x}" && "${uid_name[$uid]}" != "$name" ]]; then
+						echo "ERROR: sysusers UID $uid is assigned to both '${uid_name[$uid]}' and '$name'." >&2
+						failed=1
+					fi
+					name_uid[$name]=$uid
+					uid_name[$uid]=$name
+					;;
 			esac
+		done < "$file"
+	done < <(find ts/build/packages -type f -path '*/sysusers.d/*.conf' -print | sort)
 
-			if [[ ! "$id" =~ ^[0-9]+(:[0-9]+)?$ ]]; then
-				echo "ERROR: $file: sysusers user '$name' must use a fixed numeric UID (or UID:GID), got '$id'." >&2
-				failed=1
-				continue
-			fi
-
-			uid=${id%%:*}
-			if [[ -n "${name_uid[$name]+x}" && "${name_uid[$name]}" != "$uid" ]]; then
-				echo "ERROR: sysusers user '$name' has conflicting UIDs ${name_uid[$name]} and $uid." >&2
+	while IFS= read -r file; do
+		while read -r type name id rest; do
+			case "$type" in u|u!) ;; *) continue ;; esac
+			[[ "$id" == *:* ]] || continue
+			gid=${id#*:}
+			if [[ -z "${gid_group[$gid]+x}" ]]; then
+				echo "ERROR: $file: sysusers user '$name' requires fixed primary GID $gid, but no matching fixed group declaration exists." >&2
 				failed=1
 			fi
-			if [[ -n "${uid_name[$uid]+x}" && "${uid_name[$uid]}" != "$name" ]]; then
-				echo "ERROR: sysusers UID $uid is assigned to both '${uid_name[$uid]}' and '$name'." >&2
-				failed=1
-			fi
-			name_uid[$name]=$uid
-			uid_name[$uid]=$name
 		done < "$file"
 	done < <(find ts/build/packages -type f -path '*/sysusers.d/*.conf' -print | sort)
 
 	if [ "$failed" -ne 0 ]; then
-		echo "Refusing to continue: sysusers user IDs must be stable across builds." >&2
+		echo "Refusing to continue: sysusers user/group IDs must be stable and internally consistent across builds." >&2
 		return 1
 	fi
 }
