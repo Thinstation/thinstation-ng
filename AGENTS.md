@@ -11,8 +11,10 @@ ThinStation NG is an image-building system with a generated chroot and package-r
 - Preserve ISO/output and expensive staged container payloads before destructive build cleanup.
 - Keep site-specific organization names, addresses, credentials, deployment topology, and environment-only values out of reusable source and AI guidance.
 - Do not suppress build warnings with broad text filters. Known benign output should remain visible so future meaningful failures are not hidden.
-- Keep software compilation out of ThinStation NG except for the ThinStation image/build process itself and unavoidable kernel-coupled components such as proprietary kernel modules. Prefer Fedora/upstream RPMs. If a package requires custom source changes and compilation, build and publish that artifact in the dedicated `thinstation-rpms` repository, then consume the resulting RPM from ThinStation NG.
-- Development harnesses used to create a custom RPM (for example iPXE source-build experiments) should be retired from ThinStation NG once the RPM pipeline is authoritative. Keep only regression tests that validate ThinStation's consumption, image assembly, or runtime behavior.
+- Prefer Fedora/upstream RPMs and prebuilt artifacts for normal ThinStation builds. Regular users should not need to compile application software merely to build an image.
+- In-tree source compilation is acceptable while a package is under active development, when it materially speeds iteration, and for unavoidable kernel-coupled components such as proprietary kernel modules. Treat these compile paths as development tooling rather than the long-term user-facing package path.
+- Once a customized package is stable enough for normal use, move its source build/patch workflow to the dedicated `thinstation-rpms` repository and have ThinStation NG consume the resulting RPM.
+- Development harnesses used to create a custom package (for example the former iPXE source-build experiments) should be retired from ThinStation NG once the external package pipeline is authoritative. Keep regression tests that validate ThinStation's package consumption, image assembly, or runtime behavior.
 
 ## Project skills
 
