@@ -11,13 +11,12 @@ MOUNT_1="filedrop-nfs.thinstation.org:/mnt/pve/cephfs/filedrop-nfs /mnt/filedrop
 TIME_ZONE=UTC
 
 # MCP persistent-generation bootstrap policy.
-# auto: install from MCP_CHANNEL_URL when set, otherwise seed recovery persistently.
-# channel: require the configured distribution channel.
-# recovery: seed a replaceable persistent generation from immutable recovery.
-# off: remain in immutable recovery until configured manually.
-MCP_BOOTSTRAP_MODE=auto
+# Installation is explicit by default. Recovery remains immutable fallback.
+# off: stay on recovery until an administrator installs/activates an MCP.
+# channel/recovery remain available for site-specific unattended bootstrap.
+MCP_BOOTSTRAP_MODE=off
 MCP_BOOTSTRAP_GENERATION=bootstrap
-MCP_CHANNEL_URL=
+MCP_CHANNEL_URL=https://distro.thinstation.org/files/thinstation-mcp/mcp/catalog.json
 
 # Fedora/DNF release used by appliance package tooling.
 DIST_VER=44
