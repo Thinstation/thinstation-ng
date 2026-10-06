@@ -35,9 +35,19 @@ def ensure():
 
 def good_name(n): return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
 
+def normalize_meta(n,m):
+    if not isinstance(m,dict):m={}
+    m.setdefault('name',n)
+    m.setdefault('scopes',[])
+    m.setdefault('provider','local')
+    m.setdefault('storage_class','managed')
+    m.setdefault('exportable',m.get('storage_class')!='bootstrap')
+    m.setdefault('provider_ref',n)
+    return m
+
 def read_meta(n):
-    try:return json.loads((META/(n+'.json')).read_text())
-    except Exception:return {'name':n,'scopes':[]}
+    try:return normalize_meta(n,json.loads((META/(n+'.json')).read_text()))
+    except Exception:return normalize_meta(n,{})
 
 def lease():
     try:
@@ -81,13 +91,13 @@ def status():
     ensure(); l=lease(); out=[]
     for p in sorted(CREDS.glob('*.cred')):
         if p.stem.endswith('.__passphrase'): continue
-        m=read_meta(p.stem); row={'name':p.stem,'scopes':m.get('scopes',[]),'allowed_hosts':m.get('allowed_hosts',[]),'updated':m.get('updated'),'type':m.get('type','secret')}
+        m=read_meta(p.stem); row={'name':p.stem,'scopes':m.get('scopes',[]),'allowed_hosts':m.get('allowed_hosts',[]),'updated':m.get('updated'),'type':m.get('type','secret'),'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'exportable':bool(m.get('exportable',True)),'provider_ref':m.get('provider_ref',p.stem)}
         for field in ('username','domain'):
             if m.get(field): row[field]=m[field]
         if m.get('public_key'): row['public_key']=m.get('public_key')
         if m.get('passphrase_credential'): row['passphrase_protected']=True
         out.append(row)
-    return {'locked':l is None,'lease':l,'credentials':out,'key_mode_configured':cfg()['VAULT_KEY_MODE'],'key_mode_effective':effective_key_mode(),'tpm_present':Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(),'grants':grants_status()}
+    return {'locked':l is None,'lease':l,'credentials':out,'providers':[{'name':'local','available':True,'root_of_trust':True}],'key_mode_configured':cfg()['VAULT_KEY_MODE'],'key_mode_effective':effective_key_mode(),'tpm_present':Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(),'grants':grants_status()}
 
 
 def write_meta(name, data):
@@ -199,9 +209,10 @@ def unlock(args):
     d={'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':scopes}
     LEASE.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(LEASE,0o600); audit('unlock',expires=d['expires'],scopes=scopes); print(json.dumps(d))
 
-def put(name,scopes):
+def put(name,scopes,storage_class='managed'):
     ensure()
     if not good_name(name): raise SystemExit('invalid credential name')
+    if storage_class not in ('managed','bootstrap'): raise SystemExit('invalid storage class')
     secret=sys.stdin.buffer.read()
     if not secret: raise SystemExit('empty secret refused')
     mode=effective_key_mode(); tmp=CREDS/(name+'.cred.new'); dst=CREDS/(name+'.cred')
@@ -209,7 +220,13 @@ def put(name,scopes):
     secret=b''
     if p.returncode: raise SystemExit(p.returncode)
     os.chmod(tmp,0o600); os.replace(tmp,dst)
-    m=read_meta(name); m.update({'name':name,'scopes':scopes,'updated':int(time.time()),'key_mode':mode}); write_meta(name,m); audit('put',credential=name,scopes=scopes,key_mode=mode)
+    m=read_meta(name); m.update({'name':name,'scopes':scopes,'updated':int(time.time()),'key_mode':mode,'provider':'local','provider_ref':name,'storage_class':storage_class,'exportable':storage_class!='bootstrap'}); write_meta(name,m); audit('put',credential=name,provider='local',storage_class=storage_class,exportable=m['exportable'],scopes=scopes,key_mode=mode)
+
+def pin_local(name):
+    ensure()
+    if not good_name(name) or not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name); m.update({'provider':'local','provider_ref':name,'storage_class':'bootstrap','exportable':False,'updated':int(time.time())}); write_meta(name,m)
+    audit('pin_local',credential=name,provider='local',storage_class='bootstrap',exportable=False)
 
 
 INVENTORY=Path('/var/prstnt/mcp-appliance/config/hosts.json')
@@ -282,6 +299,8 @@ def resolve_credential(target,scope,ctype):
         m=read_meta(p.stem)
         if ctype == 'ssh-login':
             if m.get('type') not in LOGIN_TYPES: continue
+        elif ctype == 'password-login':
+            if m.get('type') not in ('active-directory','password'): continue
         elif ctype and str(m.get('type','secret'))!=ctype: continue
         if not scope_allowed(m,scope): continue
         specificity=target_specificity(m,target)
@@ -293,7 +312,7 @@ def resolve_credential(target,scope,ctype):
     if len(selected)!=1:
         raise SystemExit('multiple equally specific credentials match target; narrow host/group assignments')
     _,name,m=selected[0]
-    print(json.dumps({'name':name,'type':m.get('type','secret'),'specificity':best,'allowed_hosts':m.get('allowed_hosts',[]),'scopes':m.get('scopes',[]),'username':m.get('username',''),'domain':m.get('domain','')}))
+    print(json.dumps({'name':name,'type':m.get('type','secret'),'provider':m.get('provider','local'),'provider_ref':m.get('provider_ref',name),'storage_class':m.get('storage_class','managed'),'exportable':bool(m.get('exportable',True)),'specificity':best,'allowed_hosts':m.get('allowed_hosts',[]),'scopes':m.get('scopes',[]),'username':m.get('username',''),'domain':m.get('domain','')}))
 
 def decrypt_to_file(name,dst):
     src=CREDS/(name+'.cred')
@@ -325,7 +344,7 @@ def materialize_ssh(name,target,scope):
     if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
     work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
     try:
-        result={'credential':name,'authorization':auth,'materialized':str(work),'private_key':''}
+        result={'credential':name,'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'authorization':auth,'materialized':str(work),'private_key':''}
         if ctype=='ssh-key':
             key=work/'identity';decrypt_to_file(name,key)
             result.update(private_key=str(key),username=username,authentication='publickey')
@@ -351,6 +370,35 @@ def materialize_ssh(name,target,scope):
         work.rmdir()
         raise
 
+def materialize_login(name,target,scope):
+    ensure();MATERIALIZED.mkdir(parents=True,exist_ok=True);os.chmod(MATERIALIZED,0o700)
+    if not good_name(name): raise SystemExit('invalid credential name')
+    if not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name);ctype=m.get('type')
+    if ctype not in ('active-directory','password'): raise SystemExit('credential is not compatible with password login')
+    if not scope_allowed(m,scope): raise SystemExit('credential scope does not allow this operation')
+    if target_specificity(m,target)<0: raise SystemExit('credential target does not allow this host')
+    auth,gp=authorization(name,scope)
+    if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
+    work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
+    try:
+        source=work/'credential.json';decrypt_to_file(name,source)
+        try: identity=password_identity(source.read_text(),ctype)
+        finally: source.unlink(missing_ok=True)
+        password=work/'password';password.write_text(identity['password']);password.chmod(0o400)
+        result={'credential':name,'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'authorization':auth,'materialized':str(work),'username':identity['username'],'domain':identity.get('domain',''),'password_file':str(password),'authentication':'password'}
+        identity['password']=''
+        if gp is not None:
+            used=gp.with_suffix('.used')
+            try: os.replace(gp,used)
+            except FileNotFoundError: raise SystemExit('one-shot grant was already consumed')
+            used.unlink(missing_ok=True);audit('grant_consume',credential=name,scope=scope)
+        audit('materialize',credential=name,provider=m.get('provider','local'),target=target,scope=scope,authorization=auth)
+        print(json.dumps(result))
+    except BaseException:
+        for child in work.iterdir(): child.unlink(missing_ok=True)
+        work.rmdir()
+        raise
 def cleanup_materialized(path):
     p=Path(path)
     try:p.resolve().relative_to(MATERIALIZED.resolve())
@@ -365,7 +413,9 @@ if not args or args[0]=='status': print(json.dumps(status(),indent=2))
 elif args[0]=='init': print(json.dumps(status(),indent=2))
 elif args[0]=='unlock': unlock(args[1:])
 elif args[0]=='lock': LEASE.unlink(missing_ok=True); audit('lock')
-elif args[0]=='put' and len(args)>=2: put(args[1],args[2:])
+elif args[0]=='put' and len(args)>=2: put(args[1],args[2:],'managed')
+elif args[0]=='put-bootstrap' and len(args)>=2: put(args[1],args[2:],'bootstrap')
+elif args[0]=='pin-local' and len(args)==2: pin_local(args[1])
 elif args[0]=='grant': grant(args[1:])
 elif args[0]=='revoke-grant' and len(args)==2: revoke_grant(args[1])
 elif args[0]=='delete' and len(args)==2: delete_credential(args[1])
@@ -375,5 +425,6 @@ elif args[0]=='rename' and len(args)==3: rename_credential(args[1],args[2])
 elif args[0]=='login' and len(args)==3: set_login(args[1],args[2])
 elif args[0]=='resolve' and len(args)==4: resolve_credential(args[1],args[2],args[3])
 elif args[0]=='materialize-ssh' and len(args)==4: materialize_ssh(args[1],args[2],args[3])
+elif args[0]=='materialize-login' and len(args)==4: materialize_login(args[1],args[2],args[3])
 elif args[0]=='cleanup' and len(args)==2: cleanup_materialized(args[1])
-else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|cleanup PATH')
+else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|put-bootstrap NAME [SCOPES...]|pin-local NAME|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|materialize-login NAME TARGET SCOPE|cleanup PATH')

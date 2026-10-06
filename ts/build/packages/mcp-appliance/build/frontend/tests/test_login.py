@@ -49,6 +49,14 @@ class LoginTests(unittest.TestCase):
   secret=json.dumps({'domain':'example.test','username':'service','password':'fixture-only'})
   with patch.object(self.m,'decrypt_to_file',side_effect=lambda n,p:p.write_text(secret)):result=self.capture(self.m.materialize_ssh,'one','ad','ssh')
   self.assertEqual(result['username'],'service@example.test');self.assertEqual(result['authentication'],'password');self.assertNotIn('fixture-only',json.dumps(result));self.assertFalse((Path(result['materialized'])/'credential.json').exists());self.m.cleanup_materialized(result['materialized'])
+ def test_password_login_resolves_for_rdp_scope(self):
+  self.credential('one',ctype='active-directory',targets=['host:ad'],username='stale');self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']})
+  self.assertEqual(self.capture(self.m.resolve_credential,'ad','rdp','password-login')['name'],'one')
+ def test_materialize_login_returns_file_not_secret(self):
+  self.credential('one',ctype='active-directory',targets=['host:ad']);self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']});self.m.LEASE.write_text(json.dumps({'expires':time.time()+60,'scopes':['rdp']}))
+  secret=json.dumps({'domain':'example.test','username':'service','password':'fixture-only'})
+  with patch.object(self.m,'decrypt_to_file',side_effect=lambda n,p:p.write_text(secret)):result=self.capture(self.m.materialize_login,'one','ad','rdp')
+  self.assertEqual(result['username'],'service@example.test');self.assertEqual(Path(result['password_file']).read_text(),'fixture-only');self.assertNotIn('fixture-only',json.dumps(result));self.m.cleanup_materialized(result['materialized'])
  def test_locked_stays_locked(self):
   self.credential('one')
   with patch.object(self.m,'decrypt_to_file') as decrypt,self.assertRaisesRegex(SystemExit,'locked'):self.m.materialize_ssh('one','ad','ssh')
@@ -66,3 +74,7 @@ class LoginTests(unittest.TestCase):
  def test_ad_preserves_upn(self):self.assertEqual(password_identity('{"username":"operator@other.test","password":"fixture","domain":"example.test"}','active-directory')['username'],'operator@other.test')
  def test_update_ssh_username(self):
   self.credential('one');self.m.set_login('one','new-user');self.assertEqual(self.m.read_meta('one')['username'],'new-user')
+ def test_existing_credentials_default_to_local_managed(self):
+  self.credential('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'managed');self.assertTrue(m['exportable'])
+ def test_pin_local_is_bootstrap_and_non_exportable(self):
+  self.credential('one');self.m.pin_local('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'bootstrap');self.assertFalse(m['exportable'])

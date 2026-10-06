@@ -184,7 +184,8 @@ package lz4                   # Very fast compression/decompression for transien
 ###########################################
 ### --- Remote Desktop Applications --- ###
 ###########################################
-#package freerdp              # RDP client
+package mcp-rdp-runtime      # Headless audited RDP control runtime (FreeRDP + Xvfb + xdotool)
+#package freerdp              # Interactive RDP client
 #package ica                  # Citrix ICA, this one might need a bit for work for ctxusb
 
 ##############################

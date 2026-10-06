@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export PACKAGE=mcp-rdp-runtime
+repackage -c

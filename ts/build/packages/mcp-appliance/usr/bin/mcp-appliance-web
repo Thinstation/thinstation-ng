@@ -1181,6 +1181,12 @@ class H(BaseHTTPRequestHandler):
                 p=subprocess.run(['/usr/bin/mcp-vault-core','login',name,username],text=True,capture_output=True,timeout=15)
                 self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()});return
             except Exception as e:self.js(400,{'error':str(e)});return
+        if path=='/api/vault/pin-local':
+            try:
+                body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip()
+                p=subprocess.run(['/usr/bin/mcp-vault-core','pin-local',name],text=True,capture_output=True)
+                self.js(200 if p.returncode==0 else 400,{'ok':p.returncode==0,'vault':vault_status(),'message':(p.stdout+p.stderr).strip()}); return
+            except Exception as e:self.js(400,{'ok':False,'error':str(e)});return
         if path=='/api/vault/delete':
             try:
                 body=json.loads(self.body() or '{}'); name=str(body.get('name','')).strip()
