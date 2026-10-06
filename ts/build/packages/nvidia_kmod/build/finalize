@@ -1,0 +1,2 @@
+#!/bin/sh
+systemctl enable nvidia-devnodes.service
