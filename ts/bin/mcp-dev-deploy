@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+usage() {
+  echo "usage: $0 <host> [--user root] [--logs]"
+  echo "Hot-deploy MCP appliance web UI/backend over SSH; no image rebuild."
+  exit 2
+}
+[ "$#" -ge 1 ] || usage
+host=$1; shift
+user=root
+logs=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --user) [ "$#" -ge 2 ] || usage; user=$2; shift 2 ;;
+    --logs) logs=1; shift ;;
+    *) usage ;;
+  esac
+done
+pkg=ts/build/packages/mcp-appliance
+[ -d "$pkg" ] || { echo "run from the thinstation-ng repository root" >&2; exit 1; }
+target="$user@$host"
+if [ -f "$pkg/build/frontend/package.json" ] && command -v npm >/dev/null 2>&1; then
+  echo "Building Svelte UI..."
+  npm --prefix "$pkg/build/frontend" run build
+fi
+tmp="/tmp/mcp-dev-deploy.$$"
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/usr/bin" "$tmp/usr/share/mcp-appliance/web"
+cp -p "$pkg/usr/bin/mcp-appliance-web" "$tmp/usr/bin/"
+cp -a "$pkg/usr/share/mcp-appliance/web/." "$tmp/usr/share/mcp-appliance/web/"
+tar -C "$tmp" -cf - usr | ssh -o StrictHostKeyChecking=accept-new "$target"   'rm -rf /usr/share/mcp-appliance/web/* && tar -C / -xf - && chmod 0755 /usr/bin/mcp-appliance-web && find /usr/share/mcp-appliance/web -type f -exec chmod 0644 {} + && systemctl restart mcp-appliance-web.service && systemctl --no-pager --full status mcp-appliance-web.service'
+if [ "$logs" -eq 1 ]; then
+  ssh "$target" 'journalctl -u mcp-appliance-web.service -n 60 --no-pager'
+fi
