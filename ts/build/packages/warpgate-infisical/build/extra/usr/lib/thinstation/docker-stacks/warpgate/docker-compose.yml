@@ -1,0 +1,44 @@
+services:
+  warpgate:
+    image: thinstation/warpgate-infisical:0.29.1
+    container_name: warpgate
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${WARPGATE_SSH_PORT:-2222}:2222"
+      - "${WARPGATE_HTTPS_PORT:-8888}:8888"
+    volumes:
+      - ./data:/data
+    secrets:
+      - infisical-ssh-client-secret
+
+  agent-proxy:
+    image: infisical/cli:0.43.138
+    container_name: infisical-agent-proxy
+    restart: unless-stopped
+    env_file:
+      - agent-proxy.env
+    ports:
+      - "${INFISICAL_AGENT_PROXY_PORT:-17322}:17322"
+    secrets:
+      - infisical-agent-proxy-client-secret
+    entrypoint:
+      - /sbin/tini
+      - --
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        export INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET="$(cat /run/secrets/infisical-agent-proxy-client-secret)"
+        exec /bin/infisical secrets agent-proxy start \
+          --port 17322 \
+          --unmatched-host "${INFISICAL_AGENT_PROXY_UNMATCHED_HOST:-block}" \
+          --poll-interval "${INFISICAL_AGENT_PROXY_POLL_INTERVAL:-60}" \
+          --log-format json
+
+secrets:
+  infisical-ssh-client-secret:
+    file: ./infisical-ssh-client-secret
+  infisical-agent-proxy-client-secret:
+    file: ./infisical-agent-proxy-client-secret

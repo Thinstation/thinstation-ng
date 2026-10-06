@@ -1,0 +1,141 @@
+diff --git a/warpgate-common/src/config/target.rs b/warpgate-common/src/config/target.rs
+index 1d8ee63..9ef1bd7 100644
+--- a/warpgate-common/src/config/target.rs
++++ b/warpgate-common/src/config/target.rs
+@@ -53,6 +53,8 @@ pub enum SSHTargetAuth {
+     PublicKey(SshTargetPublicKeyAuth),
+     #[serde(rename = "iam_role")]
+     IamRole(SshTargetIamRoleAuth),
++    #[serde(rename = "infisical")]
++    Infisical(SshTargetInfisicalAuth),
+ }
+ 
+ #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Object)]
+@@ -71,6 +73,27 @@ pub struct SshTargetPublicKeyAuth {
+ #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Object, Default)]
+ pub struct SshTargetIamRoleAuth {}
+ 
++#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Object)]
++pub struct SshTargetInfisicalAuth {
++    pub project_id: String,
++    pub environment: String,
++    pub secret_path: String,
++    pub secret_key: String,
++    pub secret_kind: String,
++}
++
++impl Default for SshTargetInfisicalAuth {
++    fn default() -> Self {
++        Self {
++            project_id: String::new(),
++            environment: "prod".into(),
++            secret_path: "/".into(),
++            secret_key: String::new(),
++            secret_kind: "private_key".into(),
++        }
++    }
++}
++
+ impl Default for SSHTargetAuth {
+     fn default() -> Self {
+         Self::PublicKey(SshTargetPublicKeyAuth::default())
+diff --git a/warpgate-protocol-ssh/Cargo.toml b/warpgate-protocol-ssh/Cargo.toml
+index 36e950f..6672458 100644
+--- a/warpgate-protocol-ssh/Cargo.toml
++++ b/warpgate-protocol-ssh/Cargo.toml
+@@ -18,6 +18,7 @@ ratatui = { version = "0.30", default-features = false, features = [
+     "crossterm",
+     "unstable-backend-writer",
+ ] }
++reqwest = { workspace = true, features = ["json", "form"] }
+ russh.workspace = true
+ sea-orm.workspace = true
+ serde.workspace = true
+diff --git a/warpgate-protocol-ssh/src/client/mod.rs b/warpgate-protocol-ssh/src/client/mod.rs
+index c92d950..fc7b6fb 100644
+--- a/warpgate-protocol-ssh/src/client/mod.rs
++++ b/warpgate-protocol-ssh/src/client/mod.rs
+@@ -17,7 +17,7 @@ pub use error::SshClientError;
+ use futures::{FutureExt, pin_mut};
+ use handler::ClientHandler;
+ use russh::client::{AuthResult, Handle, KeyboardInteractiveAuthResponse};
+-use russh::keys::{PrivateKeyWithHashAlg, PublicKey};
++use russh::keys::{PrivateKeyWithHashAlg, PublicKey, decode_secret_key};
+ use russh::{MethodKind, Preferred, Sig, kex, mac};
+ use serde::Serialize;
+ use tokio::sync::mpsc::{
+@@ -36,6 +36,7 @@ use warpgate_core::{AdmittedTarget, ConfigProvider, Services};
+ use self::handler::ClientHandlerEvent;
+ use super::{ChannelOperation, DirectTCPIPParams};
+ use crate::client::handler::ClientHandlerError;
++use crate::infisical::fetch_secret;
+ use crate::{ForwardedStreamlocalParams, ForwardedTcpIpParams, load_client_keys};
+ 
+ #[derive(Debug, thiserror::Error)]
+@@ -949,6 +950,57 @@ impl Connector {
+                         Some("Public key authentication was rejected by the SSH target".into());
+                 }
+             }
++            SSHTargetAuth::Infisical(auth) => {
++                let secret = fetch_secret(auth).await?;
++                match auth.secret_kind.as_str() {
++                    "password" => {
++                        let response = session
++                            .authenticate_password(username.to_string(), secret.as_str())
++                            .await?;
++                        auth_result = self
++                            ._handle_auth_result(session, username.to_string(), response)
++                            .await
++                            .unwrap_or(false);
++                        if !auth_result {
++                            auth_error_msg = Some(
++                                "Infisical password authentication was rejected by the SSH target"
++                                    .to_string(),
++                            );
++                        }
++                    }
++                    "private_key" => {
++                        let key = Arc::new(decode_secret_key(secret.as_str(), None)?);
++                        let best_hash = session.best_supported_rsa_hash().await?.flatten();
++                        if key.key_data().is_rsa() && best_hash.is_none() && !allow_insecure_algos {
++                            auth_error_msg =
++                                Some("Infisical SSH key requires disabled ssh-rsa/SHA1".to_string());
++                        } else {
++                            let response = session
++                                .authenticate_publickey(
++                                    username.to_string(),
++                                    PrivateKeyWithHashAlg::new(key, best_hash),
++                                )
++                                .await?;
++                            auth_result = self
++                                ._handle_auth_result(session, username.to_string(), response)
++                                .await
++                                .unwrap_or(false);
++                            if !auth_result {
++                                auth_error_msg = Some(
++                                    "Infisical private-key authentication was rejected by the SSH target"
++                                        .to_string(),
++                                );
++                            }
++                        }
++                    }
++                    other => {
++                        return Err(WarpgateError::InconsistentState(format!(
++                            "Unsupported Infisical SSH secret kind: {other}"
++                        ))
++                        .into());
++                    }
++                }
++            }
+             SSHTargetAuth::IamRole(_) => {
+                 let instance_info = warpgate_aws::find_instance_by_ip(host).await?;
+ 
+diff --git a/warpgate-protocol-ssh/src/lib.rs b/warpgate-protocol-ssh/src/lib.rs
+index 40f2548..b6e58f3 100644
+--- a/warpgate-protocol-ssh/src/lib.rs
++++ b/warpgate-protocol-ssh/src/lib.rs
+@@ -1,3 +1,4 @@
++mod infisical;
+ mod channel_audit;
+ mod client;
+ mod command_detector;

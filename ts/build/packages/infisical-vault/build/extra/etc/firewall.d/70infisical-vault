@@ -1,0 +1,3 @@
+# Infisical is published through the appliance TLS frontend.
+# The Docker backend remains loopback-only; only HTTPS is exposed.
+firewall-cmd --add-service=https

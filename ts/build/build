@@ -1845,18 +1845,15 @@ filesystem_fixups()
 		echo -e "Installing Python3 Packages"
 		mkdir py-tmp
 		pip3 install -r ./tmp-tree/pip3.freeze -I --root ./py-tmp --prefix=/usr --no-warn-script-location --root-user-action=ignore --disable-pip-version-check
-		mkdir -p ./py-tmp/lib64
-		if [ -e ./py-tmp/usr/lib ]; then
-			cp -a ./py-tmp/usr/lib/* ./py-tmp/lib64/.
+		# Preserve pip payload under the runtime usr-merged layout.  The
+		# assembled tree may already have /usr/lib as a symlink/non-directory
+		# alias to /usr/lib64, so merge pip's /usr/lib contents explicitly.
+		if [ -d ./py-tmp/usr/lib ] && [ ! -L ./py-tmp/usr/lib ]; then
+			mkdir -p ./tmp-tree/usr/lib64
+			cp -a ./py-tmp/usr/lib/. ./tmp-tree/usr/lib64/.
 			rm -rf ./py-tmp/usr/lib
 		fi
-                if [ -e ./py-tmp/usr/lib64 ]; then
-                        cp -a ./py-tmp/usr/lib64/* ./py-tmp/lib64/.
-                        rm -rf ./py-tmp/usr/lib64
-                fi
-		cp -a ./py-tmp/usr/* ./py-tmp/.
-		rm -rf ./py-tmp/usr
-		cp -a ./py-tmp/* ./tmp-tree/.
+		cp -a ./py-tmp/usr/. ./tmp-tree/usr/.
 		rm -rf ./py-tmp
 		rm ./tmp-tree/pip3.freeze
 	fi

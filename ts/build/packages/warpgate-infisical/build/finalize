@@ -1,0 +1,2 @@
+#warpgate-infisical 92
+# Runtime payload is carried in build/extra and seeded into /docker/warpgate.

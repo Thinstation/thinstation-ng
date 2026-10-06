@@ -1,6 +1,6 @@
 ---
 name: thinstation-ng-engineering
-description: Turn a server, desktop, kiosk, or appliance target definition into a qualified ThinStation NG image. Use for choosing packages and machine profiles, creating or modifying build.conf/thinstation.conf inputs, setup-chroot/install_chroot, package metadata/build/extra behavior, source-vs-generated files, building images, debugging build failures, qualification, and preparing a branch/MR for the standard project pipeline.
+description: Turn a server, desktop, kiosk, or appliance target definition into a qualified ThinStation NG image. Use for choosing packages and machine profiles, creating or modifying build.conf/thinstation.conf inputs, defining buildtime/custom configuration, documenting package runtime variables in build/conf, setup-chroot/install_chroot, package metadata/build/extra behavior, source-vs-generated files, building images, debugging build failures, qualification, and preparing a branch/MR for the standard project pipeline.
 ---
 
 # ThinStation NG Engineering

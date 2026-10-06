@@ -1,0 +1,31 @@
+# Warpgate + Infisical credential broker appliance
+
+This appliance is the credential-bearing network boundary for MCP and other agents.
+
+## SSH
+
+Warpgate terminates the client SSH session and opens the target-side SSH session itself. Target passwords or private keys are resolved from Infisical just in time by the Warpgate process and are never returned to the MCP appliance.
+
+## HTTP / HTTPS / REST
+
+Infisical Agent Proxy listens on port 17322 and acts as a forward HTTP/HTTPS MITM proxy. Proxied services and injection rules are defined in Infisical. The proxy obtains the real API credential and attaches it at the network boundary; MCP receives only the upstream response.
+
+The secure default is `unmatched-host=block`, so the proxy is an allow-listed egress path rather than a generic Internet proxy.
+
+## Identity separation
+
+Use two least-privilege Infisical machine identities:
+
+- `INFISICAL_SSH_CLIENT_ID` with read access only to SSH target secrets used by Warpgate.
+- `INFISICAL_AGENT_PROXY_CLIENT_ID` with Agent Proxy/proxied-service permissions and access to only the brokered HTTP credentials.
+
+Their Universal Auth client secrets live only on this appliance as root-only Docker secret files:
+
+- `/docker/warpgate/infisical-ssh-client-secret`
+- `/docker/warpgate/infisical-agent-proxy-client-secret`
+
+MCP should use its own short-lived/scoped agent identity when connecting to Agent Proxy. It should not be able to read the service secrets that the proxy brokers.
+
+## Persistent state
+
+Warpgate state lives under `/docker/warpgate/data`. Target records contain only Infisical references, not target passwords or private keys.

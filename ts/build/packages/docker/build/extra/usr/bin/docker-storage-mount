@@ -1,10 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 VG=ts_persistent
-vgchange -ay "$VG" >/dev/null 2>&1 || exit 0
-mount_one(){ local dev="$1" mp="$2"; [[ -b "$dev" ]] || return 0; mkdir -p "$mp"; mountpoint -q "$mp" || mount "$dev" "$mp"; }
+
+fail() {
+  echo "[docker-storage-mount] ERROR: $*" >&2
+  exit 1
+}
+
+mount_one() {
+  local dev="$1"
+  local mp="$2"
+
+  [[ -b "$dev" ]] || fail "required block device is missing: $dev"
+  mkdir -p "$mp"
+  mountpoint -q "$mp" || mount "$dev" "$mp"
+  mountpoint -q "$mp" || fail "required mount did not become active: $mp"
+  [[ -w "$mp" ]] || fail "required mount is not writable: $mp"
+}
+
+vgchange -ay "$VG" >/dev/null 2>&1 || fail "unable to activate volume group $VG"
+
 mount_one "/dev/$VG/prstnt" /var/prstnt
 mount_one "/dev/$VG/docker" /docker
 mount_one "/dev/$VG/log" /var/log
 mount_one "/dev/$VG/docker-data" /var/lib/docker
 mount_one "/dev/$VG/container-data" /var/lib/containerd
+
+echo "[docker-storage-mount] persistent Docker storage is ready"

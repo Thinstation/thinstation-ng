@@ -15,18 +15,29 @@ while IFS= read -r spec || [[ -n "$spec" ]]; do
   [[ -z "$spec" || "$spec" =~ ^# ]] && continue
 
   source_image="${spec%%|*}"
+  explicit_target=0
   target_image="$source_image"
   if [[ "$spec" == *"|"* ]]; then
+    explicit_target=1
     target_image="${spec#*|}"
   fi
 
   source_image="$(echo "$source_image" | xargs)"
   target_image="$(echo "$target_image" | xargs)"
+
+  if [[ "$source_image" == local:* ]]; then
+    source_image="${source_image#local:}"
+    if (( ! explicit_target )); then
+      target_image="$source_image"
+    fi
+    echo "Using local image $source_image"
+    docker image inspect "$source_image" >/dev/null
+  else
+    echo "Pulling $source_image"
+    docker pull "$source_image"
+  fi
+
   name="$(safe_name "$target_image")"
-
-  echo "Pulling $source_image"
-  docker pull "$source_image"
-
   digest="$(docker image inspect "$source_image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
   image_id="$(docker image inspect "$source_image" --format '{{.Id}}')"
 

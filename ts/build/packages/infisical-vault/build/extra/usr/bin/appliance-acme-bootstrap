@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 027
+
+for cfg in /thinstation.buildtime /etc/thinstation.network /etc/thinstation.user /etc/thinstation.runtime /etc/thinstation.custom; do
+  [[ -r "$cfg" ]] && . "$cfg"
+done
+
+state=/var/prstnt/acme
+live="$state/live"
+alpn="$state/alpn-certs"
+certs="$state/certs"
+accounts="$state/accounts"
+
+enabled="${ACME_ENABLED:-On}"
+directory="${ACME_DIRECTORY:-}"
+email="${ACME_EMAIL:-}"
+domain="${ACME_DOMAIN:-}"
+
+if [[ -z "$domain" && -n "${INFISICAL_SITE_URL:-}" ]]; then
+  domain="${INFISICAL_SITE_URL#*://}"
+  domain="${domain%%/*}"
+  domain="${domain%%:*}"
+fi
+domain="${domain:-${NET_HOSTNAME:-}}"
+domain="${domain:-$(hostname -f 2>/dev/null || hostname)}"
+domain="${domain%.}"
+
+install -d -m 0700 -o root -g root "$state" "$accounts"
+install -d -m 2750 -o root -g lighttpd "$live" "$alpn" "$certs"
+
+if [[ ! -s "$live/privkey.pem" || ! -s "$live/fullchain.pem" ]]; then
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' EXIT
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2     -subj "/CN=$domain"     -addext "subjectAltName=DNS:$domain"     -keyout "$tmpdir/privkey.pem" -out "$tmpdir/fullchain.pem" >/dev/null 2>&1
+  install -m 0640 -o root -g lighttpd "$tmpdir/privkey.pem" "$live/privkey.pem"
+  install -m 0640 -o root -g lighttpd "$tmpdir/fullchain.pem" "$live/fullchain.pem"
+fi
+
+cat >"$state/domains.txt" <<EOF
+$domain
+EOF
+
+cat >"$state/config" <<EOF
+BASEDIR="$state"
+CERTDIR="$certs"
+ACCOUNTDIR="$accounts"
+ALPNCERTDIR="$alpn"
+DOMAINS_TXT="$state/domains.txt"
+CHALLENGETYPE="tls-alpn-01"
+HOOK="/usr/bin/appliance-acme-hook"
+RENEW_DAYS="30"
+KEY_ALGO="secp384r1"
+CONTACT_EMAIL="$email"
+EOF
+
+if [[ -n "$directory" ]]; then
+  printf 'CA="%s"\n' "$directory" >>"$state/config"
+fi
+
+cat >/run/lighttpd-infisical.conf <<EOF
+server.modules = ( "mod_openssl", "mod_proxy" )
+server.document-root = "/var/www/lighttpd"
+server.bind = "0.0.0.0"
+server.port = 443
+server.username = "lighttpd"
+server.groupname = "lighttpd"
+ssl.engine = "enable"
+ssl.pemfile = "$live/fullchain.pem"
+ssl.privkey = "$live/privkey.pem"
+ssl.acme-tls-1 = "$alpn"
+proxy.server = ( "/" => (( "host" => "127.0.0.1", "port" => 8080 )) )
+proxy.header = ( "upgrade" => "enable", "https-remap" => "enable" )
+proxy.forwarded = ( "for" => 1, "proto" => 1 )
+EOF
+
+echo "[appliance-acme] TLS frontend prepared for $domain"
+if [[ "$enabled" != "On" && "$enabled" != "on" && "$enabled" != "true" && "$enabled" != "1" ]]; then
+  echo "[appliance-acme] automatic ACME renewal is disabled"
+elif [[ -z "$directory" ]]; then
+  echo "[appliance-acme] ACME_DIRECTORY is not configured; using bootstrap certificate"
+fi

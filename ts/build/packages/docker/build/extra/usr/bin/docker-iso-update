@@ -12,6 +12,7 @@ log() {
 }
 
 changed=0
+stack_changed=0
 
 [[ -d "$ISO_DOCKER_DIR/images" ]] || {
   log "No Docker image directory found at $ISO_DOCKER_DIR/images"
@@ -44,8 +45,27 @@ for tar_file in "$ISO_DOCKER_DIR"/images/*.tar; do
   changed=1
 done
 
-if [[ "$changed" -eq 1 ]]; then
-  log "Images changed; recreating compose stacks."
+# Refresh immutable stack control files on every ISO update, even if image
+# digests are unchanged.  Persistent state (.env, databases, volumes, data)
+# is intentionally left untouched.
+for stack in "$COMPOSE_ROOT"/*; do
+  [[ -d "$stack" ]] || continue
+  stack_name="$(basename "$stack")"
+  seed_stack="/usr/lib/thinstation/docker-stacks/$stack_name"
+  [[ -d "$seed_stack" ]] || continue
+
+  for control in docker-compose.yml compose.yml setup.sh; do
+    [[ -f "$seed_stack/$control" ]] || continue
+    if [[ ! -f "$stack/$control" ]] || ! cmp -s "$seed_stack/$control" "$stack/$control"; then
+      log "Refreshing stack control file: $stack_name/$control"
+      cp -a "$seed_stack/$control" "$stack/$control"
+      stack_changed=1
+    fi
+  done
+done
+
+if [[ "$changed" -eq 1 || "$stack_changed" -eq 1 ]]; then
+  log "Images or stack controls changed; recreating compose stacks."
 
   for stack in "$COMPOSE_ROOT"/*; do
     [[ -d "$stack" ]] || continue
@@ -54,9 +74,13 @@ if [[ "$changed" -eq 1 ]]; then
     log "Updating stack: $stack"
     (
       cd "$stack"
+      if [[ -x ./setup.sh ]]; then
+        log "Running stack setup hook: $stack/setup.sh"
+        ./setup.sh
+      fi
       docker compose up -d --force-recreate
     )
   done
 else
-  log "No image changes detected."
+  log "No image or stack-control changes detected."
 fi

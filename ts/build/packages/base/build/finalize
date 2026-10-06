@@ -7,7 +7,7 @@ rm -rf /usr/share/doc
 dbus-uuidgen > /etc/machine-id
 chmod 0444 /etc/machine-id
 
-sed -i '/session[[:space:]]\+include[[:space:]]\+system-auth/a session    optional     pam_hooks.so /usr/bin/session $PAM_USER' /etc/pam.d/login
+sed -i '/session[[:space:]]\+include[[:space:]]\+system-auth/a session    optional     pam_hooks.so /usr/bin/session' /etc/pam.d/login
 
 for var in $(compgen -v | grep '^MOUNT_'); do
     mount="${!var}"

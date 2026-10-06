@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+op="${1:-}"
+case "$op" in
+  deploy_cert)
+    domain="${2:?domain}"
+    privkey="${3:?privkey}"
+    cert="${4:?cert}"
+    fullchain="${5:?fullchain}"
+    live=/var/prstnt/acme/live
+    install -d -m 2750 -o root -g lighttpd "$live"
+    install -m 0640 -o root -g lighttpd "$privkey" "$live/privkey.pem.new"
+    install -m 0640 -o root -g lighttpd "$fullchain" "$live/fullchain.pem.new"
+    mv -f "$live/privkey.pem.new" "$live/privkey.pem"
+    mv -f "$live/fullchain.pem.new" "$live/fullchain.pem"
+    systemctl reload lighttpd.service
+    echo "[appliance-acme] deployed certificate for $domain"
+    ;;
+  deploy_challenge|clean_challenge|invalid_challenge|request_failure|exit_hook|sync_cert|unchanged_cert)
+    ;;
+  *)
+    # Dehydrated intentionally probes hooks with unknown actions.
+    ;;
+esac

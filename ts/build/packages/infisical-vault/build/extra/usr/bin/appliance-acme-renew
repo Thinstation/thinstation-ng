@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+/usr/bin/appliance-acme-bootstrap
+
+for cfg in /thinstation.buildtime /etc/thinstation.network /etc/thinstation.user /etc/thinstation.runtime /etc/thinstation.custom; do
+  [[ -r "$cfg" ]] && . "$cfg"
+done
+
+case "${ACME_ENABLED:-On}" in
+  On|on|true|1) ;;
+  *) echo "[appliance-acme] disabled"; exit 0 ;;
+esac
+
+if [[ -z "${ACME_DIRECTORY:-}" ]]; then
+  echo "[appliance-acme] ACME_DIRECTORY is not configured; skipping issuance"
+  exit 0
+fi
+
+config=/var/prstnt/acme/config
+if ! find /var/prstnt/acme/accounts -type f -name account_key.pem -print -quit 2>/dev/null | grep -q .; then
+  /usr/bin/dehydrated --config "$config" --register --accept-terms
+fi
+
+/usr/bin/dehydrated --config "$config" --challenge tls-alpn-01 --cron

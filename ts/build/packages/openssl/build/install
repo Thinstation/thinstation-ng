@@ -7,6 +7,13 @@ export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""
 repackage -e
 
+# openssl-libs owns the base runtime configuration. Fail packaging if it was
+# lost, since OpenSSL tools and ACME clients require it at runtime.
+test -f /build/packages/openssl/etc/pki/tls/openssl.cnf || {
+    echo "Missing /etc/pki/tls/openssl.cnf from openssl-libs payload"
+    exit 1
+}
+
 returnval=$?
 
 exit $returnval

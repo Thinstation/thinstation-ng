@@ -1,0 +1,59 @@
+services:
+  backend:
+    image: thinstation/infisical:appliance
+    container_name: infisical
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${INFISICAL_HTTP_PORT:-8080}:8080"
+    environment:
+      NODE_ENV: production
+    networks:
+      - infisical
+
+  db:
+    image: thinstation/postgres:14-appliance
+    container_name: infisical-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=$$POSTGRES_USER --dbname=$$POSTGRES_DB"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+    networks:
+      - infisical
+
+  redis:
+    image: thinstation/redis:7-appliance
+    container_name: infisical-redis
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - ./redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - infisical
+
+networks:
+  infisical:
+    driver: bridge
