@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew ACME certificates with lego
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/mcp-appliance/lego.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/lego-update
