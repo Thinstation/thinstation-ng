@@ -66,3 +66,7 @@ class LoginTests(unittest.TestCase):
  def test_ad_preserves_upn(self):self.assertEqual(password_identity('{"username":"operator@other.test","password":"fixture","domain":"example.test"}','active-directory')['username'],'operator@other.test')
  def test_update_ssh_username(self):
   self.credential('one');self.m.set_login('one','new-user');self.assertEqual(self.m.read_meta('one')['username'],'new-user')
+ def test_existing_credentials_default_to_local_managed(self):
+  self.credential('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'managed');self.assertTrue(m['exportable'])
+ def test_pin_local_is_bootstrap_and_non_exportable(self):
+  self.credential('one');self.m.pin_local('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'bootstrap');self.assertFalse(m['exportable'])
