@@ -79,9 +79,7 @@ multipath
 multipathd
 mv
 netstat
-NetworkManager
 nft
-nm-online
 openvt
 pkg
 pidof

@@ -13,7 +13,6 @@ udev
 www
 plymouth
 libssl.so.3
-NetworkManager
 resolvconf
 crypto-policies
 locale

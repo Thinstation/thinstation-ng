@@ -16,6 +16,7 @@ INITDIR=$1
 FASTBOOT_MODE=$2
 HARDLINK=$3
 FB_COMP_EXTRA=$4
+SELECTED_PACKAGES=${5:-}
 
 FASTBOOT_DIR=../fastboot
 DEFERRED_DIR=../fastboot-tmp
@@ -46,6 +47,21 @@ read_list()
 	local file=$1
 	[ -f "$file" ] || return 0
 	grep -Ev '^[[:space:]]*(#|$)' "$file"
+}
+read_policy_list()
+{
+	local kind=$1 pkg
+	read_list "$FASTBOOT_DIR/$kind"
+	for pkg in $SELECTED_PACKAGES; do
+		read_list "$FASTBOOT_DIR/packages/$pkg/$kind"
+	done
+}
+
+policy_contains()
+{
+	local value=$1
+	local kind=$2
+	read_policy_list "$kind" | grep -Fxq "$value"
 }
 
 is_listed()
@@ -124,7 +140,7 @@ seed_retained_libraries()
 	while IFS= read -r lib; do
 		[ -n "$lib" ] || continue
 		target_library "$lib" >/dev/null && printf '%s\n' "$lib" >> "$FASTLIB_ROOTS"
-	done < <(read_list "$FASTBOOT_DIR/lib-boot")
+	done < <(read_policy_list "lib-boot")
 
 	parse_ldd_names "$FASTLIB_NEED" >> "$FASTLIB_ROOTS"
 	sort -u -o "$FASTLIB_ROOTS" "$FASTLIB_ROOTS"
@@ -184,7 +200,7 @@ collect_early_dependencies()
 			[ -e "$path" ] || continue
 			record_ldd "$path"
 		done
-	done < <(read_list "$FASTBOOT_DIR/bin-boot")
+	done < <(read_policy_list "bin-boot")
 
 	for path in "$LIB64_DIR"/plymouth/*.so "$LIB64_DIR"/plymouth/renderers/drm.so "$LIB64_DIR"/security/*; do
 		[ -e "$path" ] || continue
@@ -224,14 +240,14 @@ prepare_vendor_tree()
 		rm -rf "$LIB64_DIR/etc/$item"
 		mv "etc/$item" "$LIB64_DIR/etc/"
 		ln -sf "/usr/lib64/etc/$item" "etc/$item"
-	done < <(read_list "$FASTBOOT_DIR/etc-ro")
+	done < <(read_policy_list "etc-ro")
 
 	while IFS= read -r item; do
 		[ -e "$LIB64_DIR/$item" ] || continue
 		rm -rf "var/$item"
 		mv "$LIB64_DIR/$item" var/
 		ln -sf "/var/$item" "$LIB64_DIR/$item"
-	done < <(read_list "$FASTBOOT_DIR/lib-rw")
+	done < <(read_policy_list "lib-rw")
 }
 
 stage_deferred_usr()
@@ -400,7 +416,7 @@ prune_early_binaries()
 	for item in "$BIN_DIR"/* "$SBIN_DIR"/*; do
 		[ -e "$item" ] || [ -L "$item" ] || continue
 		file=${item##*/}
-		is_listed "$file" "$FASTBOOT_DIR/bin-boot" && continue
+		policy_contains "$file" "bin-boot" && continue
 		rm -rf "$item"
 	done
 }
@@ -448,7 +464,7 @@ prune_early_libraries()
 				;;
 		esac
 
-		is_listed "$lib" "$FASTBOOT_DIR/lib-boot" && continue
+		policy_contains "$lib" "lib-boot" && continue
 		grep -Fxq "$lib" "$FASTLIB_KEEP" && continue
 		is_core_runtime_library "$lib" && continue
 
@@ -464,7 +480,7 @@ prune_early_share()
 	for item in "$SHARE_DIR"/*; do
 		[ -e "$item" ] || [ -L "$item" ] || continue
 		name=${item##*/}
-		is_listed "$name" "$FASTBOOT_DIR/lib-boot" && continue
+		policy_contains "$name" "lib-boot" && continue
 		case "$name" in
 			fonts|fontconfig) continue ;;
 		esac
