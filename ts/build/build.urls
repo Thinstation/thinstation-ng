@@ -11,6 +11,7 @@ param ica_usburl        file://downloads/ctxusb-24.8.0.98-1.x86_64.rpm
 param ica_appprotectionurl file://downloads/ctxappprotection-24.8.0.98-0.x86_64.rpm
 param kioskurl		https://addons.cdn.mozilla.net/storage/public-staging/1659/r_kiosk-0.9.0-fx.xpi
 param torurl		https://www.torproject.org/dist/torbrowser/3.6.1/tor-browser-linux32-3.6.1_en-US.tar.xz
+param nvidia_kmodurl	https://download.nvidia.com/XFree86/Linux-x86_64/595.104.02/NVIDIA-Linux-x86_64-595.104.02.run
 param xorg7_nvidiaurl	http://us.download.nvidia.com/XFree86/Linux-x86_64/515.76/NVIDIA-Linux-x86_64-515.76.run
 param xorg7_fglrxurl	http://www2.ati.com/drivers/linux/amd-catalyst-13.12-linux-x86.x86_64.zip
 param samsunguldurl	http://www.bchemnet.com/suldr/driver/UnifiedLinuxDriver-1.00.36.tar.gz
