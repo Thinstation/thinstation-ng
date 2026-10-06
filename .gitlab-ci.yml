@@ -682,11 +682,11 @@ stage-mcp-appliance-distro:
       mv "$staging" "$incoming"
       echo "Staged $(basename "$iso") at $incoming"
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'
       when: on_success
     - when: never
 
@@ -695,10 +695,10 @@ trigger-publisher-mcp-appliance:
   needs:
     - job: stage-mcp-appliance-distro
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule" && $BUILD_MCP_APPLIANCE == "1"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "api" && $BUILD_MCP_APPLIANCE == "1"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'
       when: on_success
     - when: never
