@@ -11,6 +11,8 @@ ThinStation NG is an image-building system with a generated chroot and package-r
 - Preserve ISO/output and expensive staged container payloads before destructive build cleanup.
 - Keep site-specific organization names, addresses, credentials, deployment topology, and environment-only values out of reusable source and AI guidance.
 - Do not suppress build warnings with broad text filters. Known benign output should remain visible so future meaningful failures are not hidden.
+- Keep software compilation out of ThinStation NG except for the ThinStation image/build process itself and unavoidable kernel-coupled components such as proprietary kernel modules. Prefer Fedora/upstream RPMs. If a package requires custom source changes and compilation, build and publish that artifact in the dedicated `thinstation-rpms` repository, then consume the resulting RPM from ThinStation NG.
+- Development harnesses used to create a custom RPM (for example iPXE source-build experiments) should be retired from ThinStation NG once the RPM pipeline is authoritative. Keep only regression tests that validate ThinStation's consumption, image assembly, or runtime behavior.
 
 ## Project skills
 
