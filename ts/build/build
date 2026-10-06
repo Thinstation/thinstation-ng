@@ -616,7 +616,7 @@ make_initrd()
 	usrmerge_tree
 	if [ "$ts_fastboot" == "true" ] || [ "$ts_fastboot" == "lotsofmem" ] ;then
 		echo -e "\nMaking initramfs - Fastboot Enabled"
-		../fastboot/fastboot-mangle "$INITDIR" "$ts_fastboot" "$ts_hardlinkfs" "$ts_squashopt"
+		../fastboot/fastboot-mangle "$INITDIR" "$ts_fastboot" "$ts_hardlinkfs" "$ts_squashopt" "$FASTBOOT_PACKAGES"
 	else
 		if [ -e $INITDIR/lib.squash ] ; then
 			rm $INITDIR/lib.squash
@@ -1773,6 +1773,10 @@ do
 		rm -R $filename/build/contribs
 	fi
 done
+
+# Preserve the final dependency-expanded package set for package-aware fastboot policy
+FASTBOOT_PACKAGES=$(find "$PACDIR" -maxdepth 1 -type f \( -name '*.package' -o -name '*.pkg' \) -printf '%f\n' 2>/dev/null | sed -E 's/\.(package|pkg)$//' | sort -u | tr '\n' ' ')
+export FASTBOOT_PACKAGES
 
 # Clean up unncessary folders
 rm -Rf $PACDIR
