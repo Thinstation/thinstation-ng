@@ -4,6 +4,11 @@ start=$PWD
 self="$0"
 self_path="$(dirname "$0")/../.."
 cd "$self_path"
+if [ -d /build/boot-images ]; then
+        BT_BUILD_ROOT=/build
+else
+        BT_BUILD_ROOT="$self_path/ts/build"
+fi
 #set -e
 
 if [ -n "${BT_STATE_DIR:-}" ]; then
@@ -362,7 +367,7 @@ bridge()
 
 setup_ipxe_netboot()
 {
-        IPXE_BOOT_ROOT=/build/boot-images/grub/efi-source
+        IPXE_BOOT_ROOT="$BT_BUILD_ROOT/boot-images/grub/efi-source"
         IPXE_HTTP_PID=""
 
         case "$1" in
@@ -437,7 +442,7 @@ wrap_bios()
         fi
         export AGREE=true
         rm thinstation.img
-        mkmbrdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o /build/boot-images/grub/efi-source -l thinstation.img:10g
+        mkmbrdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o "$BT_BUILD_ROOT/boot-images/grub/efi-source" -l thinstation.img:10g
 }
 
 wrap_efi()
@@ -449,7 +454,7 @@ wrap_efi()
         fi
         export AGREE=true
         rm thinstation.img
-        mkgptdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o /build/boot-images/grub/efi-source -l thinstation.img:10g
+        mkgptdrv -p d:4g:boot -p l:2g:prstnt -p l:2g:log -p l:0:home -o "$BT_BUILD_ROOT/boot-images/grub/efi-source" -l thinstation.img:10g
 }
 
 setup_qemu "$MODE"
