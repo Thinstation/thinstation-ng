@@ -25,7 +25,7 @@
     if(target.startsWith('group:')) return 'Group: '+target.slice(6);
     return target;
   }
-  async function unlockVault(){try{await json('/api/vault/unlock','POST',{seconds:Number(unlockSeconds||600),scopes:list(unlockScopes)});result='Vault unlocked.';await onRefresh()}catch(e){result=e.message}}
+  async function unlockVault(){try{const response=await json('/api/vault/unlock','POST',{seconds:Number(unlockSeconds||600),scopes:list(unlockScopes)});const expires=response?.vault?.lease?.expires;result=expires?'Vault unlocked until '+new Date(expires*1000).toLocaleString()+'.':'Vault unlocked.';await onRefresh()}catch(e){result=e.message}}
   async function lockVault(){try{await json('/api/vault/lock','POST',{});result='Vault locked.';await onRefresh()}catch(e){result=e.message}}
   async function loadRequests(){try{requests=(await api('/api/vault/credential-requests')).requests||[]}catch(e){result=e.message}}
   async function loadInventory(){
@@ -122,7 +122,7 @@
     <div class="panel-body stack">
       <p class="muted">{#if health?.vault?.locked}Unlock the vault before using protected credentials.{:else}Authorized until {health?.vault?.lease?.expires?new Date(health.vault.lease.expires*1000).toLocaleString():'the current lease ends'}.{/if}</p>
       <div class="form-grid">
-        <label class="field"><span>Authorization duration (seconds)</span><input type="number" min="60" max="3600" bind:value={unlockSeconds}/></label>
+        <label class="field"><span>Authorization duration (seconds)</span><input type="number" min="60" max="604800" bind:value={unlockSeconds}/></label>
         <label class="field"><span>Scopes</span><input bind:value={unlockScopes} placeholder="Leave blank for all permitted scopes"/></label>
       </div>
       <div class="actions"><button class="btn primary" disabled={!health?.vault?.locked} on:click={unlockVault}>Unlock</button><button class="btn" disabled={health?.vault?.locked} on:click={lockVault}>Lock now</button></div>
