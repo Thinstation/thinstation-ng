@@ -1,0 +1,11 @@
+#!/bin/sh
+
+export PACKAGE="rsync"
+export PORTS="rsync"
+export DROP_FILES=""
+export DROP_DIRS=""
+export CREATE_EMPTY_DIRS=""
+repackage -e
+
+returnval=$?
+exit $returnval
