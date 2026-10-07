@@ -176,7 +176,7 @@ package lz4                   # Very fast compression/decompression for transien
 #package extensions           # Extra system utilities
 #package extensions-x         # Extra X11 utilities and tools
 #package file-roller          # Archive manager for compressed files
-#package nmap                 # Network analysis tool
+package nmap                  # Network analysis and troubleshooting toolkit
 
 ############################
 ### --- Applications --- ###
