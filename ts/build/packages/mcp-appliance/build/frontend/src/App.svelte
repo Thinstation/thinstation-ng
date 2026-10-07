@@ -45,7 +45,7 @@
  <div class="shell" class:nav-open={navOpen}>
   {#if navOpen}<button class="drawer-backdrop" aria-label="Close menu" on:click={()=>navOpen=false}></button>{/if}
   <aside class="sidebar">
-   <div class="brand"><img class="brandmark" src="/thinstation.svg" alt="ThinStation"/><div><div class="brandtext">ThinStation</div><div class="brandsub">MCP Appliance</div></div></div>
+   <div class="brand"><img class="brandwordmark" src="/watermark.png" alt="ThinStation"/><div class="brandsub">MCP Appliance</div></div>
    <nav class="navgroup" aria-label="Main navigation">
     {#each topPages as item}
      <button class="navbtn" class:active={page===item[0]||page.startsWith(item[0]+'/')} on:click={()=>go(item[0])}>{item[1]}</button>
