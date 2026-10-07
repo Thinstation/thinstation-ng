@@ -110,7 +110,7 @@ class ADIntegrationTests(unittest.TestCase):
             'accept_terms':True,'dns_provider':'active-directory','ad_server':'dc01.example.test',
             'ad_zone':'example.test','ad_realm':'example.test','credential':'acme-ad'})
         self.cred={'name':'acme-ad','type':'active-directory','scopes':['acme'],'allowed_hosts':['dc01.example.test']}
-        self.vault={'credentials':[self.cred],'lease':{'expires':4102444800,'scopes':['acme']},'grants':[]}
+        self.vault={'credentials':[self.cred],'credential_leases':[{'credential':'acme-ad','expires':4102444800,'scopes':['acme']}],'grants':[]}
         self.manager=acme.Certificates({'vault_status':lambda:self.vault},base=self.base,native=self.base/'native.conf')
         acme.atomic(self.base/'config/hosts.json', json.dumps({'hosts':{'dc':{'platform':'windows','hostname':'dc01.example.test','address':'192.0.2.10'}},'groups':{}}))
     def tearDown(self):self.tmp.cleanup()
@@ -125,7 +125,7 @@ class ADIntegrationTests(unittest.TestCase):
     def test_other_ad_server_rejected(self):
         self.cred['allowed_hosts']=['other.example.test'];self.assertFalse(self.readiness()['ready'])
     def test_locked_vault_requires_grant(self):
-        self.vault['lease']=None;self.assertFalse(self.readiness()['ready'])
+        self.vault['credential_leases']=[];self.assertFalse(self.readiness()['ready'])
         self.vault['grants']=[{'scope':'acme','credential':'acme-ad','expires':4102444800}]
         self.assertTrue(self.readiness()['ready'])
     def test_runtime_absent_blocks_provider(self):

@@ -25,8 +25,23 @@
     if(target.startsWith('group:')) return 'Group: '+target.slice(6);
     return target;
   }
-  async function unlockVault(){try{const response=await json('/api/vault/unlock','POST',{seconds:Number(unlockSeconds||600),scopes:list(unlockScopes)});const expires=response?.vault?.lease?.expires;result=expires?'Vault unlocked until '+new Date(expires*1000).toLocaleString()+'.':'Vault unlocked.';await onRefresh()}catch(e){result=e.message}}
-  async function lockVault(){try{await json('/api/vault/lock','POST',{});result='Vault locked.';await onRefresh()}catch(e){result=e.message}}
+  async function authorizeSelected(){
+    try{
+      const response=await json('/api/vault/authorize-credential','POST',{name:selected.name,seconds:Number(unlockSeconds||600),scopes:list(unlockScopes)});
+      const current=response?.vault?.credentials?.find(c=>c.name===selected.name);
+      selected=current?{...selected,...current}:selected;
+      const expires=current?.authorization?.expires;
+      result=expires?'Credential authorized until '+new Date(expires*1000).toLocaleString()+'.':'Credential authorized.';
+      await onRefresh();
+    }catch(e){result=e.message}
+  }
+  async function revokeSelected(){
+    try{
+      await json('/api/vault/revoke-credential','POST',{name:selected.name});
+      selected={...selected,authorization:{mode:'locked'}};
+      result='Credential authorization revoked.';await onRefresh()
+    }catch(e){result=e.message}
+  }
   async function loadRequests(){try{requests=(await api('/api/vault/credential-requests')).requests||[]}catch(e){result=e.message}}
   async function loadInventory(){
     try{
@@ -105,7 +120,7 @@
     }catch(e){result=e.message}
   }
   async function pinLocal(){
-    try{await json('/api/vault/pin-local','POST',{name:selected.name});result='Credential pinned to the local bootstrap provider and marked non-exportable.';selected=null;await onRefresh()}
+    try{await json('/api/vault/pin-local','POST',{name:selected.name});result='Credential is now machine-bound, non-exportable, and automatically available after boot.';selected=null;await onRefresh()}
     catch(e){result=e.message}
   }
   async function deleteSelected(){
@@ -118,15 +133,8 @@
 <div class="page">
   <div class="page-title"><div><h1>Credentials</h1><p>Privileged credentials and permitted targets</p></div><div class="actions"><span class="pill">{creds.length} stored</span><button class="btn primary" on:click={()=>newWizard()}>Add credential</button></div></div>
   <section class="panel" style="margin-bottom:1rem">
-    <div class="panel-head"><h2>Vault authorization</h2><span class="spacer"></span><span class:warn={health?.vault?.locked} class:ok={!health?.vault?.locked} class="pill">{health?.vault?.locked?'Locked':'Unlocked'}</span></div>
-    <div class="panel-body stack">
-      <p class="muted">{#if health?.vault?.locked}Unlock the vault before using protected credentials.{:else}Authorized until {health?.vault?.lease?.expires?new Date(health.vault.lease.expires*1000).toLocaleString():'the current lease ends'}.{/if}</p>
-      <div class="form-grid">
-        <label class="field"><span>Authorization duration (seconds)</span><input type="number" min="60" max="604800" bind:value={unlockSeconds}/></label>
-        <label class="field"><span>Scopes</span><input bind:value={unlockScopes} placeholder="Leave blank for all permitted scopes"/></label>
-      </div>
-      <div class="actions"><button class="btn primary" disabled={!health?.vault?.locked} on:click={unlockVault}>Unlock</button><button class="btn" disabled={health?.vault?.locked} on:click={lockVault}>Lock now</button></div>
-    </div>
+    <div class="panel-head"><h2>Credential authorization</h2><span class="spacer"></span><span class="pill">{health?.vault?.authorization?.authorized||0} authorized</span></div>
+    <div class="panel-body"><p class="muted">Managed credentials are authorized individually. Machine-bound bootstrap credentials are available automatically after boot so services can start unattended.</p></div>
   </section>
   {#if requests.filter(r=>!r.satisfied).length}
     <section class="panel" style="margin-bottom:1rem">
@@ -140,8 +148,8 @@
   <div class="two-col">
     <section class="panel">
       <div class="panel-head"><h2>Credential inventory</h2><span class="spacer"></span><input style="max-width:300px" placeholder="Search credentials" bind:value={search}/></div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Provider</th><th>Scopes</th><th>Targets</th><th></th></tr></thead><tbody>
-      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}{#if c.storage_class==='bootstrap'}<div class="muted">bootstrap · non-exportable</div>{/if}</td><td>{c.type||'secret'}</td><td>{c.provider||'local'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><button class="btn small" on:click={()=>open(c)}>Open</button></td></tr>{/each}
+      <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Authorization</th><th>Provider</th><th>Scopes</th><th>Targets</th><th></th></tr></thead><tbody>
+      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}{#if c.storage_class==='bootstrap'}<div class="muted">machine-bound · non-exportable</div>{/if}</td><td>{c.type||'secret'}</td><td>{c.storage_class==='bootstrap'?'Always available':c.authorization?.mode==='credential'?'Until '+new Date(c.authorization.expires*1000).toLocaleString():'Locked'}</td><td>{c.provider||'local'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><button class="btn small" on:click={()=>open(c)}>Open</button></td></tr>{/each}
       </tbody></table>{#if !filtered.length}<div class="empty">No matching credentials.</div>{/if}</div>
     </section>
     <section class="panel">
@@ -152,7 +160,8 @@
             <div class="detail-item"><div class="k">Name</div><div class="v">{selected.name}</div></div>
             <div class="detail-item"><div class="k">Type</div><div class="v">{selected.type||'secret'}</div></div>
             <div class="detail-item"><div class="k">Provider</div><div class="v">{selected.provider||'local'}</div></div>
-            <div class="detail-item"><div class="k">Storage class</div><div class="v">{selected.storage_class||'managed'}{selected.exportable===false?' · non-exportable':''}</div></div>
+            <div class="detail-item"><div class="k">Storage class</div><div class="v">{selected.storage_class==='bootstrap'?'machine-bound bootstrap':(selected.storage_class||'managed')}{selected.exportable===false?' · non-exportable':''}</div></div>
+            <div class="detail-item"><div class="k">Authorization</div><div class="v">{selected.storage_class==='bootstrap'?'Always available after boot':selected.authorization?.mode==='credential'?'Authorized until '+new Date(selected.authorization.expires*1000).toLocaleString():'Locked'}</div></div>
             <div class="detail-item"><div class="k">Protection</div><div class="v">{selected.passphrase_protected?'Passphrase protected':'Standard vault protection'}</div></div>
             <div class="detail-item"><div class="k">Public key</div><div class="v">{selected.public_key?'Available':'Not applicable'}</div></div>
           </div>
@@ -172,9 +181,16 @@
             </div>
             {#if selected.type==='ssh-key'}<label class="field"><span>Login username</span><input bind:value={selected.loginUsername} autocomplete="username"/></label>{:else if selected.username}<div class="muted">Login: {selected.username}{selected.domain?' ('+selected.domain+')':''}</div>{/if}
             {#if selected.public_key}<div><button class="btn" on:click={()=>navigator.clipboard.writeText(selected.public_key)}>Copy public key</button></div>{/if}
+            {#if selected.storage_class!=='bootstrap'}
+              <div class="form-grid">
+                <label class="field"><span>Authorization duration (seconds)</span><input type="number" min="60" max="604800" bind:value={unlockSeconds}/></label>
+                <label class="field"><span>Authorized scopes</span><input bind:value={unlockScopes} placeholder="Leave blank for all credential scopes"/></label>
+              </div>
+              <div class="actions"><button class="btn primary" on:click={authorizeSelected}>Authorize credential</button>{#if selected.authorization?.mode==='credential'}<button class="btn" on:click={revokeSelected}>Lock credential</button>{/if}</div>
+            {/if}
             <hr style="border:0;border-top:1px solid var(--line);width:100%"/>
             <label class="field"><span>Rename credential</span><input bind:value={selected.newName}/></label>
-            <div class="actions"><button class="btn primary" on:click={saveSelected}>Save</button>{#if (selected.provider||'local')==='local'&&selected.storage_class!=='bootstrap'}<button class="btn" on:click={()=>confirm('Pin this credential to the local bootstrap provider? This marks it non-exportable.')&&pinLocal()}>Pin local</button>{/if}<button class="btn danger" on:click={()=>confirm('Delete this credential?')&&deleteSelected()}>Delete</button></div>
+            <div class="actions"><button class="btn primary" on:click={saveSelected}>Save</button>{#if (selected.provider||'local')==='local'&&selected.storage_class!=='bootstrap'}<button class="btn" on:click={()=>confirm('Make this a machine-bound bootstrap credential? It will be non-exportable and available automatically after boot.')&&pinLocal()}>Make machine credential</button>{/if}<button class="btn danger" on:click={()=>confirm('Delete this credential?')&&deleteSelected()}>Delete</button></div>
           </div>
         {:else}<div class="empty">Select a credential to inspect scopes, targets, and administrative options.</div>{/if}
       </div>

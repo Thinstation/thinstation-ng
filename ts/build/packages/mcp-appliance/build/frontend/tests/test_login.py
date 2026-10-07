@@ -9,7 +9,7 @@ class LoginTests(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
   self.doc={'hosts':{'ad':{'address':'192.0.2.10','hostname':'dc.example.test','platform':'windows'}},'groups':{'controllers':{'hosts':['ad']}}}
   self.m=types.ModuleType('vault_fixture');source=(BIN/'mcp-vault-core').read_text().split('\nargs=sys.argv[1:]')[0];exec(compile(source,'vault-fixture','exec'),self.m.__dict__)
-  for name,rel in {'BASE':'vault','CREDS':'vault/credentials','META':'vault/metadata','RUN':'run','LEASE':'run/lease.json','GRANTS':'run/grants','AUDIT':'log/audit','INVENTORY':'config/hosts.json','LEGACY_INVENTORY':'old.json','MATERIALIZED':'run/materialized'}.items():setattr(self.m,name,self.root/rel)
+  for name,rel in {'BASE':'vault','CREDS':'vault/credentials','META':'vault/metadata','RUN':'run','LEASE':'run/lease.json','GRANTS':'run/grants','CRED_LEASES':'run/credential-leases','AUDIT':'log/audit','INVENTORY':'config/hosts.json','LEGACY_INVENTORY':'old.json','MATERIALIZED':'run/materialized'}.items():setattr(self.m,name,self.root/rel)
   self.m.ensure();self.m.INVENTORY.parent.mkdir();self.m.INVENTORY.write_text(json.dumps(self.doc))
  def tearDown(self):self.tmp.cleanup()
  def credential(self,name,ctype='ssh-key',targets=None,username='automation'):
@@ -18,7 +18,7 @@ class LoginTests(unittest.TestCase):
   stream=io.StringIO()
   with contextlib.redirect_stdout(stream):fn(*args)
   return json.loads(stream.getvalue())
- def unlock(self):self.m.LEASE.write_text(json.dumps({'expires':time.time()+60,'scopes':['ssh']}))
+ def unlock(self,name='one',scope='ssh'):self.m.CRED_LEASES.mkdir(parents=True,exist_ok=True);self.m.CRED_LEASES.joinpath(name+'.json').write_text(json.dumps({'credential':name,'expires':time.time()+60,'scopes':[scope]}))
  def test_host_beats_group(self):
   self.credential('group',targets=['group:controllers']);self.credential('direct',targets=['host:ad'])
   self.assertEqual(self.capture(self.m.resolve_credential,'ad','ssh','ssh-login')['name'],'direct')
@@ -53,7 +53,7 @@ class LoginTests(unittest.TestCase):
   self.credential('one',ctype='active-directory',targets=['host:ad'],username='stale');self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']})
   self.assertEqual(self.capture(self.m.resolve_credential,'ad','rdp','password-login')['name'],'one')
  def test_materialize_login_returns_file_not_secret(self):
-  self.credential('one',ctype='active-directory',targets=['host:ad']);self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']});self.m.LEASE.write_text(json.dumps({'expires':time.time()+60,'scopes':['rdp']}))
+  self.credential('one',ctype='active-directory',targets=['host:ad']);self.m.write_meta('one',{**self.m.read_meta('one'),'scopes':['rdp']});self.unlock('one','rdp')
   secret=json.dumps({'domain':'example.test','username':'service','password':'fixture-only'})
   with patch.object(self.m,'decrypt_to_file',side_effect=lambda n,p:p.write_text(secret)):result=self.capture(self.m.materialize_login,'one','ad','rdp')
   self.assertEqual(result['username'],'service@example.test');self.assertEqual(Path(result['password_file']).read_text(),'fixture-only');self.assertNotIn('fixture-only',json.dumps(result));self.m.cleanup_materialized(result['materialized'])
@@ -78,3 +78,12 @@ class LoginTests(unittest.TestCase):
   self.credential('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'managed');self.assertTrue(m['exportable'])
  def test_pin_local_is_bootstrap_and_non_exportable(self):
   self.credential('one');self.m.pin_local('one');m=self.m.read_meta('one');self.assertEqual(m['provider'],'local');self.assertEqual(m['storage_class'],'bootstrap');self.assertFalse(m['exportable'])
+
+ def test_bootstrap_credential_is_available_without_operator_lease(self):
+  self.credential('machine');self.m.pin_local('machine')
+  self.assertEqual(self.m.authorization('machine','ssh')[0],'bootstrap')
+ def test_managed_credentials_have_individual_leases(self):
+  self.credential('one');self.credential('two')
+  self.unlock('one','ssh')
+  self.assertEqual(self.m.authorization('one','ssh')[0],'credential-lease')
+  self.assertIsNone(self.m.authorization('two','ssh')[0])
