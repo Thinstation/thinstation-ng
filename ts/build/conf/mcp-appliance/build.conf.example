@@ -160,6 +160,13 @@ package curl                 # Command-line tool for transferring data with URLs
 #package gparted              # Graphical partition manager
 package git                   # Version control for persistent chroot workspaces
 package dnf                   # DNF5/RPM package manager for persistent chroot creation and maintenance
+package jq                    # JSON inspection for appliance configuration and recovery
+package sqlite                # Local appliance database inspection and recovery
+package iproute               # Full iproute2 suite, including ss
+package parted                # Persistent-disk partition repair and expansion
+package gdisk                 # GPT inspection/repair (sgdisk)
+package rsync                 # Preserve metadata while repairing/copying persistent trees
+package tpm2-tools            # Diagnose and recover TPM/vTPM-backed appliance state
 package zstd                  # Fast general-purpose compression for chroot/image archives
 package lz4                   # Very fast compression/decompression for transient images/caches
 #package nano                 # Lightweight text editor

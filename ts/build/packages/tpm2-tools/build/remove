@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export PACKAGE=tpm2-tools
+repackage -c
