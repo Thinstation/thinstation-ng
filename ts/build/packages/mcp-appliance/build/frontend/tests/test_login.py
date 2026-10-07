@@ -87,3 +87,11 @@ class LoginTests(unittest.TestCase):
   self.unlock('one','ssh')
   self.assertEqual(self.m.authorization('one','ssh')[0],'credential-lease')
   self.assertIsNone(self.m.authorization('two','ssh')[0])
+
+ def test_authorize_without_scope_uses_credential_policy(self):
+  self.credential('one');result=self.capture(self.m.authorize_credential,['one','120'])
+  self.assertEqual(result['scopes'],['ssh'])
+  self.assertEqual(self.m.authorization('one','ssh')[0],'credential-lease')
+ def test_authorize_explicit_invalid_scope_still_fails_closed(self):
+  self.credential('one')
+  with self.assertRaisesRegex(SystemExit,'exceeds credential policy'):self.m.authorize_credential(['one','120','rdp'])
