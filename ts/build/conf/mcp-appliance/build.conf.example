@@ -163,6 +163,7 @@ package dnf                   # DNF5/RPM package manager for persistent chroot c
 package jq                    # JSON inspection for appliance configuration and recovery
 package sqlite                # Local appliance database inspection and recovery
 package iproute               # Full iproute2 suite, including ss
+package netcat                # nc-compatible TCP/UDP diagnostic client
 package parted                # Persistent-disk partition repair and expansion
 package gdisk                 # GPT inspection/repair (sgdisk)
 package rsync                 # Preserve metadata while repairing/copying persistent trees
