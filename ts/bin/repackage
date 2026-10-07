@@ -455,54 +455,111 @@ from_env()
 
 reduce_libs()
 {
-	if [ -e $pkgpath/usr/lib64 ]; then
-		for link in `find $pkgpath/usr/lib64 -mindepth 1 -maxdepth 1 -type l \
-		| grep -E 'lib64/lib' \
-		| grep -E '\.so' | sort -u`; do
-			# Normalize the link
-			linkdest=`readlink $link | sed -e 's,\.\./\.\./usr/lib64/,,' -e 's,\.\./\.\./lib64/,,' -e 's,^/usr/lib64/,,' -e 's,^/lib64/,,'`
-			linkdir=`dirname $link`
-			# If the link is to another directory, leave it alone
-			if [ `echo $linkdest | grep -E '/'` ]; then
-				continue
-			fi
-			# Ignore TCL/TK, it doesn't ever declare an SONAME
-			# ncurses has some wierd scripts named .so ??
-			# llvm has an ascii file with a .so extension
-			if [ -n "`basename $link |grep -E 'libtcl.so$|libtk.so$|libncurses.so$|libcurses.so$|libform.so$|libmenu.so$|libpanel.so$|libcursesw.so$|libc\+\+.so$|libVkLayer_khronos_validation.so$'`" ]; then
-				continue
-			fi
-			soname=`objdump -p $linkdir/$linkdest | grep SONAME | awk '{print $2}'`
-			base=`basename $link`
-			if [ -z "$soname" ]; then
-				echo "MISSING SONAME $link"
-#				exit 1
-			elif [ "$base" == "$soname" ]; then
-				rm $link
-				cp $linkdir/$linkdest $link
-			else
-				rm $link
-			fi
+	local libdir="$pkgpath/usr/lib64"
+	local stage ledger entry real soname staged
+	local src_hash staged_hash
+
+	[ -d "$libdir" ] || return 0
+
+	stage="$libdir/.repackage-soname.$$"
+	ledger="$stage/delete.list"
+	mkdir -p "$stage/files" || return 1
+	: > "$ledger" || { rm -rf "$stage"; return 1; }
+
+	resolve_library_link()
+	{
+		local current="$1"
+		local target hops=0
+
+		while [ -L "$current" ]; do
+			target=`readlink "$current"` || return 1
+
+			# Keep the old conservative behavior for links that leave the
+			# top-level library directory. Those may be linker scripts or
+			# intentionally cross-directory links.
+			case "$target" in
+				*/*) return 1 ;;
+			esac
+
+			current="$libdir/$target"
+			hops=$((hops + 1))
+			[ "$hops" -le 32 ] || return 1
 		done
-		for lib in `find $pkgpath/usr/lib64 -mindepth 1 -maxdepth 1 -type f \
-		| grep -E 'lib64/lib' \
-		| grep -E '\.so' |sort -u`; do
-			# Ignore TCL/TK, it doesn't ever declare an SONAME
-			# ncurses has some wierd scripts named .so ??
-			# llvm has an ascii file with a .so extension
-			if [ -n "`basename $lib |grep -E 'libtcl8.6.so$|libtk8.6.so$|libncurses.so$|libcurses.so$|libform.so$|libmenu.so$|libpanel.so$|libcursesw.so|libc\+\+.so$|libVkLayer_khronos_validation.so$'`" ]; then
-				continue
+
+		[ -f "$current" ] || return 1
+		printf '%s\n' "$current"
+	}
+
+	# First pass: resolve every top-level lib*.so* entry to its real ELF,
+	# probe that real file for SONAME, and stage one regular file named
+	# exactly by that SONAME. Do not delete or replace anything yet.
+	for entry in "$libdir"/lib*.so*; do
+		[ -e "$entry" ] || [ -L "$entry" ] || continue
+
+		if [ -L "$entry" ]; then
+			real=`resolve_library_link "$entry"` || continue
+		elif [ -f "$entry" ]; then
+			real="$entry"
+		else
+			continue
+		fi
+
+		soname=`objdump -p -- "$real" 2>/dev/null | awk '$1 == "SONAME" { print $2; exit }'`
+		[ -n "$soname" ] || continue
+
+		case "$soname" in
+			""|"."|".."|*/*)
+				echo "Invalid SONAME '$soname' from $real" >&2
+				rm -rf "$stage"
+				return 1
+				;;
+		esac
+
+		staged="$stage/files/$soname"
+		if [ -f "$staged" ]; then
+			src_hash=`sha256sum "$real" | awk '{print $1}'`
+			staged_hash=`sha256sum "$staged" | awk '{print $1}'`
+			if [ "$src_hash" != "$staged_hash" ]; then
+				echo "Conflicting libraries advertise SONAME $soname: $real" >&2
+				rm -rf "$stage"
+				return 1
 			fi
-			soname=`objdump -p $lib | grep SONAME | awk '{print $2}'`
-			base=`basename $lib`
-			if [ -z "$soname" ]; then
-				echo "MISSING SONAME $lib"
-#				exit 1
-			elif [ "$base" != "$soname" ]; then
-				rm $lib
-			fi
-		done
+		else
+			cp -a -- "$real" "$staged" || {
+				rm -rf "$stage"
+				return 1
+			}
+		fi
+
+		printf '%s\n' "$entry" >> "$ledger"
+	done
+
+	# If nothing was safely reducible, leave the package untouched.
+	if [ ! -s "$ledger" ]; then
+		rm -rf "$stage"
+		return 0
 	fi
+
+	# All SONAME files are now staged successfully. Only now mutate the
+	# package tree. Delete each original path once, then install the staged
+	# regular files under their SONAMEs.
+	sort -u "$ledger" -o "$ledger"
+	while IFS= read -r entry; do
+		rm -f -- "$entry" || {
+			rm -rf "$stage"
+			return 1
+		}
+	done < "$ledger"
+
+	for staged in "$stage"/files/*; do
+		[ -f "$staged" ] || continue
+		mv -f -- "$staged" "$libdir/`basename "$staged"`" || {
+			rm -rf "$stage"
+			return 1
+		}
+	done
+
+	rm -rf "$stage"
 }
 
 remove_libs()
