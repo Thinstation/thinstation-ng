@@ -2,7 +2,7 @@
 import json, os, subprocess, sys, tempfile, time
 from pathlib import Path
 BASE=Path('/var/prstnt/mcp-appliance/vault'); RUN=Path('/run/mcp-appliance/vault')
-CREDS=BASE/'credentials'; META=BASE/'metadata'; LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'; AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
+CREDS=BASE/'credentials'; META=BASE/'metadata'; CRED_LEASES=RUN/'credential-leases'; GRANTS=RUN/'grants'; AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
 
 
 def audit(event, **fields):
@@ -20,11 +20,12 @@ def authorize(scope,name,envvar=None,command=None):
     m=load(META/(name+'.json'),{})
     cs=set(m.get('scopes',[]))
     if cs and '*' not in cs and scope not in cs: raise SystemExit('credential scope denied')
+    if m.get('storage_class')=='bootstrap': return ('bootstrap',None)
     now=int(time.time())
-    l=load(LEASE,{})
-    if int(l.get('expires',0))>now:
+    l=load(CRED_LEASES/(name+'.json'),{})
+    if int(l.get('expires',0))>now and l.get('credential')==name:
         ls=set(l.get('scopes',[]))
-        if '*' in ls or scope in ls: return ('lease',None)
+        if '*' in ls or scope in ls: return ('credential-lease',None)
     GRANTS.mkdir(parents=True,exist_ok=True); os.chmod(GRANTS,0o700)
     for gp in sorted(GRANTS.glob('*.json')):
         d=load(gp,{})
@@ -44,7 +45,7 @@ def authorize(scope,name,envvar=None,command=None):
                 return ('service',None)
         except Exception:
             pass
-    raise SystemExit('vault is locked or no matching one-shot grant')
+    raise SystemExit('credential is locked or no matching one-shot grant')
 
 def main(a):
     if len(a)<5 or a[3]!='--': raise SystemExit('usage: mcp-vault-run SCOPE CREDENTIAL ENVVAR -- COMMAND...')

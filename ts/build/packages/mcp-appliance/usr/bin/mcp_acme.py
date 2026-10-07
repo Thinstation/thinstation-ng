@@ -298,13 +298,14 @@ class Certificates:
                     else:target_allowed=not hosts or all(n in hosts for n in names)
                     if not target_allowed:
                         issues.append('The credential must allow the AD DNS server directly or through its inventory group.' if cfg['dns_provider'] == 'active-directory' else 'The credential must allow every certificate DNS name explicitly.')
-                    lease = vault.get('lease') or {}
-                    allowed = lease.get('expires', 0) > time.time() and bool({'*', 'acme'}.intersection(lease.get('scopes', [])))
+                    lease = next((x for x in vault.get('credential_leases', []) if x.get('credential') == cfg['credential'] and int(x.get('expires',0)) > time.time()), None)
+                    allowed = cred.get('storage_class') == 'bootstrap'
+                    allowed = allowed or bool(lease and {'*','acme'}.intersection(lease.get('scopes', [])))
                     allowed = allowed or any(g.get('scope') == 'acme' and g.get('credential') == cfg['credential'] and g.get('expires', 0) > time.time() for g in vault.get('grants', []))
                     if not allowed:
-                        issues.append('Authorize the credential for acme in Credentials before requesting a certificate.')
-                    if cfg['automatic']:
-                        warnings.append('Vault credentials require a valid acme lease or grant at renewal time; the vault is never unlocked automatically.')
+                        issues.append('Authorize this credential for acme in Credentials before requesting a certificate.')
+                    if cfg['automatic'] and cred.get('storage_class') != 'bootstrap':
+                        warnings.append('Automatic renewal requires its saved service authorization or a machine-bound bootstrap credential; interactive credential leases expire.')
         elif cfg['challenge'] == 'http-01':
             issues.extend(http01.prerequisites(cfg))
             if cfg['http_mode']=='standalone':
@@ -363,7 +364,7 @@ class Certificates:
         if not self.settings.exists(): raise ValueError('Save the ACME configuration before authorizing credential use.')
         if cfg.get('challenge')!='dns-01' or cfg.get('dns_provider')!='active-directory' or not cfg.get('credential'):
             raise ValueError('The saved ACME configuration does not use an Active Directory DNS credential.')
-        report=self.readiness(cfg,{**self.vault(),'lease':{'expires':int(time.time())+60,'scopes':['acme']},'grants':[]})
+        report=self.readiness(cfg,{**self.vault(),'credential_leases':[{'credential':cfg['credential'],'expires':int(time.time())+60,'scopes':['acme']}],'grants':[]})
         blocking=[x for x in report['issues'] if 'Authorize the credential' not in x]
         if blocking: raise ValueError(' '.join(blocking))
         p=command(['/usr/bin/mcp-vault-core','grant','acme',cfg['credential'],'300'])

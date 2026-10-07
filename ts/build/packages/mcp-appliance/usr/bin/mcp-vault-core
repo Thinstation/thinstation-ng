@@ -4,7 +4,7 @@ from pathlib import Path
 from mcp_login import LOGIN_TYPES, login_name, password_identity, target_rank
 BASE=Path('/var/prstnt/mcp-appliance/vault')
 CREDS=BASE/'credentials'; META=BASE/'metadata'
-RUN=Path('/run/mcp-appliance/vault'); LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'
+RUN=Path('/run/mcp-appliance/vault'); LEASE=RUN/'lease.json'; GRANTS=RUN/'grants'; CRED_LEASES=RUN/'credential-leases'
 CONF=Path('/etc/mcp-appliance/vault.conf')
 AUDIT=Path('/var/prstnt/mcp-appliance/log/vault-audit.jsonl')
 
@@ -31,7 +31,7 @@ def effective_key_mode():
     return 'host'
 
 def ensure():
-    for p in (BASE,CREDS,META,RUN,GRANTS): p.mkdir(parents=True,exist_ok=True); os.chmod(p,0o700)
+    for p in (BASE,CREDS,META,RUN,GRANTS,CRED_LEASES): p.mkdir(parents=True,exist_ok=True); os.chmod(p,0o700)
 
 def good_name(n): return bool(n) and all(c.isalnum() or c in '._-' for c in n) and not n.startswith('.')
 
@@ -56,6 +56,52 @@ def lease():
         return d
     except Exception:return None
 
+
+def credential_lease(name):
+    ensure(); now=int(time.time()); p=CRED_LEASES/(name+'.json')
+    try:
+        d=json.loads(p.read_text())
+        if int(d.get('expires',0))<=now:
+            p.unlink(missing_ok=True); return None
+        if d.get('credential')!=name: raise ValueError()
+        return d
+    except Exception:
+        p.unlink(missing_ok=True); return None
+
+def credential_leases_status():
+    out=[]
+    for p in sorted(CRED_LEASES.glob('*.json')):
+        d=credential_lease(p.stem)
+        if d: out.append(d)
+    return out
+
+def authorize_credential(args):
+    ensure()
+    if not args: raise SystemExit('usage: authorize CREDENTIAL [SECONDS] [SCOPES...]')
+    name=args[0]
+    if not good_name(name) or not (CREDS/(name+'.cred')).is_file(): raise SystemExit('credential not found')
+    m=read_meta(name)
+    if m.get('storage_class')=='bootstrap':
+        raise SystemExit('bootstrap credentials are machine-bound and do not require a runtime lease')
+    rest=args[1:]; c=cfg()
+    secs=int(rest[0]) if rest and rest[0].isdigit() else int(c['VAULT_DEFAULT_LEASE_SECONDS'])
+    if rest and rest[0].isdigit(): rest=rest[1:]
+    max_secs=int(c['VAULT_MAX_LEASE_SECONDS'])
+    if secs < 1 or secs > max_secs: raise SystemExit(f'lease duration must be between 1 and {max_secs} seconds')
+    requested=rest or ['*']
+    allowed=[str(x).strip() for x in m.get('scopes',[]) if str(x).strip()]
+    if allowed and '*' not in allowed:
+        invalid=[x for x in requested if x!='*' and x not in allowed]
+        if '*' in requested or invalid: raise SystemExit('requested lease scope exceeds credential policy')
+    d={'credential':name,'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':requested}
+    p=CRED_LEASES/(name+'.json'); p.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(p,0o600)
+    audit('credential_authorize',credential=name,expires=d['expires'],scopes=requested); print(json.dumps(d))
+
+def revoke_credential(name):
+    if not good_name(name): raise SystemExit('invalid credential name')
+    p=CRED_LEASES/(name+'.json')
+    existed=p.exists(); p.unlink(missing_ok=True)
+    if existed: audit('credential_revoke',credential=name)
 
 def grants_status():
     ensure_grants=[]
@@ -88,16 +134,34 @@ def revoke_grant(gid):
     if p.exists(): p.unlink(); audit('grant_revoke',grant=gid)
 
 def status():
-    ensure(); l=lease(); out=[]
+    ensure(); out=[]; managed=authorized=bootstrap=0
     for p in sorted(CREDS.glob('*.cred')):
         if p.stem.endswith('.__passphrase'): continue
-        m=read_meta(p.stem); row={'name':p.stem,'scopes':m.get('scopes',[]),'allowed_hosts':m.get('allowed_hosts',[]),'updated':m.get('updated'),'type':m.get('type','secret'),'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'exportable':bool(m.get('exportable',True)),'provider_ref':m.get('provider_ref',p.stem)}
+        m=read_meta(p.stem); storage=m.get('storage_class','managed')
+        row={'name':p.stem,'scopes':m.get('scopes',[]),'allowed_hosts':m.get('allowed_hosts',[]),'updated':m.get('updated'),'type':m.get('type','secret'),'provider':m.get('provider','local'),'storage_class':storage,'exportable':bool(m.get('exportable',True)),'provider_ref':m.get('provider_ref',p.stem)}
         for field in ('username','domain'):
             if m.get(field): row[field]=m[field]
         if m.get('public_key'): row['public_key']=m.get('public_key')
         if m.get('passphrase_credential'): row['passphrase_protected']=True
+        if storage=='bootstrap':
+            bootstrap+=1; row['authorization']={'mode':'bootstrap','always_available':True}
+        else:
+            managed+=1; l=credential_lease(p.stem)
+            if l:
+                authorized+=1; row['authorization']={'mode':'credential','expires':l.get('expires'),'scopes':l.get('scopes',[])}
+            else:
+                row['authorization']={'mode':'locked'}
         out.append(row)
-    return {'locked':l is None,'lease':l,'credentials':out,'providers':[{'name':'local','available':True,'root_of_trust':True}],'key_mode_configured':cfg()['VAULT_KEY_MODE'],'key_mode_effective':effective_key_mode(),'tpm_present':Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(),'grants':grants_status()}
+    return {
+        'locked': managed>0 and authorized==0,
+        'lease': None,
+        'credentials':out,
+        'authorization':{'managed':managed,'authorized':authorized,'bootstrap':bootstrap},
+        'credential_leases':credential_leases_status(),
+        'providers':[{'name':'local','available':True,'root_of_trust':True}],
+        'key_mode_configured':cfg()['VAULT_KEY_MODE'],'key_mode_effective':effective_key_mode(),
+        'tpm_present':Path('/dev/tpmrm0').exists() or Path('/dev/tpm0').exists(),'grants':grants_status()
+    }
 
 
 def write_meta(name, data):
@@ -119,6 +183,7 @@ def delete_credential(name):
             d=json.loads(gp.read_text())
             if d.get('credential')==name: gp.unlink(missing_ok=True)
         except Exception: pass
+    (CRED_LEASES/(name+'.json')).unlink(missing_ok=True)
     if not removed: raise SystemExit('credential not found')
     audit('delete',credential=name)
 
@@ -196,6 +261,10 @@ def rename_credential(old,new):
                 if d.get('credential')==old:
                     d['credential']=new; gp.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(gp,0o600)
             except Exception: pass
+        old_lease=CRED_LEASES/(old+'.json')
+        if old_lease.exists():
+            d=json.loads(old_lease.read_text()); d['credential']=new
+            new_lease=CRED_LEASES/(new+'.json'); new_lease.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(new_lease,0o600); old_lease.unlink()
         audit('rename',credential=old,new_credential=new)
     except Exception:
         main_tmp.unlink(missing_ok=True)
@@ -203,13 +272,7 @@ def rename_credential(old,new):
         raise
 
 def unlock(args):
-    ensure(); c=cfg(); secs=int(args[0]) if args and args[0].isdigit() else int(c['VAULT_DEFAULT_LEASE_SECONDS'])
-    if args and args[0].isdigit(): args=args[1:]
-    max_secs=int(c['VAULT_MAX_LEASE_SECONDS'])
-    if secs < 1 or secs > max_secs: raise SystemExit(f'lease duration must be between 1 and {max_secs} seconds')
-    scopes=args or ['*']
-    d={'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':scopes}
-    LEASE.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(LEASE,0o600); audit('unlock',expires=d['expires'],scopes=scopes); print(json.dumps(d))
+    raise SystemExit('global vault unlock is disabled; authorize individual managed credentials instead')
 
 def put(name,scopes,storage_class='managed'):
     ensure()
@@ -286,9 +349,12 @@ def active_grant(name,scope):
     return None,None
 
 def authorization(name,scope):
-    l=lease()
+    m=read_meta(name)
+    if m.get('storage_class')=='bootstrap':
+        return ('bootstrap',None)
+    l=credential_lease(name)
     if l and ('*' in l.get('scopes',[]) or scope in l.get('scopes',[])):
-        return ('lease',None)
+        return ('credential-lease',None)
     gp,_=active_grant(name,scope)
     if gp:return ('grant',gp)
     return (None,None)
@@ -343,7 +409,7 @@ def materialize_ssh(name,target,scope):
         try: username=login_name(m.get('username'))
         except ValueError as exc: raise SystemExit(str(exc))
     auth,gp=authorization(name,scope)
-    if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
+    if not auth: raise SystemExit('credential is locked for this scope and no matching one-shot grant is active')
     work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
     try:
         result={'credential':name,'provider':m.get('provider','local'),'storage_class':m.get('storage_class','managed'),'authorization':auth,'materialized':str(work),'private_key':''}
@@ -381,7 +447,7 @@ def materialize_login(name,target,scope):
     if not scope_allowed(m,scope): raise SystemExit('credential scope does not allow this operation')
     if target_specificity(m,target)<0: raise SystemExit('credential target does not allow this host')
     auth,gp=authorization(name,scope)
-    if not auth: raise SystemExit('vault is locked for this scope and no matching one-shot grant is active')
+    if not auth: raise SystemExit('credential is locked for this scope and no matching one-shot grant is active')
     work=MATERIALIZED/(name+'-'+os.urandom(6).hex());work.mkdir(mode=0o700)
     try:
         source=work/'credential.json';decrypt_to_file(name,source)
@@ -414,7 +480,9 @@ args=sys.argv[1:]
 if not args or args[0]=='status': print(json.dumps(status(),indent=2))
 elif args[0]=='init': print(json.dumps(status(),indent=2))
 elif args[0]=='unlock': unlock(args[1:])
-elif args[0]=='lock': LEASE.unlink(missing_ok=True); audit('lock')
+elif args[0]=='lock': LEASE.unlink(missing_ok=True); audit('legacy_global_lock')
+elif args[0]=='authorize': authorize_credential(args[1:])
+elif args[0]=='revoke' and len(args)==2: revoke_credential(args[1])
 elif args[0]=='put' and len(args)>=2: put(args[1],args[2:],'managed')
 elif args[0]=='put-bootstrap' and len(args)>=2: put(args[1],args[2:],'bootstrap')
 elif args[0]=='pin-local' and len(args)==2: pin_local(args[1])
@@ -429,4 +497,4 @@ elif args[0]=='resolve' and len(args)==4: resolve_credential(args[1],args[2],arg
 elif args[0]=='materialize-ssh' and len(args)==4: materialize_ssh(args[1],args[2],args[3])
 elif args[0]=='materialize-login' and len(args)==4: materialize_login(args[1],args[2],args[3])
 elif args[0]=='cleanup' and len(args)==2: cleanup_materialized(args[1])
-else: raise SystemExit('usage: mcp-vault-core status|init|unlock [SECONDS] [SCOPES...]|lock|put NAME [SCOPES...]|put-bootstrap NAME [SCOPES...]|pin-local NAME|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|materialize-login NAME TARGET SCOPE|cleanup PATH')
+else: raise SystemExit('usage: mcp-vault-core status|init|authorize CREDENTIAL [SECONDS] [SCOPES...]|revoke CREDENTIAL|put NAME [SCOPES...]|put-bootstrap NAME [SCOPES...]|pin-local NAME|grant SCOPE CREDENTIAL [SECONDS]|revoke-grant ID|delete NAME|scopes NAME [SCOPES...]|hosts NAME [HOSTS...]|rename OLD NEW|resolve TARGET SCOPE TYPE|materialize-ssh NAME TARGET SCOPE|materialize-login NAME TARGET SCOPE|cleanup PATH')
