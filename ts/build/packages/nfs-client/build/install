@@ -6,6 +6,7 @@ nfs-common-utils
 nfs-client-utils
 nfsv4-client-utils
 libnfsidmap
+libtirpc
 keyutils
 rpcbind
 gssproxy"
