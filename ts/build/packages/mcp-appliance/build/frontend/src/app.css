@@ -29,7 +29,7 @@ textarea{min-height:105px;resize:vertical}.form-grid{display:grid;grid-template-
 .empty{padding:2rem;text-align:center;color:var(--muted)}
 .shell{min-height:100vh;display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:56px minmax(0,1fr)}
 .sidebar{grid-row:1/3;background:var(--nav);color:#dce5ec;border-right:1px solid #101820;padding:.75rem;position:sticky;top:0;height:100vh;overflow:auto}
-.brand{display:flex;align-items:center;gap:.65rem;padding:.45rem .55rem 1rem}.brandmark{width:34px;height:34px;display:block;object-fit:contain;flex:0 0 auto}.login-logo{width:72px;height:72px;margin:auto}.brandtext{font-weight:750}.brandsub{font-size:.72rem;color:#93a4b3}
+.brand{display:grid;gap:.28rem;padding:.45rem .55rem 1rem}.brandwordmark{display:block;width:190px;max-width:100%;height:auto;object-fit:contain}.login-wordmark{display:block;width:min(250px,80vw);height:auto;margin:auto}.brandsub{font-size:.72rem;color:#93a4b3}
 .navgroup{display:grid;gap:.18rem}.navbtn{width:100%;text-align:left;border:0;background:transparent;color:#c9d4dd;padding:.62rem .7rem;border-radius:.42rem;font-weight:600}.navbtn:hover{background:#ffffff0b;color:white}.navbtn.active{background:var(--nav-soft);color:white}
 .topbar{grid-column:2;display:flex;align-items:center;gap:.75rem;padding:0 1rem;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}.topbar-title{font-weight:720;flex:1}.topbar-user{font-size:.85rem;color:var(--muted)}
 .menu{display:none}

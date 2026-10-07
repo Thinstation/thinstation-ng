@@ -618,8 +618,8 @@ build-mcp-appliance:
     - command -v npm >/dev/null 2>&1 || sudo dnf -y install npm
     - npm --prefix ts/build/packages/mcp-appliance/build/frontend ci
     - npm --prefix ts/build/packages/mcp-appliance/build/frontend run build
-    - test -s ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/thinstation.svg
-    - grep -q 'thinstation.svg' ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/index.html ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/assets/*.js
+    - test -s ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/watermark.png
+    - grep -q 'watermark.png' ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/index.html ts/build/packages/mcp-appliance/usr/share/mcp-appliance/web/assets/*.js
     - |
       if [[ -n "${MCP_APPLIANCE_CA_BUNDLE_URL:-}" ]]; then
         anchor_dir="ts/build/packages/site/etc/pki/ca-trust/source/anchors"

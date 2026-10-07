@@ -72,8 +72,8 @@
 <div class="login-shell">
   <div class="login-wrap">
     <div class="login-brand">
-      <img class="brandmark login-logo" src="/thinstation.svg" alt="ThinStation" />
-      <h1>ThinStation MCP Appliance</h1>
+      <img class="login-wordmark" src="/watermark.png" alt="ThinStation" />
+      <h1>MCP Appliance</h1>
       <div class="muted">Secure appliance management</div>
     </div>
 
