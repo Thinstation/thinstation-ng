@@ -88,11 +88,11 @@ def authorize_credential(args):
     if rest and rest[0].isdigit(): rest=rest[1:]
     max_secs=int(c['VAULT_MAX_LEASE_SECONDS'])
     if secs < 1 or secs > max_secs: raise SystemExit(f'lease duration must be between 1 and {max_secs} seconds')
-    requested=rest or ['*']
     allowed=[str(x).strip() for x in m.get('scopes',[]) if str(x).strip()]
+    requested=rest or (allowed if allowed else ['*'])
     if allowed and '*' not in allowed:
-        invalid=[x for x in requested if x!='*' and x not in allowed]
-        if '*' in requested or invalid: raise SystemExit('requested lease scope exceeds credential policy')
+        invalid=[x for x in requested if x not in allowed]
+        if invalid: raise SystemExit('requested lease scope exceeds credential policy')
     d={'credential':name,'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':requested}
     p=CRED_LEASES/(name+'.json'); p.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(p,0o600)
     audit('credential_authorize',credential=name,expires=d['expires'],scopes=requested); print(json.dumps(d))
