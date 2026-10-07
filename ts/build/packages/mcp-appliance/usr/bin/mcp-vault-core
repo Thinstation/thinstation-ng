@@ -16,7 +16,7 @@ def audit(event, **fields):
     os.chmod(AUDIT,0o600)
 
 def cfg():
-    d={'VAULT_KEY_MODE':'auto','VAULT_DEFAULT_LEASE_SECONDS':'600','VAULT_MAX_LEASE_SECONDS':'3600','VAULT_DEFAULT_GRANT_SECONDS':'300'}
+    d={'VAULT_KEY_MODE':'auto','VAULT_DEFAULT_LEASE_SECONDS':'600','VAULT_MAX_LEASE_SECONDS':'604800','VAULT_DEFAULT_GRANT_SECONDS':'300'}
     if CONF.exists():
         for line in CONF.read_text().splitlines():
             if '=' in line and not line.lstrip().startswith('#'):
@@ -205,7 +205,9 @@ def rename_credential(old,new):
 def unlock(args):
     ensure(); c=cfg(); secs=int(args[0]) if args and args[0].isdigit() else int(c['VAULT_DEFAULT_LEASE_SECONDS'])
     if args and args[0].isdigit(): args=args[1:]
-    secs=max(1,min(secs,int(c['VAULT_MAX_LEASE_SECONDS']))); scopes=args or ['*']
+    max_secs=int(c['VAULT_MAX_LEASE_SECONDS'])
+    if secs < 1 or secs > max_secs: raise SystemExit(f'lease duration must be between 1 and {max_secs} seconds')
+    scopes=args or ['*']
     d={'issued':int(time.time()),'expires':int(time.time())+secs,'scopes':scopes}
     LEASE.write_text(json.dumps(d,indent=2)+'\n'); os.chmod(LEASE,0o600); audit('unlock',expires=d['expires'],scopes=scopes); print(json.dumps(d))
 
