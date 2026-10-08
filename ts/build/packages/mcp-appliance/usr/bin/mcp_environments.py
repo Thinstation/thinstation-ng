@@ -3,11 +3,38 @@
 from pathlib import Path
 from datetime import datetime, timezone
 import os
+import json
+import uuid
+import subprocess
+import re
 
 ROOT = Path(os.environ.get('MCP_CHROOT_ROOT', '/var/prstnt/mcp-appliance/chroots'))
 CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"]]
 
 class Environments:
+    def start(self, body, owner):
+        name=str(body.get('name',''))
+        action=str(body.get('action',''))
+        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','upgrade'): raise ValueError('Invalid job')
+        root=ROOT/name
+        if root.is_symlink() or not root.is_dir():raise ValueError('Missing environment')
+        state=Path('/var/prstnt/mcp-appliance/state/environments')
+        state.mkdir(parents=True,exist_ok=True)
+        ident=uuid.uuid4().hex
+        job={'id':ident,'name':name,'action':action,'state':'queued','owner':owner}
+        (state/(ident+'.json')).write_text(json.dumps(job))
+        subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15)
+        return job
+    def job(self, ident):
+        if not re.fullmatch('[a-f0-9]{32}',ident):raise ValueError('Invalid job ID')
+        folder=Path('/var/prstnt/mcp-appliance/state/environments')
+        file=folder/(ident+'.json')
+        if not file.is_file():raise ValueError('Job missing')
+        job=json.loads(file.read_text())
+        log=folder/(ident+'.log')
+        job['log_tail']=log.read_text(errors='replace')[-12000:] if log.exists() else ''
+        return job
+
     def status(self):
         known = {name:(title,desc) for name,title,desc in CATALOG}
         installed = []
