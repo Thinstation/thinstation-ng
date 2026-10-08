@@ -63,7 +63,7 @@ class Environments:
 
     def _schedule(self,name,action,owner,state):
         ident=uuid.uuid4().hex
-        job={'id':ident,'name':name,'action':action,'state':'queued','owner':owner}
+        job={'id':ident,'name':name,'action':action,'state':'queued','owner':owner,'created_at':datetime.now(timezone.utc).isoformat()}
         (state/(ident+'.json')).write_text(json.dumps(job))
         try:
             subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/python3','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15,capture_output=True)
@@ -102,6 +102,7 @@ class Environments:
                     try: entry=json.loads(jobfile.read_text())
                     except (OSError,ValueError): continue
                     if entry.get('name')==name:history.append(entry)
+                history.sort(key=lambda entry: entry.get('created_at',''))
                 latest=history[-1] if history else {}
                 installed.append(dict(name=name,title=title,description=description,os=release,
                     dnf_available=dnf,update_status=latest.get('state','Not checked') if dnf else 'DNF missing',
