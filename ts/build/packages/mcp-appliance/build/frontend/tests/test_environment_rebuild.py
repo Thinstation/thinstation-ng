@@ -31,6 +31,23 @@ class ManifestSafetyTests(unittest.TestCase):
     def write(self, data):
         (self.manifests / 'test-f44.json').write_text(json.dumps(data))
 
+    def test_active_mount_blocks_replacement(self):
+        active=self.root/'test-f44'
+        active.mkdir()
+        mounts=f'23 22 0:15 / {active} rw - tmpfs tmpfs rw'
+        with patch.object(module.Path, 'read_text', autospec=True) as read:
+            def fake(path, *args, **kwargs):
+                if str(path)=='/proc/self/mountinfo':return mounts
+                return ''
+            read.side_effect=fake
+            with self.assertRaisesRegex(RuntimeError,'active mounts'):
+                module.assert_inactive(active)
+
+    def test_idle_root_allowed(self):
+        idle=self.root/'test-f44'
+        idle.mkdir()
+        module.assert_inactive(idle)
+
     def test_invalid_name_rejected(self):
         with self.assertRaises(ValueError):
             module.rebuild('../outside', 'unit', io.StringIO(), [])
