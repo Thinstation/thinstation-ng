@@ -16,17 +16,20 @@ def run(i):
  args={'check':['check-upgrade'],'upgrade':['upgrade']}.get(d['action'])
  if args is None:save(state='failed');return 1
  opts=[]
+ try: override=json.loads(Path('/var/prstnt/mcp-appliance/config/package-sources.json').read_text())
+ except (OSError,ValueError): override={}
  try: lines=Path('/etc/thinstation.defaults').read_text().splitlines()
  except OSError: lines=[]
  for key,repo in [('MCP_PACKAGE_FEDORA_URL','fedora'),('MCP_PACKAGE_UPDATES_URL','updates')]:
   raw=next((line.partition('=')[2].strip().strip('"') for line in lines if line.startswith(key+'=')),'')
+  raw=override.get('fedora_url' if repo=='fedora' else 'updates_url',raw)
   if not raw:continue
   parsed=urlsplit(raw)
   if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:
    save(state='failed',error='Invalid repository override');return 1
   url=raw.replace('$releasever',release).replace('$basearch','x86_64')
   opts.extend(['--setopt='+repo+'.metalink=','--setopt='+repo+'.mirrorlist=','--setopt='+repo+'.baseurl='+url])
- save(state='running',progress=5)
+ save(state='running',progress=5,package_source='configured mirror' if opts else 'Fedora upstream')
  with (S/(i+'.log')).open('w') as log:
   proc=subprocess.Popen(['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args,stdout=log,stderr=subprocess.STDOUT)
   while proc.poll() is None:
