@@ -43,10 +43,13 @@ class Environments:
     def start(self, body, owner):
         name=str(body.get('name',''))
         action=str(body.get('action',''))
-        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','upgrade'): raise ValueError('Invalid job')
-        # Chroots are disposable; recovery is a catalog-backed rebuild, not an in-place snapshot.
+        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','upgrade','rebuild'): raise ValueError('Invalid job')
+        # Chroots are disposable. Rebuilds require an explicit, validated package manifest.
         root=ROOT/name
-        if root.is_symlink() or not root.is_dir():raise ValueError('Missing environment')
+        if action=='rebuild':
+            manifest=Path('/var/prstnt/mcp-appliance/config/environment-manifests')/(name+'.json')
+            if not manifest.is_file():raise ValueError('No approved environment manifest; rebuild blocked')
+        if root.is_symlink() or (not root.is_dir() and action!='rebuild'):raise ValueError('Missing environment')
         state=Path('/var/prstnt/mcp-appliance/state/environments')
         state.mkdir(parents=True,exist_ok=True)
         with (state/'.lock').open('a+') as lock:
