@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+import json,re,subprocess,sys,time
+from pathlib import Path
+S=Path('/var/prstnt/mcp-appliance/state/environments')
+R=Path('/var/prstnt/mcp-appliance/chroots')
+def run(i):
+ if not re.fullmatch('[a-f0-9]{32}',i):return 2
+ p=S/(i+'.json');d=json.loads(p.read_text());root=R/d['name']
+ def save(**kw):
+  d.update(kw);t=p.with_suffix('.tmp');t.write_text(json.dumps(d));t.replace(p)
+ if root.is_symlink() or not root.is_dir():save(state='failed');return 1
+ osrelease=(root/'etc/os-release').read_text()
+ release=next((v.split('=',1)[1].strip('"') for v in osrelease.splitlines() if v.startswith('VERSION_ID=')),'')
+ if not re.fullmatch('[0-9]{1,3}',release):save(state='failed');return 1
+ args={'check':['check-upgrade'],'upgrade':['upgrade']}.get(d['action'])
+ if args is None:save(state='failed');return 1
+ save(state='running',progress=5)
+ with (S/(i+'.log')).open('w') as log:
+  proc=subprocess.Popen(['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+args,stdout=log,stderr=subprocess.STDOUT)
+  while proc.poll() is None:
+   save(progress=10);time.sleep(2)
+  rc=proc.wait()
+ good=rc==0 or (d['action']=='check' and rc==100)
+ save(state='completed' if good else 'failed',progress=100 if good else 0,exit_code=rc,updates_available=(rc==100 if d['action']=='check' else None))
+ return 0 if good else 1
+if __name__=='__main__':sys.exit(run(sys.argv[1]) if len(sys.argv)==2 else 2)
