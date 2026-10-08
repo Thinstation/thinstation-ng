@@ -12,6 +12,33 @@ ROOT = Path(os.environ.get('MCP_CHROOT_ROOT', '/var/prstnt/mcp-appliance/chroots
 CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"]]
 
 class Environments:
+    def sources(self):
+        file=Path('/var/prstnt/mcp-appliance/config/package-sources.json')
+        try: saved=json.loads(file.read_text())
+        except (OSError,ValueError): saved={}
+        try: lines=Path('/etc/thinstation.defaults').read_text().splitlines()
+        except OSError: lines=[]
+        def default(key):
+            return next((x.partition('=')[2].strip().strip('"') for x in lines if x.startswith(key+'=')),'')
+        return {'fedora_url':saved.get('fedora_url',default('MCP_PACKAGE_FEDORA_URL')),'updates_url':saved.get('updates_url',default('MCP_PACKAGE_UPDATES_URL')),'fallback':False,'fallback_supported':False,'source':'persistent' if saved else 'build defaults'}
+    def save_sources(self, body):
+        from urllib.parse import urlsplit
+        result={}
+        for key in ('fedora_url','updates_url'):
+            val=str(body.get(key,'')).strip()
+            if len(val)>1024:raise ValueError('Repository URL too long')
+            if val:
+                url=urlsplit(val)
+                if url.scheme!='https' or not url.hostname or url.username or url.password or url.fragment:raise ValueError('Repository URL must be HTTPS without credentials or fragments')
+            result[key]=val
+        if body.get('fallback'):raise ValueError('Automatic fallback is not yet supported')
+        file=Path('/var/prstnt/mcp-appliance/config/package-sources.json')
+        file.parent.mkdir(parents=True,exist_ok=True)
+        tmp=file.with_suffix('.tmp')
+        tmp.write_text(json.dumps(result))
+        tmp.chmod(0o600)
+        tmp.replace(file)
+        return self.sources()
     def start(self, body, owner):
         name=str(body.get('name',''))
         action=str(body.get('action',''))
@@ -54,7 +81,7 @@ class Environments:
                     dnf_available=dnf,update_status='Not checked' if dnf else 'DNF missing',
                     update_progress=None,installed=True))
         types = {e['name'].rsplit('-f',1)[0] for e in installed}
-        return dict(root=str(ROOT),installed=installed,catalog=[
+        return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
             dict(id=n,title=t,description=d,installed=n in types)
             for n,t,d in CATALOG],
             note='Availability and update status are local observations; update jobs are not enabled yet.')
