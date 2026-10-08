@@ -51,8 +51,8 @@ def rebuild(name, ident, log, options):
             series={'22.04':'jammy','24.04':'noble','26.04':'resolute'}[release]
             subprocess.run(['/usr/sbin/debootstrap','--arch=amd64','--variant=minbase',series,str(stage),'https://archive.ubuntu.com/ubuntu/'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
             # Initial package index and requested tools are installed inside the new root.
-            subprocess.run(['/usr/sbin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
-            subprocess.run(['/usr/sbin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+            subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
+            subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
         else:
             cmd=['/usr/bin/dnf','--installroot='+str(stage),'--releasever='+release,'-y','--setopt=install_weak_deps=False']+options+['install']+pkgs
             subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
