@@ -34,6 +34,9 @@ def rebuild(name, ident, log, options):
     pkgs=data.get('packages')
     if not isinstance(pkgs,list) or not pkgs or len(pkgs)>200 or any(not isinstance(p,str) or not re.fullmatch(r'[A-Za-z0-9_+.-]{1,100}',p) for p in pkgs):
         raise ValueError('Manifest must contain a validated package list')
+    base=str(data.get('base','fedora')).lower()
+    if base not in ('fedora','ubuntu'):raise ValueError('Unsupported environment base')
+    if base=='ubuntu':raise ValueError('Ubuntu provisioning requires an approved debootstrap bootstrapper; not available in appliance image')
     release=str(data.get('release','44'))
     if not re.fullmatch(r'[0-9]{1,3}',release):raise ValueError('Invalid release')
     stage=ROOT/('.stage-'+ident)
