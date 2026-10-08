@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {route,title,topPages,systemTopics} from '../src/lib/navigation.js';
 import {allocationBytes,bytes,usedPercent} from '../src/lib/storage.js';
-test('application resources are top-level',()=>assert.deepEqual(topPages.map(p=>p[0]),['overview','connections','mcp','inventory','credentials','system']));
+test('application resources are top-level',()=>assert.deepEqual(topPages.map(p=>p[0]),['overview','connections','mcp','inventory','environments','credentials','system']));
 test('legacy resource routes leave System',()=>{
  for(const [old,next] of [['overview','overview'],['hosts','inventory'],['credentials','credentials'],['system/overview','overview'],['system/inventory','inventory'],['system/credentials','credentials']])assert.equal(route(old),next)
 });
