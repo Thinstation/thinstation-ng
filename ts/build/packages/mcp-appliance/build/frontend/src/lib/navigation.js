@@ -7,7 +7,7 @@ export const systemTopics=[
 ];
 export const topPages=[
  ['overview','Overview'],['connections','AI Connector'],['mcp','MCP'],
- ['inventory','Inventory'],['credentials','Credentials'],['system','System']
+ ['inventory','Inventory'],['environments','Environments'],['credentials','Credentials'],['system','System']
 ];
 const aliases={
  overview:'overview',hosts:'inventory',credentials:'credentials',
@@ -17,12 +17,12 @@ const aliases={
 export function route(value){
  const p=String(value||'').replace(/^#\/?/,'');
  if(Object.hasOwn(aliases,p))return aliases[p];
- if(['overview','connections','mcp','mcp/settings','inventory','credentials'].includes(p)||systemTopics.some(t=>p==='system/'+t[0]))return p;
+ if(['overview','connections','mcp','mcp/settings','inventory','environments','credentials'].includes(p)||systemTopics.some(t=>p==='system/'+t[0]))return p;
  return 'overview';
 }
 export function title(value){
  const p=route(value);
  if(p.startsWith('system/'))return 'System / '+systemTopics.find(t=>p==='system/'+t[0])[1];
  if(p==='mcp/settings')return 'MCP / Update policy';
- return ({overview:'Overview',connections:'AI Connector',mcp:'MCP',inventory:'Inventory',credentials:'Credentials'})[p]||'Overview';
+ return ({overview:'Overview',connections:'AI Connector',mcp:'MCP',inventory:'Inventory',environments:'Environments',credentials:'Credentials'})[p]||'Overview';
 }

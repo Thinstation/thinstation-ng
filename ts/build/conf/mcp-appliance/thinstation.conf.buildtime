@@ -21,3 +21,8 @@ MCP_CHANNEL_URL=https://distro.thinstation.org/files/thinstation-mcp/mcp/catalog
 # Fedora/DNF release used by appliance package tooling.
 DIST_VER=44
 DNF_VAR_releasever=44
+
+# Optional Foreman Fedora repository URLs for MCP chroot packages.
+# Leave empty for upstream; configure site-specific URLs at build time.
+MCP_PACKAGE_FEDORA_URL=""
+MCP_PACKAGE_UPDATES_URL=""
