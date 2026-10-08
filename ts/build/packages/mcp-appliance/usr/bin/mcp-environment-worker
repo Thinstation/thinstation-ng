@@ -35,10 +35,10 @@ def run(i):
    save(state='failed',error='Invalid repository override');return 1
   url=raw.replace('$releasever',release).replace('$basearch','x86_64')
   opts.extend(['--setopt='+repo+'.metalink=','--setopt='+repo+'.mirrorlist=','--setopt='+repo+'.baseurl='+url])
- save(state='running',progress=5,package_source='configured mirror' if opts else 'Fedora upstream')
+ save(state='running',progress=5,package_source='Ubuntu APT' if manager=='apt' else ('configured mirror' if opts else 'Fedora upstream'))
  with (S/(i+'.log')).open('w') as log:
   cmd=(['/usr/bin/chroot',str(root),'/usr/bin/apt-get','-y']+args if manager=='apt' else ['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args)
-  log.write('Source: '+('configured mirror' if opts else 'Fedora upstream')+'\n');log.flush()
+  log.write('Source: '+('Ubuntu APT configuration' if manager=='apt' else ('configured mirror' if opts else 'Fedora upstream'))+'\n');log.flush()
   if d['action']=='rebuild':
    from mcp_environment_rebuild import rebuild
    try:
