@@ -28,6 +28,7 @@ def assert_inactive(target):
             if beneath(linked):raise RuntimeError('Environment is referenced by a running process')
 def rebuild(name, ident, log, options):
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,62}',name):raise ValueError('Bad environment name')
+    if not re.fullmatch(r'[a-f0-9]{32}',ident):raise ValueError('Invalid rebuild job identifier')
     file=MANIFEST/(name+'.json')
     data=json.loads(file.read_text())
     pkgs=data.get('packages')
@@ -39,6 +40,7 @@ def rebuild(name, ident, log, options):
     old=ROOT/('.previous-'+ident)
     target=ROOT/name
     if stage.exists() or old.exists() or target.is_symlink():raise ValueError('Unsafe environment path')
+    if not ROOT.is_dir() or ROOT.is_symlink():raise ValueError('Unsafe environment root')
     stage.mkdir(mode=0o700)
     try:
         cmd=['/usr/bin/dnf','--installroot='+str(stage),'--releasever='+release,'-y','--setopt=install_weak_deps=False']+options+['install']+pkgs
@@ -46,7 +48,8 @@ def rebuild(name, ident, log, options):
         if not (stage/'etc/os-release').is_file() or not (stage/'usr/bin/rpm').exists():raise ValueError('Staged root failed validation')
         for entry in data.get('required_paths',[]):
             if not isinstance(entry,str) or not entry.startswith('/usr/') or '..' in Path(entry).parts:raise ValueError('Invalid required path')
-            if not (stage/entry.lstrip('/')).exists():raise ValueError('Missing required path: '+entry)
+            required=stage/entry.lstrip('/')
+            if not required.exists() or not required.resolve().is_relative_to(stage.resolve()):raise ValueError('Missing or unsafe required path: '+entry)
         assert_inactive(target)
         had_target=target.is_dir()
         if had_target:os.rename(target,old)
