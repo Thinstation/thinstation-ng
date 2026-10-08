@@ -66,7 +66,7 @@ class Environments:
         job={'id':ident,'name':name,'action':action,'state':'queued','owner':owner}
         (state/(ident+'.json')).write_text(json.dumps(job))
         try:
-            subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15,capture_output=True)
+            subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/python3','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15,capture_output=True)
         except (OSError,subprocess.CalledProcessError,subprocess.TimeoutExpired):
             job['state']='failed'
             (state/(ident+'.json')).write_text(json.dumps(job))
