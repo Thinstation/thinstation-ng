@@ -1,7 +1,7 @@
 <script>
   import { api, json } from './lib/api.js';
   export let health=null; export let onRefresh=()=>{};
-  let search='', selected=null, result='', requests=[], wizard=false, step=1, sourceRequest=null, inventory={hosts:{},groups:{}};
+  let search='', selected=null, result='', requests=[], wizard=false, step=1, sourceRequest=null, inventory={hosts:{},groups:{}}, rowMenu=null;
   let form={kind:'secret',name:'',type:'api-token',project:'',purpose:'',scopes:'',hosts:'',secret:'',private_key:'',passphrase:'',protect:true,comment:'',ad_domain:'',ad_username:'',ad_password:'',login_username:''};
   $: creds=health?.vault?.credentials||[];
   $: filtered=creds.filter(c=>JSON.stringify(c).toLowerCase().includes(search.toLowerCase()));
@@ -58,7 +58,19 @@
       if(!inventory.groups)inventory.groups={};
     }catch(e){result=e.message}
   }
-  function open(c){selected={...c,scopesText:(c.scopes||[]).join(', '),hostsText:(c.allowed_hosts||[]).join(', '),newName:'',loginUsername:c.username||''};result=''}
+  function open(c){rowMenu=null;selected={...c,scopesText:(c.scopes||[]).join(', '),hostsText:(c.allowed_hosts||[]).join(', '),newName:'',loginUsername:c.username||''};result=''}
+  function toggleRowMenu(event,c){
+    event.stopPropagation();
+    if(rowMenu?.name===c.name){rowMenu=null;return}
+    const r=event.currentTarget.getBoundingClientRect();
+    const width=170, gap=6;
+    const left=Math.min(window.innerWidth-width-gap,Math.max(gap,r.right-width));
+    const below=r.bottom+gap;
+    const menuHeight=c.public_key?84:48;
+    const top=(below+menuHeight<=window.innerHeight-gap)?below:Math.max(gap,r.top-menuHeight-gap);
+    rowMenu={name:c.name,credential:c,left,top};
+  }
+  function closeRowMenu(){rowMenu=null}
   function newWizard(req=null){
     sourceRequest=req; const t=(req?.type||'').toLowerCase();
     const kind=t==='active-directory'?'ad':t.includes('ssh')?(t.includes('import')?'ssh-import':'ssh-generate'):'secret';
@@ -137,6 +149,7 @@
   loadRequests(); loadInventory();
 </script>
 
+<svelte:window on:click={closeRowMenu}/>
 <div class="page">
   <div class="page-title"><div><h1>Credentials</h1><p>Privileged credentials and permitted targets</p></div><div class="actions"><span class="pill">{creds.length} stored</span><button class="btn primary" on:click={()=>newWizard()}>Add credential</button></div></div>
   {#if result}<div class="notice credential-result" class:bad={result.startsWith('Could not')} style="margin-bottom:1rem">{result}</div>{/if}
@@ -163,7 +176,7 @@
     <section class="panel">
       <div class="panel-head"><h2>Credential inventory</h2><span class="spacer"></span><input style="max-width:300px" placeholder="Search credentials" bind:value={search}/></div>
       <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Authorization</th><th>Provider</th><th>Scopes</th><th>Targets</th><th></th></tr></thead><tbody>
-      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}{#if c.storage_class==='bootstrap'}<div class="muted">machine-bound · non-exportable</div>{/if}</td><td>{c.type||'secret'}</td><td>{c.storage_class==='bootstrap'?'Always available':isAuthorized(c)?'Until '+new Date(c.authorization.expires*1000).toLocaleString():'Locked'}</td><td>{c.provider||'local'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><div class="credential-actions">{#if c.storage_class!=='bootstrap'}<button class="btn small" class:primary={!isAuthorized(c)} disabled={busyCredential===c.name} on:click={()=>isAuthorized(c)?revokeCredential(c):authorizeCredential(c)}>{busyCredential===c.name?'Working…':isAuthorized(c)?'Lock':'Unlock'}</button>{/if}<details class="row-menu"><summary aria-label={"Actions for "+c.name}>⋮</summary><div class="row-menu-popover"><button type="button" on:click={()=>open(c)}>Edit</button>{#if c.public_key}<button type="button" on:click={()=>navigator.clipboard.writeText(c.public_key)}>Copy public key</button>{/if}</div></details></div></td></tr>{/each}
+      {#each filtered as c}<tr><td><strong>{c.name}</strong>{#if c.passphrase_protected}<div class="muted">protected key</div>{/if}{#if c.storage_class==='bootstrap'}<div class="muted">machine-bound · non-exportable</div>{/if}</td><td>{c.type||'secret'}</td><td>{c.storage_class==='bootstrap'?'Always available':isAuthorized(c)?'Until '+new Date(c.authorization.expires*1000).toLocaleString():'Locked'}</td><td>{c.provider||'local'}</td><td class="mono">{(c.scopes||[]).join(', ')||'—'}</td><td class="mono">{(c.allowed_hosts||[]).join(', ')||'all/unspecified'}</td><td><div class="credential-actions">{#if c.storage_class!=='bootstrap'}<button class="btn small" class:primary={!isAuthorized(c)} disabled={busyCredential===c.name} on:click={()=>isAuthorized(c)?revokeCredential(c):authorizeCredential(c)}>{busyCredential===c.name?'Working…':isAuthorized(c)?'Lock':'Unlock'}</button>{/if}<button class="row-menu-button" type="button" aria-label={"Actions for "+c.name} aria-expanded={rowMenu?.name===c.name} on:click={(event)=>toggleRowMenu(event,c)}>⋮</button></div></td></tr>{/each}
       </tbody></table>{#if !filtered.length}<div class="empty">No matching credentials.</div>{/if}</div>
     </section>
     <section class="panel">
@@ -204,6 +217,13 @@
     </section>
   </div>
 </div>
+
+{#if rowMenu}
+  <div class="row-menu-popover floating-row-menu" style={"left:"+rowMenu.left+"px;top:"+rowMenu.top+"px"} on:click|stopPropagation>
+    <button type="button" on:click={()=>open(rowMenu.credential)}>Edit</button>
+    {#if rowMenu.credential.public_key}<button type="button" on:click={()=>{navigator.clipboard.writeText(rowMenu.credential.public_key);rowMenu=null}}>Copy public key</button>{/if}
+  </div>
+{/if}
 
 {#if wizard}
 <div class="modal-backdrop">
