@@ -43,8 +43,8 @@ class Environments:
     def start(self, body, owner):
         name=str(body.get('name',''))
         action=str(body.get('action',''))
-        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check',): raise ValueError('Invalid job')
-        # Upgrades remain disabled until verified snapshot/rollback support exists.
+        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','upgrade'): raise ValueError('Invalid job')
+        # Chroots are disposable; recovery is a catalog-backed rebuild, not an in-place snapshot.
         root=ROOT/name
         if root.is_symlink() or not root.is_dir():raise ValueError('Missing environment')
         state=Path('/var/prstnt/mcp-appliance/state/environments')
@@ -107,4 +107,4 @@ class Environments:
         return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
             dict(id=n,title=t,description=d,installed=n in types)
             for n,t,d in CATALOG],
-            note='Update checks are available. Upgrades require rollback protection and are not enabled yet.')
+            note='Chroots contain no durable user data. Recovery uses removal and redeployment from an environment definition; automated rebuild remains under development.')
