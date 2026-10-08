@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import json,re,subprocess,sys,time
+import json,re,subprocess,sys,time,os
 from urllib.parse import urlsplit
 from pathlib import Path
 S=Path('/var/prstnt/mcp-appliance/state/environments')
@@ -31,7 +31,9 @@ def run(i):
   opts.extend(['--setopt='+repo+'.metalink=','--setopt='+repo+'.mirrorlist=','--setopt='+repo+'.baseurl='+url])
  save(state='running',progress=5,package_source='configured mirror' if opts else 'Fedora upstream')
  with (S/(i+'.log')).open('w') as log:
-  proc=subprocess.Popen(['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args,stdout=log,stderr=subprocess.STDOUT)
+  cmd=['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args
+  log.write('Source: '+('configured mirror' if opts else 'Fedora upstream')+'\n');log.flush()
+  proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT)
   while proc.poll() is None:
    save(progress=10);time.sleep(2)
   rc=proc.wait()
