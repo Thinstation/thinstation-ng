@@ -7,6 +7,7 @@ import json
 import uuid
 import subprocess
 import re
+import fcntl
 
 ROOT = Path(os.environ.get('MCP_CHROOT_ROOT', '/var/prstnt/mcp-appliance/chroots'))
 CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"]]
@@ -47,10 +48,25 @@ class Environments:
         if root.is_symlink() or not root.is_dir():raise ValueError('Missing environment')
         state=Path('/var/prstnt/mcp-appliance/state/environments')
         state.mkdir(parents=True,exist_ok=True)
+        with (state/'.lock').open('a+') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            for previous in state.glob('*.json'):
+                try: old=json.loads(previous.read_text())
+                except (OSError, ValueError): continue
+                if old.get('name')==name and old.get('state') in ('queued','running'):
+                    raise ValueError('An operation is already active for this environment')
+            return self._schedule(name,action,owner,state)
+
+    def _schedule(self,name,action,owner,state):
         ident=uuid.uuid4().hex
         job={'id':ident,'name':name,'action':action,'state':'queued','owner':owner}
         (state/(ident+'.json')).write_text(json.dumps(job))
-        subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15)
+        try:
+            subprocess.run(['/usr/bin/systemd-run','--unit=mcp-env-'+ident,'--collect','/usr/bin/mcp-environment-worker',ident],check=True,timeout=15,capture_output=True)
+        except (OSError,subprocess.CalledProcessError,subprocess.TimeoutExpired):
+            job['state']='failed'
+            (state/(ident+'.json')).write_text(json.dumps(job))
+            raise ValueError('Environment worker could not start')
         return job
     def job(self, ident):
         if not re.fullmatch('[a-f0-9]{32}',ident):raise ValueError('Invalid job ID')
@@ -77,9 +93,15 @@ class Environments:
                     data=(path/'etc/os-release').read_text(errors='replace')
                     release=next((line.split('=',1)[1].strip().strip('"') for line in data.splitlines() if line.startswith('PRETTY_NAME=')),release)
                 except OSError: pass
+                history=[]
+                for jobfile in (Path('/var/prstnt/mcp-appliance/state/environments')).glob('*.json'):
+                    try: entry=json.loads(jobfile.read_text())
+                    except (OSError,ValueError): continue
+                    if entry.get('name')==name:history.append(entry)
+                latest=history[-1] if history else {}
                 installed.append(dict(name=name,title=title,description=description,os=release,
-                    dnf_available=dnf,update_status='Not checked' if dnf else 'DNF missing',
-                    update_progress=None,installed=True))
+                    dnf_available=dnf,update_status=latest.get('state','Not checked') if dnf else 'DNF missing',
+                    update_progress=latest.get('progress'),latest_job=latest.get('id'),installed=True))
         types = {e['name'].rsplit('-f',1)[0] for e in installed}
         return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
             dict(id=n,title=t,description=d,installed=n in types)
