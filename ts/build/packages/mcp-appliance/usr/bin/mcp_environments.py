@@ -10,8 +10,14 @@ import re
 import fcntl
 
 ROOT = Path(os.environ.get('MCP_CHROOT_ROOT', '/var/prstnt/mcp-appliance/chroots'))
-CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"]]
+CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"],["wireshark","Network Analysis","Wireshark CLI and capture analysis tools"]]
 
+KEY_PACKAGES = {
+ 'ai':['python3','llama.cpp','ollama'], 'avatar':['blender','python3','ffmpeg'],
+ 'browser':['chromium','firefox','playwright'], 'cad':['freecad','blender','meshlab'],
+ 'cuda':['nvidia-smi','nvcc','python3'], 'media':['ffmpeg','ffprobe','mediainfo'],
+ 'photo':['imagemagick','exiftool','darktable'], 'wireshark':['wireshark-cli','tshark','tcpdump']
+}
 class Environments:
     def sources(self):
         file=Path('/var/prstnt/mcp-appliance/config/package-sources.json')
@@ -43,7 +49,7 @@ class Environments:
     def start(self, body, owner):
         name=str(body.get('name',''))
         action=str(body.get('action',''))
-        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','upgrade','rebuild'): raise ValueError('Invalid job')
+        if not re.fullmatch('[a-z][a-z0-9-]{0,62}',name) or action not in ('check','update','rebuild'): raise ValueError('Invalid job')
         # Chroots are disposable. Rebuilds require an explicit, validated package manifest.
         root=ROOT/name
         if action=='rebuild':
@@ -92,6 +98,13 @@ class Environments:
                 kind = name.rsplit('-f',1)[0]
                 title,description = known.get(kind,(name,'Custom persistent execution environment'))
                 dnf = (path/'usr/bin/dnf').exists() or (path/'usr/bin/dnf5').exists()
+                apt = (path/'usr/bin/apt-get').exists()
+                manager = 'dnf' if dnf else ('apt' if apt else 'none')
+                manifest_file=Path('/var/prstnt/mcp-appliance/config/environment-manifests')/(name+'.json')
+                try: manifest=json.loads(manifest_file.read_text())
+                except (OSError,ValueError): manifest={}
+                keys=manifest.get('key_packages', KEY_PACKAGES.get(kind,[]))
+                if not isinstance(keys,list):keys=[]
                 release = 'Unknown'
                 try:
                     data=(path/'etc/os-release').read_text(errors='replace')
@@ -105,10 +118,10 @@ class Environments:
                 history.sort(key=lambda entry: entry.get('created_at',''))
                 latest=history[-1] if history else {}
                 installed.append(dict(name=name,title=title,description=description,os=release,
-                    dnf_available=dnf,update_status=latest.get('state','Not checked') if dnf else 'DNF missing',
+                    dnf_available=dnf,apt_available=apt,package_manager=manager,key_packages=keys,update_status=latest.get('state','Not checked') if manager!='none' else 'Package manager missing',
                     update_progress=latest.get('progress'),latest_job=latest.get('id'),installed=True))
         types = {e['name'].rsplit('-f',1)[0] for e in installed}
         return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
-            dict(id=n,title=t,description=d,installed=n in types)
+            dict(id=n,title=t,description=d,installed=n in types,key_packages=KEY_PACKAGES.get(n,[]),supported_bases=['fedora','ubuntu'])
             for n,t,d in CATALOG],
             note='Chroots contain no durable user data. Recovery uses removal and redeployment from an environment definition; automated rebuild remains under development.')
