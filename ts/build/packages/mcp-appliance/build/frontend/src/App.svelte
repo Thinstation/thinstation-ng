@@ -8,6 +8,7 @@
  import SystemPage from './System.svelte';
  import Overview from './Overview.svelte';
  import Hosts from './Hosts.svelte';
+ import Environments from './Environments.svelte';
  import Credentials from './Credentials.svelte';
  import McpBootstrap from './McpBootstrap.svelte';
  let state='loading',registration={registered:false},issue='',user=null,health=null;
@@ -66,6 +67,7 @@
   <main class="main">
    {#if page==='overview'}<Overview {health} onNavigate={go}/>
    {:else if page==='inventory'}<Hosts/>
+   {:else if page==='environments'}<Environments/>
    {:else if page==='credentials'}<Credentials {health} onRefresh={refresh}/>
    {:else if page.startsWith('system/')}<SystemPage topic={page.slice(7)} {health} onRefresh={refresh} onNavigate={go}/>
    {:else if page==='mcp/settings'}<McpBootstrap onNavigate={go}/>

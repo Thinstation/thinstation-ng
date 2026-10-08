@@ -11,6 +11,7 @@ from mcp_operator import OperatorAPI
 from mcp_openai import OpenAITunnel
 from mcp_acme import Certificates
 from mcp_storage import Storage
+from mcp_environments import Environments
 
 legacy=runpy.run_path(str(Path(__file__).resolve().with_name('mcp-appliance-web')),run_name='mcp_web_backend')
 web_override=os.environ.get('MCP_OPERATOR_WEB_ROOT','')
@@ -23,6 +24,7 @@ operator=OperatorAPI(legacy)
 openai_tunnel=OpenAITunnel(operator)
 certificates=Certificates(legacy)
 storage=Storage()
+environments=Environments()
 
 class H(legacy['H']):
     def mcp_auth(self):
@@ -50,6 +52,7 @@ class H(legacy['H']):
         try:
             if path=='/api/operator/certificates':self.js(200,certificates.status())
             elif path=='/api/operator/certificates/authorization':self.js(200,certificates.authorization_status())
+            elif path=='/api/operator/environments':self.js(200,environments.status())
             elif path=='/api/operator/storage':self.js(200,storage.status())
             elif path=='/api/operator/storage/job':self.js(200,storage.job())
             elif path=='/api/operator/connections':self.js(200,operator.connections())
