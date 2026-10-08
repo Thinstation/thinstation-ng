@@ -9,11 +9,16 @@ def run(i):
  p=S/(i+'.json');d=json.loads(p.read_text());root=R/d['name']
  def save(**kw):
   d.update(kw);t=p.with_suffix('.tmp');t.write_text(json.dumps(d));t.replace(p)
- if root.is_symlink() or not root.is_dir():save(state='failed');return 1
- osrelease=(root/'etc/os-release').read_text()
- release=next((v.split('=',1)[1].strip('"') for v in osrelease.splitlines() if v.startswith('VERSION_ID=')),'')
+ if root.is_symlink() or (not root.is_dir() and d['action']!='rebuild'):save(state='failed',error='Missing or unsafe environment');return 1
+ if d['action']=='rebuild':
+  manifest=Path('/var/prstnt/mcp-appliance/config/environment-manifests')/(d['name']+'.json')
+  try: release=str(json.loads(manifest.read_text()).get('release','44'))
+  except (OSError,ValueError):save(state='failed',error='Missing or invalid manifest');return 1
+ else:
+  osrelease=(root/'etc/os-release').read_text()
+  release=next((v.split('=',1)[1].strip('"') for v in osrelease.splitlines() if v.startswith('VERSION_ID=')),'')
  if not re.fullmatch('[0-9]{1,3}',release):save(state='failed');return 1
- args={'check':['check-upgrade'],'upgrade':['upgrade']}.get(d['action'])
+ args={'check':['check-upgrade'],'upgrade':['upgrade'],'rebuild':[]}.get(d['action'])
  if args is None:save(state='failed');return 1
  opts=[]
  try: override=json.loads(Path('/var/prstnt/mcp-appliance/config/package-sources.json').read_text())
@@ -33,6 +38,16 @@ def run(i):
  with (S/(i+'.log')).open('w') as log:
   cmd=['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args
   log.write('Source: '+('configured mirror' if opts else 'Fedora upstream')+'\n');log.flush()
+  if d['action']=='rebuild':
+   from mcp_environment_rebuild import rebuild
+   try:
+    previous=rebuild(d['name'],i,log,opts)
+    save(state='completed',progress=100,exit_code=0,previous_environment=previous)
+    return 0
+   except Exception as exc:
+    log.write('Rebuild failed: '+str(exc)+'\n')
+    save(state='failed',error=str(exc),exit_code=1)
+    return 1
   proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT)
   while proc.poll() is None:
    save(progress=10);time.sleep(2)
