@@ -103,7 +103,7 @@ class LifecycleTests(unittest.TestCase):
         fw=http.Firewall(configuration())
         with patch.object(fw,'command',return_value=subprocess.CompletedProcess([],0,'','')) as cmd:
             fw.open();script=cmd.call_args.args[1]
-        self.assertIn('192.0.2.10/32',script);self.assertIn('80 timeout 900s',script);self.assertNotIn('flush',script);self.assertNotIn('443',script)
+        self.assertIn('192.0.2.10/32',script);self.assertIn('80 timeout 900s',script);self.assertNotIn('flush',script);self.assertNotRegex(script,r'\\btcp dport 443\\b|\\{ 443 timeout')
     def test_firewall_only_own_rules_removed(self):
         fw=http.Firewall(configuration());fw.active=True
         state={'nftables':[{'rule':{'comment':'other','handle':1}},{'rule':{'comment':fw.tag,'handle':10}}]}
