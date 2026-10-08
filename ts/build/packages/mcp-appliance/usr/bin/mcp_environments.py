@@ -84,4 +84,4 @@ class Environments:
         return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
             dict(id=n,title=t,description=d,installed=n in types)
             for n,t,d in CATALOG],
-            note='Availability and update status are local observations; update jobs are not enabled yet.')
+            note='Update jobs use persistent package source settings; catalog installation and automatic fallback are not enabled yet.')
