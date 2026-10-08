@@ -702,3 +702,20 @@ trigger-publisher-mcp-appliance:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'
       when: on_success
     - when: never
+
+# Validation-only gate for MCP environment management; no ISO or publish actions.
+test-mcp-environments:
+  stage: build
+  tags:
+    - fedora
+    - shell
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    - when: never
+  script:
+    - python3 -m py_compile ts/build/packages/mcp-appliance/usr/bin/mcp_environments.py ts/build/packages/mcp-appliance/usr/bin/mcp_environment_rebuild.py ts/build/packages/mcp-appliance/usr/bin/mcp-environment-worker
+    - python3 -m unittest discover -s ts/build/packages/mcp-appliance/build/frontend/tests -p 'test_environment_rebuild.py' -v
+    - cd ts/build/packages/mcp-appliance/build/frontend
+    - npm ci
+    - npm run build
