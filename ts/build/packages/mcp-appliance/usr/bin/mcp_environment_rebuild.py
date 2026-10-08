@@ -4,6 +4,28 @@ import json, os, re, shutil, subprocess, sys
 from pathlib import Path
 ROOT=Path('/var/prstnt/mcp-appliance/chroots')
 MANIFEST=Path('/var/prstnt/mcp-appliance/config/environment-manifests')
+def assert_inactive(target):
+    """Refuse replacement while target contains mounts or referenced process paths."""
+    if not target.exists(): return
+    resolved=target.resolve()
+    def beneath(path):
+        try: return path==resolved or resolved in path.parents
+        except (OSError,RuntimeError): return False
+    try:
+        mounts=Path('/proc/self/mountinfo').read_text().splitlines()
+    except OSError as exc:
+        raise RuntimeError('Unable to inspect mounts') from exc
+    for line in mounts:
+        parts=line.split()
+        if len(parts)>4:
+            mount=Path(parts[4].replace('\\040',' '))
+            if beneath(mount): raise RuntimeError('Environment contains active mounts')
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit():continue
+        for entry in ('cwd','root','exe'):
+            try: linked=(proc/entry).resolve(strict=True)
+            except (OSError,RuntimeError):continue
+            if beneath(linked):raise RuntimeError('Environment is referenced by a running process')
 def rebuild(name, ident, log, options):
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,62}',name):raise ValueError('Bad environment name')
     file=MANIFEST/(name+'.json')
@@ -25,6 +47,7 @@ def rebuild(name, ident, log, options):
         for entry in data.get('required_paths',[]):
             if not isinstance(entry,str) or not entry.startswith('/usr/') or '..' in Path(entry).parts:raise ValueError('Invalid required path')
             if not (stage/entry.lstrip('/')).exists():raise ValueError('Missing required path: '+entry)
+        assert_inactive(target)
         had_target=target.is_dir()
         if had_target:os.rename(target,old)
         try:os.rename(stage,target)
