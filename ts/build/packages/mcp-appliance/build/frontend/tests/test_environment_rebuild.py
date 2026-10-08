@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SOURCE = Path(__file__).resolve().parents[2] / 'usr' / 'bin' / 'mcp_environment_rebuild.py'
+SOURCE = Path(__file__).resolve().parents[3] / 'usr' / 'bin' / 'mcp_environment_rebuild.py'
 spec = importlib.util.spec_from_file_location('mcp_environment_rebuild', SOURCE)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
