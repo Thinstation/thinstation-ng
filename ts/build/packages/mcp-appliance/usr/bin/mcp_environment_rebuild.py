@@ -85,9 +85,8 @@ def rebuild(name, ident, log, options):
             subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
             subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
         else:
-            repo=source.get('repo')
             cmd=['/usr/bin/dnf','--installroot='+str(stage),'--releasever='+release,'-y','--setopt=install_weak_deps=False']
-            if repo:
+            if source.get('repo_config'):
                 config=source.get('repo_config')
                 if not config or not Path(config).is_file():raise ValueError('Missing approved DNF repo config')
                 cmd+=['--setopt=reposdir='+str(Path(config).parent)]

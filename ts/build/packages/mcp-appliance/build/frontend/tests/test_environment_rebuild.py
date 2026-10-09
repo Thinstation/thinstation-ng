@@ -21,6 +21,15 @@ class ManifestSafetyTests(unittest.TestCase):
         self.manifests = self.base / 'manifests'
         self.root.mkdir()
         self.manifests.mkdir()
+        self.sources = self.base / 'sources'
+        self.sources.mkdir()
+        (self.sources / 'fedora.json').write_text(json.dumps({'family':'dnf','releases':{'44':{}}}))
+        self.source_patch = patch.object(module, 'SOURCE_DIR', self.sources)
+        self.override_patch = patch.object(module, 'OVERRIDE_DIR', self.base / 'overrides')
+        self.source_patch.start()
+        self.override_patch.start()
+        self.addCleanup(self.source_patch.stop)
+        self.addCleanup(self.override_patch.stop)
         self.root_patch = patch.object(module, 'ROOT', self.root)
         self.manifest_patch = patch.object(module, 'MANIFEST', self.manifests)
         self.root_patch.start()
