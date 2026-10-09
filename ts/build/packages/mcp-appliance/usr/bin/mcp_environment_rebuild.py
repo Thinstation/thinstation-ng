@@ -36,7 +36,7 @@ def rebuild(name, ident, log, options):
         raise ValueError('Manifest must contain a validated package list')
     base=str(data.get('base','fedora')).lower()
     if base not in ('fedora','ubuntu'):raise ValueError('Unsupported environment base')
-    if base=='ubuntu' and not Path('/usr/sbin/debootstrap').exists():raise ValueError('Ubuntu provisioning requires debootstrap')
+    if base=='ubuntu' and not Path('/usr/bin/debootstrap').exists():raise ValueError('Ubuntu provisioning requires debootstrap')
     release=str(data.get('release','44'))
     if base=='fedora' and not re.fullmatch(r'[0-9]{1,3}',release):raise ValueError('Invalid Fedora release')
     if base=='ubuntu' and release not in ('22.04','24.04','26.04'):raise ValueError('Unsupported Ubuntu release')
@@ -49,7 +49,7 @@ def rebuild(name, ident, log, options):
     try:
         if base=='ubuntu':
             series={'22.04':'jammy','24.04':'noble','26.04':'resolute'}[release]
-            subprocess.run(['/usr/sbin/debootstrap','--arch=amd64','--variant=minbase',series,str(stage),'https://archive.ubuntu.com/ubuntu/'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+            subprocess.run(['/usr/bin/debootstrap','--arch=amd64','--variant=minbase',series,str(stage),'https://archive.ubuntu.com/ubuntu/'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
             # Initial package index and requested tools are installed inside the new root.
             subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
             subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
