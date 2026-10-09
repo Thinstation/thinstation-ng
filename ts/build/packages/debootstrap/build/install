@@ -1,6 +1,6 @@
 #!/bin/sh
 export PACKAGE="debootstrap"
-export PORTS="debootstrap perl-interpreter"
+export PORTS="debootstrap perl-interpreter ubu-keyring"
 export DROP_FILES=""
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""

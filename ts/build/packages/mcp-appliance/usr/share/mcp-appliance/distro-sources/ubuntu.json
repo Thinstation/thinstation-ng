@@ -1,0 +1,20 @@
+{
+  "family": "apt",
+  "releases": {
+    "22.04": {
+      "suite": "jammy",
+      "url": "https://archive.ubuntu.com/ubuntu/",
+      "keyring": "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    },
+    "24.04": {
+      "suite": "noble",
+      "url": "https://archive.ubuntu.com/ubuntu/",
+      "keyring": "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    },
+    "26.04": {
+      "suite": "resolute",
+      "url": "https://archive.ubuntu.com/ubuntu/",
+      "keyring": "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    }
+  }
+}

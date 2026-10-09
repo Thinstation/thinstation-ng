@@ -1,0 +1,11 @@
+{
+  "family": "dnf",
+  "releases": {
+    "9": {
+      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rocky.repo"
+    },
+    "10": {
+      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rocky.repo"
+    }
+  }
+}
