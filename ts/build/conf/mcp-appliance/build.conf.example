@@ -160,6 +160,7 @@ package curl                 # Command-line tool for transferring data with URLs
 #package gparted              # Graphical partition manager
 package git                   # Version control for persistent chroot workspaces
 package dnf                   # DNF5/RPM package manager for persistent chroot creation and maintenance
+package debootstrap           # Ubuntu chroot bootstrap (Fedora RPM)
 package jq                    # JSON inspection for appliance configuration and recovery
 package sqlite                # Local appliance database inspection and recovery
 package iproute               # Full iproute2 suite, including ss
