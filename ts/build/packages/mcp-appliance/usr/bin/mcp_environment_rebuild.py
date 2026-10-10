@@ -101,13 +101,13 @@ def rebuild(name, ident, log, options):
                     if not script_path.is_file():raise ValueError('Missing debootstrap compatibility script: '+script)
                     cmd.append(str(script_path))
                 try:
-                    log.write('Trying signed APT mirror: '+mirror['url']+'\\n'); log.flush()
+                    log.write('Trying signed APT mirror: '+mirror['url']+'\n'); log.flush()
                     subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
                     dest=stage/'usr/share/keyrings'/keyring.name
                     dest.parent.mkdir(parents=True,exist_ok=True)
                     shutil.copy2(keyring,dest)
                     sources=stage/'etc/apt/sources.list'
-                    sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\\n')
+                    sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
                     break
