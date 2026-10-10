@@ -106,6 +106,24 @@ def rebuild(name, ident, log, options):
                     dest=stage/'usr/share/keyrings'/keyring.name
                     dest.parent.mkdir(parents=True,exist_ok=True)
                     shutil.copy2(keyring,dest)
+                    # Carry appliance-trusted site CAs into the bootstrap root before
+                    # APT connects to private mirrors over HTTPS. Keep public CA
+                    # trust from the distribution's existing bundle.
+                    anchors=Path('/etc/pki/ca-trust/source/anchors')
+                    if anchors.is_dir():
+                        ca_dest=stage/'usr/local/share/ca-certificates'
+                        ca_dest.mkdir(parents=True,exist_ok=True)
+                        bundle=stage/'etc/ssl/certs/ca-certificates.crt'
+                        bundle.parent.mkdir(parents=True,exist_ok=True)
+                        for ca in sorted(anchors.iterdir()):
+                            if not ca.is_file() or ca.suffix.lower() not in ('.crt','.pem'):
+                                continue
+                            cert=ca.read_bytes()
+                            if b'-----BEGIN CERTIFICATE-----' not in cert:
+                                continue
+                            (ca_dest/(ca.stem+'.crt')).write_bytes(cert)
+                            with bundle.open('ab') as dst:
+                                dst.write(b'\\n'+cert+b'\\n')
                     sources=stage/'etc/apt/sources.list'
                     sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
