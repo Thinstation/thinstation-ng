@@ -40,6 +40,25 @@ class ManifestSafetyTests(unittest.TestCase):
     def write(self, data):
         (self.manifests / 'test-f44.json').write_text(json.dumps(data))
 
+
+    def test_distribution_source_isolation(self):
+        (self.sources / 'rocky.json').write_text(json.dumps({'family':'dnf','releases':{
+            '9':{'repo_config':'/var/prstnt/mcp-appliance/config/dnf-repos/rocky/9/rocky.repo'},
+            '10':{'repo_config':'/var/prstnt/mcp-appliance/config/dnf-repos/rocky/10/rocky.repo'}}}))
+        self.assertNotEqual(module.resolve_source('rocky','9')['repo_config'],
+                            module.resolve_source('rocky','10')['repo_config'])
+        (self.sources / 'rocky.json').write_text(json.dumps({'family':'dnf','releases':{
+            '10':{'repo_config':'/var/prstnt/mcp-appliance/config/dnf-repos/rocky.repo'}}}))
+        with self.assertRaisesRegex(ValueError,'isolated'):
+            module.resolve_source('rocky','10')
+
+    def test_ubuntu_2604_uses_named_compatibility_script(self):
+        (self.sources / 'ubuntu.json').write_text(json.dumps({'family':'apt','releases':{
+            '26.04':{'suite':'resolute','url':'https://snapshot.ubuntu.com/ubuntu/',
+                     'keyring':'/usr/share/keyrings/ubuntu-archive-keyring.gpg',
+                     'bootstrap_script':'gutsy'}}}))
+        self.assertEqual(module.resolve_source('ubuntu','26.04')['bootstrap_script'],'gutsy')
+
     def test_active_mount_blocks_replacement(self):
         active=self.root/'test-f44'
         active.mkdir()

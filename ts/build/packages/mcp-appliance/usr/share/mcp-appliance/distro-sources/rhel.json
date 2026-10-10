@@ -2,10 +2,10 @@
   "family": "dnf",
   "releases": {
     "9": {
-      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rhel.repo"
+      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rhel/9/rhel.repo"
     },
     "10": {
-      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rhel.repo"
+      "repo_config": "/var/prstnt/mcp-appliance/config/dnf-repos/rhel/10/rhel.repo"
     }
   }
 }

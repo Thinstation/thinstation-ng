@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Build disposable Fedora environment in staging, validate, then replace."""
+"""Build disposable distribution environments with signed, isolated sources."""
 import json, os, re, shutil, subprocess, sys
 from pathlib import Path
 ROOT=Path('/var/prstnt/mcp-appliance/chroots')
@@ -23,9 +23,15 @@ def resolve_source(base, release, source_name=None):
             raise ValueError('Incomplete APT source')
         if not out['url'].startswith('https://') or not out['keyring'].startswith('/usr/share/keyrings/'):
             raise ValueError('Untrusted APT repository configuration')
+        script=out.get('bootstrap_script')
+        if script is not None and (not isinstance(script,str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,40}',script)):
+            raise ValueError('Invalid bootstrap script')
     else:
-        if 'repo_config' in out and not str(out['repo_config']).startswith('/var/prstnt/mcp-appliance/config/dnf-repos/'):
-            raise ValueError('DNF repository configs must be under persistent dnf-repos')
+        repo=out.get('repo_config')
+        if repo is not None:
+            approved=Path('/var/prstnt/mcp-appliance/config/dnf-repos')/name/release
+            if not isinstance(repo,str) or Path(repo).parent!=approved or not repo.endswith('.repo'):
+                raise ValueError('DNF repository file must be isolated by distro and release')
     return out
 def assert_inactive(target):
     """Refuse replacement while target contains mounts or referenced process paths."""
@@ -75,6 +81,11 @@ def rebuild(name, ident, log, options):
             if not keyring.is_file():raise ValueError('Missing trusted archive keyring: '+str(keyring))
             cmd=['/usr/bin/debootstrap','--arch=amd64','--variant=minbase','--keyring='+str(keyring),
                  source['suite'],str(stage),source['url']]
+            script=source.get('bootstrap_script')
+            if script:
+                script_path=Path('/usr/share/debootstrap/scripts')/script
+                if not script_path.is_file():raise ValueError('Missing debootstrap compatibility script: '+script)
+                cmd.append(str(script_path))
             subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
             # Ensure initial and subsequent package transactions use the same source trust anchor.
             dest=stage/'usr/share/keyrings'/keyring.name

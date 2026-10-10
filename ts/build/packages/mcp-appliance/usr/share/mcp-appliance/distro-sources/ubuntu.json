@@ -14,7 +14,8 @@
     "26.04": {
       "suite": "resolute",
       "url": "https://archive.ubuntu.com/ubuntu/",
-      "keyring": "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+      "keyring": "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
+      "bootstrap_script": "gutsy"
     }
   }
 }
