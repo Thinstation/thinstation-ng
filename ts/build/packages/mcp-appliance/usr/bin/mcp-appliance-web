@@ -737,7 +737,11 @@ def health():
     if not persist_mounted: problems.append('persistent storage is not mounted')
     if st['mcp_service']!='active': problems.append('MCP runtime service is not active')
     if st['mcp_selected'] and st['mcp_selected'].get('kind')=='recovery': problems.append('immutable recovery MCP is active')
-    if st['mcp_quarantined']: problems.append('one or more MCP generations are quarantined')
+    # Retain historical quarantines in the MCP status for diagnosis, but only warn
+    # when the currently selected generation itself is quarantined.
+    selected_generation=(st['mcp_selected'] or {}).get('generation')
+    if selected_generation and selected_generation in st['mcp_quarantined']:
+        problems.append('selected MCP generation is quarantined')
     if failed_units: problems.append('systemd has failed units')
     if h['certificate'].get('days_remaining',999)<14: problems.append('management certificate expires soon')
     if not h['network']['default_route']: problems.append('no default route')
