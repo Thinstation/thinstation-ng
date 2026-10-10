@@ -123,7 +123,7 @@ def rebuild(name, ident, log, options):
                                 continue
                             (ca_dest/(ca.stem+'.crt')).write_bytes(cert)
                             with bundle.open('ab') as dst:
-                                dst.write(b'\\n'+cert+b'\\n')
+                                dst.write(bytes([10])+cert+bytes([10]))
                     sources=stage/'etc/apt/sources.list'
                     sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
