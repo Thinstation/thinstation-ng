@@ -19,10 +19,17 @@ def resolve_source(base, release, source_name=None):
     if not isinstance(entry,dict):raise ValueError('Unsupported release for '+name+': '+release)
     out=dict(entry,family=config['family'])
     if out['family']=='apt':
-        if not all(isinstance(out.get(x),str) for x in ('url','suite','keyring')):
-            raise ValueError('Incomplete APT source')
-        if not out['url'].startswith('https://') or not out['keyring'].startswith('/usr/share/keyrings/'):
-            raise ValueError('Untrusted APT repository configuration')
+        mirrors=out.get('mirrors') or [{'url':out.get('url'),'keyring':out.get('keyring')}]
+        if not isinstance(mirrors,list) or not mirrors:
+            raise ValueError('APT source requires one or more mirrors')
+        for mirror in mirrors:
+            if not isinstance(mirror,dict) or not isinstance(mirror.get('url'),str) or not isinstance(mirror.get('keyring'),str):
+                raise ValueError('Invalid APT mirror')
+            if not mirror['url'].startswith('https://') or not (mirror['keyring'].startswith('/usr/share/keyrings/') or mirror['keyring'].startswith('/var/prstnt/mcp-appliance/config/keyrings/')):
+                raise ValueError('Untrusted APT repository configuration')
+        out['mirrors']=mirrors
+        if not isinstance(out.get('suite'),str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,40}',out['suite']):
+            raise ValueError('Invalid APT suite')
         script=out.get('bootstrap_script')
         if script is not None and (not isinstance(script,str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,40}',script)):
             raise ValueError('Invalid bootstrap script')
@@ -77,30 +84,46 @@ def rebuild(name, ident, log, options):
     stage.mkdir(mode=0o700)
     try:
         if family=='apt':
-            keyring=Path(source['keyring'])
-            if not keyring.is_file():raise ValueError('Missing trusted archive keyring: '+str(keyring))
-            cmd=['/usr/bin/debootstrap','--arch=amd64','--variant=minbase','--keyring='+str(keyring),
-                 source['suite'],str(stage),source['url']]
-            script=source.get('bootstrap_script')
-            if script:
-                script_path=Path('/usr/share/debootstrap/scripts')/script
-                if not script_path.is_file():raise ValueError('Missing debootstrap compatibility script: '+script)
-                cmd.append(str(script_path))
-            subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
-            # Ensure initial and subsequent package transactions use the same source trust anchor.
-            dest=stage/'usr/share/keyrings'/keyring.name
-            dest.parent.mkdir(parents=True,exist_ok=True)
-            shutil.copy2(keyring,dest)
-            sources=stage/'etc/apt/sources.list'
-            sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+source['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
-            subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
-            subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+            errors=[]
+            for mirror in source['mirrors']:
+                keyring=Path(mirror['keyring'])
+                if not keyring.is_file():
+                    errors.append('Missing trusted archive keyring: '+str(keyring))
+                    continue
+                if any(stage.iterdir()):
+                    shutil.rmtree(stage)
+                    stage.mkdir(mode=0o700)
+                cmd=['/usr/bin/debootstrap','--arch=amd64','--variant=minbase','--keyring='+str(keyring),
+                     source['suite'],str(stage),mirror['url']]
+                script=source.get('bootstrap_script')
+                if script:
+                    script_path=Path('/usr/share/debootstrap/scripts')/script
+                    if not script_path.is_file():raise ValueError('Missing debootstrap compatibility script: '+script)
+                    cmd.append(str(script_path))
+                try:
+                    log.write('Trying signed APT mirror: '+mirror['url']+'\\n'); log.flush()
+                    subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+                    dest=stage/'usr/share/keyrings'/keyring.name
+                    dest.parent.mkdir(parents=True,exist_ok=True)
+                    shutil.copy2(keyring,dest)
+                    sources=stage/'etc/apt/sources.list'
+                    sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\\n')
+                    subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
+                    subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+                    break
+                except (subprocess.CalledProcessError,subprocess.TimeoutExpired) as exc:
+                    errors.append(mirror['url']+': '+str(exc))
+                    log.write('Mirror attempt failed; trying next configured mirror.\\n'); log.flush()
+            else:
+                raise RuntimeError('All signed APT mirrors failed: '+'; '.join(errors))
         else:
             cmd=['/usr/bin/dnf','--installroot='+str(stage),'--releasever='+release,'-y','--setopt=install_weak_deps=False']
             if source.get('repo_config'):
                 config=source.get('repo_config')
                 if not config or not Path(config).is_file():raise ValueError('Missing approved DNF repo config')
                 cmd+=['--setopt=reposdir='+str(Path(config).parent)]
+            else:
+                cmd+=['--use-host-config']
             subprocess.run(cmd+options+['install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
         if not (stage/'etc/os-release').is_file() or not (stage/('usr/bin/rpm' if family=='dnf' else 'usr/bin/apt-get')).exists():raise ValueError('Staged root failed validation')
         for entry in data.get('required_paths',[]):
