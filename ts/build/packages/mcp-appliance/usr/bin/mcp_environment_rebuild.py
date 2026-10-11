@@ -174,6 +174,23 @@ def rebuild(name, ident, log, options):
                     destination=stage/keyfile.as_posix().lstrip('/')
                     destination.parent.mkdir(parents=True,exist_ok=True)
                     shutil.copy2(keyfile,destination)
+        if family=='dnf':
+            anchors=Path('/etc/pki/ca-trust/source/anchors')
+            dest=stage/'etc/pki/ca-trust/source/anchors'
+            dest.mkdir(parents=True,exist_ok=True)
+            if anchors.is_dir():
+                for ca in anchors.iterdir():
+                    if ca.is_file() and ca.suffix.lower() in ('.crt','.pem'):
+                        shutil.copy2(ca,dest/ca.name)
+            # Prevent distribution-provided mirrorlists from superseding
+            # the explicitly approved repository configuration.
+            if source.get('repo_config'):
+                repos=stage/'etc/yum.repos.d'
+                approved={p.name for p in Path(source['repo_config']).parent.glob('*.repo')}
+                for repo in repos.glob('*.repo'):
+                    if repo.name not in approved:repo.rename(repo.with_suffix('.repo.disabled'))
+            subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/update-ca-trust','extract'],
+                           check=True,stdout=log,stderr=subprocess.STDOUT,timeout=180)
         mount_runtime()
         if data.get('thinstation_init', True):
             import hashlib, urllib.request
