@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# /etc/mtab resolves through /proc/self/mounts; mount proc before querying mounts.
+if [ ! -e /proc/self/mounts ]; then
+	mount -t proc proc /proc
+fi
+
 if [ -z "`mount |grep -e overlay`" ]; then
 	mount -t devtmpfs none /dev
 
