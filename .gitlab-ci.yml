@@ -5,6 +5,9 @@ default:
       - sudo umount "$CI_PROJECT_DIR/build-grub-network-benchmark" 2>/dev/null || sudo umount -l "$CI_PROJECT_DIR/build-grub-network-benchmark" 2>/dev/null || true
 
 variables:
+  BUILD_THINSTATION_NG:
+    value: "0"
+    description: "Build and publish the stock ThinStation NG ISO when set to 1."
   BUILD_NPM:
     value: "0"
     description: "Set to 1 to build the NPM appliance ISO."
@@ -74,6 +77,41 @@ stages:
   - build
   - deploy
   - publish
+
+build-thinstation-ng:
+  stage: build
+  tags: [fedora, shell]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_THINSTATION_NG == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: manual
+    - when: never
+  script:
+    - sudo rm -rf build-thinstation-ng
+    - sudo mkdir build-thinstation-ng
+    - sudo mount -t tmpfs -o size=40G tmpfs build-thinstation-ng
+    - sudo chown gitlab-runner:gitlab-runner build-thinstation-ng
+    - ln -s "$CI_PROJECT_DIR/.git" build-thinstation-ng/.git
+    - cd build-thinstation-ng
+    - git checkout -f "$CI_COMMIT_SHA"
+    # Unmodified stock profile. setup-chroot initialization performs unwind.
+    - sudo env MAX_PARALLEL_DOWNLOADS="$MAX_PARALLEL_DOWNLOADS" MAX_DOWNLOADS_PER_MIRROR="$MAX_DOWNLOADS_PER_MIRROR" TS_EXTRA_PORTS="$TS_EXTRA_PORTS" ./setup-chroot -i
+    - sudo ./setup-chroot -e stb
+    - test -s ts/build/boot-images/grub/thinstation-efi.iso
+    - sudo cp ts/build/boot-images/grub/thinstation-efi.iso "$CI_PROJECT_DIR/thinstation-ng-$CI_PIPELINE_ID.iso"
+    - cd "$CI_PROJECT_DIR"
+    - sha256sum "thinstation-ng-$CI_PIPELINE_ID.iso" > "thinstation-ng-$CI_PIPELINE_ID.iso.sha256"
+    - sudo chown gitlab-runner:gitlab-runner "thinstation-ng-$CI_PIPELINE_ID.iso" "thinstation-ng-$CI_PIPELINE_ID.iso.sha256"
+  artifacts:
+    name: "thinstation-ng-$CI_PIPELINE_ID"
+    paths:
+      - thinstation-ng-*.iso
+      - thinstation-ng-*.iso.sha256
+    expire_in: 30 days
+  after_script:
+    - sudo umount build-thinstation-ng || true
+    - sudo rm -rf build-thinstation-ng
 
 build-npm:
   stage: build
@@ -284,6 +322,22 @@ build-infisical-vault:
 
       echo "Submitted $APPLIANCE_NAME as ${REMOTE_PAYLOAD} for repository publishing"
 
+deploy-thinstation-ng:
+  extends: .deploy-repo
+  variables:
+    APPLIANCE_NAME: "thinstation-ng"
+    APPLIANCE_PUBLISH_PROJECT: "thinstation-ng"
+    APPLIANCE_ARTIFACT_GLOB: "thinstation-ng-*.iso"
+  needs:
+    - job: build-thinstation-ng
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_THINSTATION_NG == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
+
 deploy-npm:
   extends: .deploy-repo
   variables:
@@ -354,6 +408,17 @@ deploy-gitlab-ee:
     project: $PUBLISH_ARTIFACTS_PROJECT
     branch: $PUBLISH_ARTIFACTS_BRANCH
     strategy: depend
+
+trigger-publisher-thinstation-ng:
+  extends: .trigger-publisher
+  needs:
+    - job: deploy-thinstation-ng
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_THINSTATION_NG == "1"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+      when: on_success
+    - when: never
 
 trigger-publisher-npm:
   extends: .trigger-publisher
