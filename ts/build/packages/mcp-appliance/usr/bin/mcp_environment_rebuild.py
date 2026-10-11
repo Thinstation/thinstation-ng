@@ -153,7 +153,9 @@ def rebuild(name, ident, log, options):
             script=stage/'tmp/thinstation-init.sh'
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_bytes(payload)
-            subprocess.run(['/usr/bin/chroot', str(stage), '/usr/bin/bash', '/tmp/thinstation-init.sh'],
+            subprocess.run(['/usr/bin/chroot', str(stage), '/usr/bin/env', '-i',
+                            'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                            'HOME=/root', '/usr/bin/bash', '/tmp/thinstation-init.sh'],
                            check=True, stdout=log, stderr=subprocess.STDOUT, timeout=3600)
             script.unlink()
         if not (stage/'etc/os-release').is_file() or not (stage/('usr/bin/rpm' if family=='dnf' else 'usr/bin/apt-get')).exists():raise ValueError('Staged root failed validation')
