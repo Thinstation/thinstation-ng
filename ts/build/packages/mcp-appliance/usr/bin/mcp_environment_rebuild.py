@@ -82,6 +82,19 @@ def rebuild(name, ident, log, options):
     if stage.exists() or old.exists() or target.is_symlink():raise ValueError('Unsafe environment path')
     if not ROOT.is_dir() or ROOT.is_symlink():raise ValueError('Unsafe environment root')
     stage.mkdir(mode=0o700)
+    mounts=[]
+    def mount_runtime():
+        if mounts:return
+        for rel,kind,src in [('dev','bind','/dev'),('dev/pts','bind','/dev/pts'),('proc','proc','proc'),('sys','sysfs','sysfs')]:
+            dst=stage/rel
+            dst.mkdir(parents=True,exist_ok=True)
+            cmd=['mount','--bind',src,str(dst)] if kind=='bind' else ['mount','-t',kind,src,str(dst)]
+            subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT)
+            mounts.append(dst)
+    def unmount_runtime():
+        while mounts:
+            subprocess.run(['umount',str(mounts[-1])],check=True,stdout=log,stderr=subprocess.STDOUT)
+            mounts.pop()
     try:
         if family=='apt':
             errors=[]
@@ -126,10 +139,12 @@ def rebuild(name, ident, log, options):
                                 dst.write(bytes([10])+cert+bytes([10]))
                     sources=stage/'etc/apt/sources.list'
                     sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
+                    mount_runtime()
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
                     break
                 except (subprocess.CalledProcessError,subprocess.TimeoutExpired) as exc:
+                    unmount_runtime()
                     errors.append(mirror['url']+': '+str(exc))
                     log.write('Mirror attempt failed; trying next configured mirror.\\n'); log.flush()
             else:
@@ -159,6 +174,7 @@ def rebuild(name, ident, log, options):
                     destination=stage/keyfile.as_posix().lstrip('/')
                     destination.parent.mkdir(parents=True,exist_ok=True)
                     shutil.copy2(keyfile,destination)
+        mount_runtime()
         if data.get('thinstation_init', True):
             import hashlib, urllib.request
             expected='cf15984d5db95b17d75a1ce7c43edea5b00a38b1cecc56309f3107f7a3260c82'
@@ -179,6 +195,7 @@ def rebuild(name, ident, log, options):
             if not isinstance(entry,str) or not entry.startswith('/usr/') or '..' in Path(entry).parts:raise ValueError('Invalid required path')
             required=stage/entry.lstrip('/')
             if not required.exists() or not required.resolve().is_relative_to(stage.resolve()):raise ValueError('Missing or unsafe required path: '+entry)
+        unmount_runtime()
         assert_inactive(target)
         had_target=target.is_dir()
         if had_target:os.rename(target,old)
@@ -190,5 +207,6 @@ def rebuild(name, ident, log, options):
         log.flush()
         return str(old) if had_target else None
     finally:
+        unmount_runtime()
         if stage.exists():shutil.rmtree(stage)
 if __name__=='__main__':sys.exit(2)
