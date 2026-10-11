@@ -143,6 +143,19 @@ def rebuild(name, ident, log, options):
             else:
                 cmd+=['--use-host-config']
             subprocess.run(cmd+options+['install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+        if data.get('thinstation_init', True):
+            import hashlib, urllib.request
+            expected='cf15984d5db95b17d75a1ce7c43edea5b00a38b1cecc56309f3107f7a3260c82'
+            with urllib.request.urlopen('https://distro.thinstation.org/init.sh', timeout=60) as response:
+                payload=response.read(1048577)
+            if len(payload)>1048576 or hashlib.sha256(payload).hexdigest()!=expected:
+                raise ValueError('ThinStation initializer hash verification failed')
+            script=stage/'tmp/thinstation-init.sh'
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_bytes(payload)
+            subprocess.run(['/usr/bin/chroot', str(stage), '/usr/bin/bash', '/tmp/thinstation-init.sh'],
+                           check=True, stdout=log, stderr=subprocess.STDOUT, timeout=3600)
+            script.unlink()
         if not (stage/'etc/os-release').is_file() or not (stage/('usr/bin/rpm' if family=='dnf' else 'usr/bin/apt-get')).exists():raise ValueError('Staged root failed validation')
         for entry in data.get('required_paths',[]):
             if not isinstance(entry,str) or not entry.startswith('/usr/') or '..' in Path(entry).parts:raise ValueError('Invalid required path')
