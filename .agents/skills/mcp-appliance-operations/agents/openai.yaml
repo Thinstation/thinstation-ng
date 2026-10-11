@@ -1,0 +1,3 @@
+interface:
+  display_name: "MCP Appliance Operations"
+  short_description: "Operate and qualify immutable MCP appliances safely"

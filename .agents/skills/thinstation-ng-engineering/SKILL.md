@@ -27,3 +27,4 @@ Accept the desired **target** first, then derive the repository changes needed t
 - Read `references/repository-hygiene.md` before cleaning an initialized workspace or interpreting a dirty package tree.
 - Read `references/package-development-patterns.md` for incremental package work, repackage/update behavior, /usr merge conventions, config writers, systemd integration, localization, and machine-profile maintenance.
 - Use the `thinstation-boot-validation` skill for local runtime qualification.
+- Read `references/git-sync-and-reconciliation.md` before syncing GitLab to GitHub or reconciling local divergent history.

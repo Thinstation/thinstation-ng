@@ -29,3 +29,4 @@ Use ThinStation as an immutable appliance OS with mutable application state on e
 - `references/firewall-and-server-packages.md` — package firewall ownership.
 - `references/k3s-awx-appliance.md` — reusable K3s/AWX build mechanics.
 - `references/wazuh-appliance.md` — reusable Wazuh build/validation mechanics.
+- `references/secure-operations-and-environments.md` — credential authorization, secure service bootstrap, and persistent distro environment management.

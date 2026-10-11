@@ -23,3 +23,4 @@ Prefer local, reproducible evidence over environment-specific deployment testing
 - `references/boot-and-test-architecture.md` — bt matrix, OVMF, PXE, persistent disks, QGA protocol details.
 - `references/fastboot-runtime.md` — initrd/lib.squash split and runtime loader diagnostics.
 - `references/local-qemu-validation.md` — local guest inspection and qualification checklist.
+- `references/end-to-end-release-gates.md` — build/publish/rotate/boot/persist/update/recover release qualification.
