@@ -110,6 +110,11 @@ def rebuild(name, ident, log, options):
         import time
         while mounts:
             destination=mounts[-1]
+            # Bind-mounted /dev can expose /dev/pts without a separate mount;
+            # another chroot may already have released this mountpoint.
+            if subprocess.run(['mountpoint','-q',str(destination)]).returncode!=0:
+                mounts.pop()
+                continue
             for attempt in range(10):
                 result=subprocess.run(['umount',str(destination)],stdout=log,stderr=subprocess.STDOUT)
                 if result.returncode==0:break
