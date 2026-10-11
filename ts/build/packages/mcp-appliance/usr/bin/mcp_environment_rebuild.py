@@ -143,6 +143,22 @@ def rebuild(name, ident, log, options):
             else:
                 cmd+=['--use-host-config']
             subprocess.run(cmd+options+['install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
+        # A staged chroot cannot use the host's loopback DNS stub.
+        resolver=Path('/run/systemd/resolve/resolv.conf')
+        if not resolver.is_file():resolver=Path('/etc/resolv.conf')
+        (stage/'etc').mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(resolver,stage/'etc/resolv.conf')
+        if family=='dnf':
+            repo_source=source.get('repo_config')
+            if repo_source:
+                repo_dir=stage/'etc/yum.repos.d'
+                repo_dir.mkdir(parents=True,exist_ok=True)
+                for repo_file in Path(repo_source).parent.glob('*.repo'):
+                    shutil.copy2(repo_file,repo_dir/repo_file.name)
+                for keyfile in Path('/var/prstnt/mcp-appliance/config/dnf-repos').glob('*.gpg'):
+                    destination=stage/keyfile.as_posix().lstrip('/')
+                    destination.parent.mkdir(parents=True,exist_ok=True)
+                    shutil.copy2(keyfile,destination)
         if data.get('thinstation_init', True):
             import hashlib, urllib.request
             expected='cf15984d5db95b17d75a1ce7c43edea5b00a38b1cecc56309f3107f7a3260c82'
