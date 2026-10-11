@@ -92,8 +92,15 @@ def rebuild(name, ident, log, options):
             subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT)
             mounts.append(dst)
     def unmount_runtime():
+        import time
         while mounts:
-            subprocess.run(['umount',str(mounts[-1])],check=True,stdout=log,stderr=subprocess.STDOUT)
+            destination=mounts[-1]
+            for attempt in range(10):
+                result=subprocess.run(['umount',str(destination)],stdout=log,stderr=subprocess.STDOUT)
+                if result.returncode==0:break
+                time.sleep(1+attempt)
+            else:
+                raise RuntimeError('Chroot mount is still busy: '+str(destination))
             mounts.pop()
     try:
         if family=='apt':
@@ -150,6 +157,7 @@ def rebuild(name, ident, log, options):
             else:
                 raise RuntimeError('All signed APT mirrors failed: '+'; '.join(errors))
         else:
+            pkgs=list(dict.fromkeys(pkgs+['gawk','dnf']))
             cmd=['/usr/bin/dnf','--installroot='+str(stage),'--releasever='+release,'-y','--setopt=install_weak_deps=False']
             if source.get('repo_config'):
                 config=source.get('repo_config')
