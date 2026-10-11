@@ -91,6 +91,21 @@ def rebuild(name, ident, log, options):
             cmd=['mount','--bind',src,str(dst)] if kind=='bind' else ['mount','-t',kind,src,str(dst)]
             subprocess.run(cmd,check=True,stdout=log,stderr=subprocess.STDOUT)
             mounts.append(dst)
+    def stop_staged_gpg_agents():
+        import signal,time
+        targets=[]
+        for proc in Path('/proc').iterdir():
+            if not proc.name.isdigit():continue
+            try:
+                root=(proc/'root').resolve(strict=True)
+                comm=(proc/'comm').read_text().strip()
+                if root==stage.resolve() and comm in ('gpg-agent','scdaemon'):
+                    targets.append(int(proc.name))
+            except (OSError,RuntimeError):continue
+        for pid in targets:
+            try:os.kill(pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+        if targets:time.sleep(2)
     def unmount_runtime():
         import time
         while mounts:
@@ -220,6 +235,7 @@ def rebuild(name, ident, log, options):
             if not isinstance(entry,str) or not entry.startswith('/usr/') or '..' in Path(entry).parts:raise ValueError('Invalid required path')
             required=stage/entry.lstrip('/')
             if not required.exists() or not required.resolve().is_relative_to(stage.resolve()):raise ValueError('Missing or unsafe required path: '+entry)
+        stop_staged_gpg_agents()
         unmount_runtime()
         assert_inactive(target)
         had_target=target.is_dir()
@@ -232,6 +248,7 @@ def rebuild(name, ident, log, options):
         log.flush()
         return str(old) if had_target else None
     finally:
+        stop_staged_gpg_agents()
         unmount_runtime()
         if stage.exists():shutil.rmtree(stage)
 if __name__=='__main__':sys.exit(2)
