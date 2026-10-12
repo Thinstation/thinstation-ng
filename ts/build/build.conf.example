@@ -28,7 +28,7 @@
 # package included. Once the client machine is booted with that image
 # you can open and xterm or ssh in and run "hwlister.sh". hwlister.sh
 # will compile some lists and attempt to post them to the pxe server assigned
-# to the client. If the pxe server is this workstation and you are hosting
+# to the client. If this is the build workstation and you are hosting
 # files directly out of this build env, you can then run
 # "./mkmachine SOME-MODEL" and the files will be put into the machine folder
 # under that model name. Now all you have to do is add a line to this file
@@ -203,6 +203,7 @@ package freerdp              # RDP client
 ##############################
 # Virtualization tools and utilities.
 
+package qemu-guest-agent     # QEMU/KVM guest agent
 package open-vm-tools        # VMware guest tools
 package vboxguest            # VirtualBox guest additions
 package xe-guest-utils       # XCP-ng guest utilities
