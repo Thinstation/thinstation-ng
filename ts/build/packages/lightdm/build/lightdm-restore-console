@@ -1,0 +1,20 @@
+#!/bin/sh
+# Remove only the obsolete template-wide empty ExecStart override. Preserve
+# real agetty replacements and unrelated administrator/package overrides.
+set -eu
+root=${1:-}
+root=${root%/}
+[ -d "${root:-/}" ] || { echo "Image root does not exist: $root" >&2; exit 1; }
+
+for units in usr/lib64/systemd/system usr/lib/systemd/system lib64/systemd/system lib/systemd/system etc/systemd/system; do
+    legacy="$root/$units/getty@.service.d/disable-tty1.conf"
+    [ -f "$legacy" ] || continue
+    directives=$(sed -e '/^[[:space:]]*[#;]/d' \
+        -e '/^[[:space:]]*$/d' \
+        -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+        -e 's/^ExecStart[[:space:]]*=[[:space:]]*$/ExecStart=/' "$legacy")
+    if [ "$directives" = "$(printf '[Service]\nExecStart=')" ]; then
+        echo "Removing obsolete getty template override: $legacy"
+        rm -f -- "$legacy"
+    fi
+done

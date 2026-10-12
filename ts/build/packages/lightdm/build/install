@@ -1,10 +1,23 @@
 #!/bin/sh
 
 export PACKAGE=lightdm
-export PORTS="lightdm lightdm-gtk accountsservice lightdm-autologin-greeter lightdm-gobject"
-repackage -e
+# Keep the greeter's keyboard library in the package payload. The RPM cache
+# may contain dependencies that are not installed in the build chroot.
+export PORTS="lightdm lightdm-gtk accountsservice lightdm-autologin-greeter lightdm-gobject libxklavier"
+repackage -e || exit $?
+
+# repackage may leave its installed marker behind after a partial extraction.
+# Do not allow an incomplete greeter package to be reused or baked into an ISO.
+for required in usr/bin/lightdm usr/bin/lightdm-gtk-greeter usr/lib64/libxklavier.so.16; do
+    if [ ! -s "/build/packages/lightdm/$required" ]; then
+        echo "LightDM package is incomplete: missing $required" >&2
+        rm -f /build/packages/lightdm/build/installed
+        exit 1
+    fi
+done
 
 sed -i -e 's|/usr/bin|/bin|g' /build/packages/lightdm/usr/lib64/systemd/system/*.service
 returnval=$?
+[ "$returnval" -eq 0 ] || rm -f /build/packages/lightdm/build/installed
 
-exit $returnval
+exit "$returnval"
