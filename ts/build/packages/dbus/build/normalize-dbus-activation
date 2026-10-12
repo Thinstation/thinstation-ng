@@ -37,6 +37,47 @@ plain_directory()
     done
 }
 
+# Inspect leaf symlinks within IMAGE_ROOT without following host paths. Keep
+# directory symlinks opaque, and reject cycles, missing targets and root escapes.
+resolve_activation_link()
+{
+    local part path target hops=0
+    local -a pending=() parents=()
+    IFS=/ read -r -a pending <<< "${1#"$root"/}"
+    while [ "${#pending[@]}" -gt 0 ]; do
+        part=${pending[0]}
+        pending=("${pending[@]:1}")
+        case "$part" in
+            ''|.) continue ;;
+            ..)
+                [ "${#parents[@]}" -gt 0 ] || return 1
+                unset 'parents[-1]'
+                continue
+                ;;
+        esac
+        path=$root
+        for target in "${parents[@]}"; do path="$path/$target"; done
+        path="$path/$part"
+        if [ -L "$path" ]; then
+            [ "${#pending[@]}" -eq 0 ] || return 1
+            hops=$((hops + 1))
+            [ "$hops" -le 40 ] || return 1
+            target=$(readlink "$path") || return 1
+            case "$target" in *$'\n'*) return 1 ;; esac
+            case "$target" in /*) parents=() ;; esac
+            IFS=/ read -r -a pending <<< "$target"
+        elif [ "${#pending[@]}" -gt 0 ]; then
+            [ -d "$path" ] || return 1
+            parents+=("$part")
+        else
+            [ -f "$path" ] && [ -r "$path" ] || return 1
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done
+    return 1
+}
+
 read_name()
 {
     awk '
@@ -82,14 +123,22 @@ for bus in session system; do
         fi
         for file in "$root/$relative"/*.service; do
             occupied["$file"]=1
-            # A symlink can advertise another provider, including an absolute
-            # target outside a staged root. Leave the bus unchanged if unsure.
-            if [ -L "$file" ] || [ ! -f "$file" ]; then
+            # Canonical in-image aliases (notably systemd's session record)
+            # count as providers but are never renamed. Their target must also
+            # be canonical, so normalization cannot invalidate the link.
+            record=$file
+            if [ -L "$file" ]; then
+                if ! record=$(resolve_activation_link "$file"); then
+                    warn "$bus: unresolved activation link ${file#"$root"}; leaving this bus unchanged"
+                    opaque=true
+                    continue
+                fi
+            elif [ ! -f "$file" ]; then
                 warn "$bus: non-regular activation entry ${file#"$root"}; leaving this bus unchanged"
                 opaque=true
                 continue
             fi
-            if ! name=$(read_name "$file"); then
+            if ! name=$(read_name "$record"); then
                 warn "$bus: ambiguous/missing Name in ${file#"$root"}; leaving this bus unchanged"
                 opaque=true
                 continue
@@ -97,6 +146,12 @@ for bus in session system; do
             if [ "${#name}" -gt 247 ] ||
                [[ ! "$name" =~ ^[A-Za-z_-][A-Za-z0-9_-]*(\.[A-Za-z_-][A-Za-z0-9_-]*)+$ ]]; then
                 warn "$bus: invalid or overlong bus Name in ${file#"$root"}; leaving this bus unchanged"
+                opaque=true
+                continue
+            fi
+            if [ -L "$file" ] && { [ "${file##*/}" != "$name.service" ] ||
+                                      [ "${record##*/}" != "$name.service" ]; }; then
+                warn "$bus: noncanonical activation link ${file#"$root"}; leaving this bus unchanged"
                 opaque=true
                 continue
             fi
