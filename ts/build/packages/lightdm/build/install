@@ -16,8 +16,5 @@ for required in usr/bin/lightdm usr/bin/lightdm-gtk-greeter usr/lib64/libxklavie
     fi
 done
 
-sed -i -e 's|/usr/bin|/bin|g' /build/packages/lightdm/usr/lib64/systemd/system/*.service
-returnval=$?
-[ "$returnval" -eq 0 ] || rm -f /build/packages/lightdm/build/installed
-
-exit "$returnval"
+# Runtime usr-merge aliases resolve vendor executable paths without rewrites.
+exit 0
