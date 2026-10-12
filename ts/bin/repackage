@@ -26,8 +26,8 @@ get_opts()
 		case "$1" in
 			-h|--help)		show_help ; exit 255 ;;
 			-t|--temp)		temp_folder="$2" ; shift ;;
-			-e|--env)		from_env ; exit 0 ;;
-			-c|--clean)		clean ; exit 0 ;;
+			-e|--env)		from_env ; exit $? ;;
+			-c|--clean)		clean ; exit $? ;;
 			*)			package="$1" ;;
 		esac
 		shift
@@ -58,10 +58,10 @@ extract_scripts()
 	local rpm_name
 
 	# Create script directory
-	mkdir -p "$script_dir"
+	mkdir -p "$script_dir" || return $?
 
 	# Extract all scripts into a temporary file
-	rpm -qp --scripts "$rpm_file" > all_scripts.txt
+	rpm -qp --scripts "$rpm_file" > all_scripts.txt || return $?
 
 	# Extract the base RPM name without version
 	rpm_name=$(basename "$rpm_file" | sed -r 's/-[0-9].*//')
@@ -111,7 +111,7 @@ apply_caps() {
 	            file="${BASH_REMATCH[1]}"
 	            caps="${BASH_REMATCH[2]}"
 	            if [[ -n "$caps" && -e "$pkgpath/$file" ]] && [[ "$caps" != '(none)' ]]; then
-	                setcap "$caps" "$pkgpath/$file"
+	                setcap "$caps" "$pkgpath/$file" || return $?
 	            fi
 	        fi
 	    done < $pkgpath/file_caps.txt
@@ -199,10 +199,10 @@ extract_archive()
 		mkdir -p "$pkgpath"
 	fi
 
-	extract_scripts "$rpm_file"
-	rpm2archive "$rpm_file" | tar --xattrs --selinux -xzf - -C "$pkgpath"
-	rpm -qp --qf '[%{filenames} %{filecaps}\n]' "$rpm_file" > "$pkgpath/file_caps.txt"
-	apply_caps
+	extract_scripts "$rpm_file" || return $?
+	( set -o pipefail; rpm2archive "$rpm_file" | tar --xattrs --selinux -xzf - -C "$pkgpath" ) || return $?
+	rpm -qp --qf '[%{filenames} %{filecaps}\n]' "$rpm_file" > "$pkgpath/file_caps.txt" || return $?
+	apply_caps || return $?
 
 	rm -rf "$pkgpath/usr/lib/.build-id" "$pkgpath/usr/lib64/.build-id"
 	if [ -e "$pkgpath/usr/lib" ] && [ -z "$(ls -A "$pkgpath/usr/lib")" ]; then
@@ -232,26 +232,26 @@ canonicalize_usr()
         local src="$1" dst="$2"
         if [ -d "$src" ] && [ -n "$(ls -A "$src")" ]; then
             mkdir -p "$dst"
-            cp -a "$src"/. "$dst"/.
+            cp -a "$src"/. "$dst"/. || return $?
             rm -rf "$src"
         fi
     }
 
-    merge_tree "$pkgpath/bin" "$pkgpath/usr/bin"
-    merge_tree "$pkgpath/sbin" "$pkgpath/usr/bin"
+    merge_tree "$pkgpath/bin" "$pkgpath/usr/bin" || return $?
+    merge_tree "$pkgpath/sbin" "$pkgpath/usr/bin" || return $?
 
     # Modern merged-bin layout has one executable namespace. Do not let
     # upstream RPMs reintroduce /usr/sbin into ThinStation packages.
     if [ -L "$pkgpath/usr/sbin" ]; then
         rm -f "$pkgpath/usr/sbin"
     elif [ -d "$pkgpath/usr/sbin" ]; then
-        merge_tree "$pkgpath/usr/sbin" "$pkgpath/usr/bin"
+        merge_tree "$pkgpath/usr/sbin" "$pkgpath/usr/bin" || return $?
     fi
 
-    merge_tree "$pkgpath/lib" "$pkgpath/usr/lib64"
-    merge_tree "$pkgpath/lib64" "$pkgpath/usr/lib64"
-    merge_tree "$pkgpath/libexec" "$pkgpath/usr/libexec"
-    merge_tree "$pkgpath/share" "$pkgpath/usr/share"
+    merge_tree "$pkgpath/lib" "$pkgpath/usr/lib64" || return $?
+    merge_tree "$pkgpath/lib64" "$pkgpath/usr/lib64" || return $?
+    merge_tree "$pkgpath/libexec" "$pkgpath/usr/libexec" || return $?
+    merge_tree "$pkgpath/share" "$pkgpath/usr/share" || return $?
 
     # /usr/lib can contain multilib payload even during a native 64-bit
     # transaction. Never promote ELF32 objects into /usr/lib64.
@@ -283,7 +283,7 @@ canonicalize_usr()
                 fi
             fi
 
-            cp -a "$obj" "$dst"
+            cp -a "$obj" "$dst" || return $?
         done < <(find "$pkgpath/usr/lib" -mindepth 1 ! -type d -print0)
 
         rm -rf "$pkgpath/usr/lib"
@@ -436,130 +436,33 @@ merge_trunk()
 
 from_env()
 {
-	for project in $TSWRKNG $XTRWRKNG; do
-		if [ -d $project/packages/$PACKAGE ]; then
-			INSTALLDIR=$project/packages/$PACKAGE
-		fi
-	done
-	temp_folder=./build-$PACKAGE
-	for package in $PORTS $RPM; do
-		main
-		cp -a $temp_folder/$package/* $INSTALLDIR/.
-		rm -rf $temp_folder
-	done
-	cut_bloat
-	create_empty
-	merge_trunk
-	touch $INSTALLDIR/build/installed
+    local project
+    INSTALLDIR=""
+    for project in $TSWRKNG $XTRWRKNG; do
+        if [ -d "$project/packages/$PACKAGE" ]; then
+            INSTALLDIR="$project/packages/$PACKAGE"
+        fi
+    done
+    [ -n "$INSTALLDIR" ] || { echo "Unknown package: $PACKAGE" >&2; return 1; }
+    rm -f "$INSTALLDIR/build/installed" || return $?
+    # Isolated staging avoids leftovers and collisions between invocations.
+    temp_folder=$(mktemp -d "./build-$PACKAGE.XXXXXX") || return $?
+    local status=0
+    for package in $PORTS $RPM; do
+        main || { status=$?; break; }
+        cp -a "$temp_folder/$package/." "$INSTALLDIR/" || { status=$?; break; }
+    done
+    rm -rf "$temp_folder"
+    [ "$status" -eq 0 ] || return "$status"
+    cut_bloat || return $?
+    create_empty || return $?
+    merge_trunk || return $?
+    touch "$INSTALLDIR/build/installed"
 }
 
 reduce_libs()
 {
-	local libdir="$pkgpath/usr/lib64"
-	local stage ledger entry real soname staged
-	local src_hash staged_hash
-
-	[ -d "$libdir" ] || return 0
-
-	stage="$libdir/.repackage-soname.$$"
-	ledger="$stage/delete.list"
-	mkdir -p "$stage/files" || return 1
-	: > "$ledger" || { rm -rf "$stage"; return 1; }
-
-	resolve_library_link()
-	{
-		local current="$1"
-		local target hops=0
-
-		while [ -L "$current" ]; do
-			target=`readlink "$current"` || return 1
-
-			# Keep the old conservative behavior for links that leave the
-			# top-level library directory. Those may be linker scripts or
-			# intentionally cross-directory links.
-			case "$target" in
-				*/*) return 1 ;;
-			esac
-
-			current="$libdir/$target"
-			hops=$((hops + 1))
-			[ "$hops" -le 32 ] || return 1
-		done
-
-		[ -f "$current" ] || return 1
-		printf '%s\n' "$current"
-	}
-
-	# First pass: resolve every top-level lib*.so* entry to its real ELF,
-	# probe that real file for SONAME, and stage one regular file named
-	# exactly by that SONAME. Do not delete or replace anything yet.
-	for entry in "$libdir"/lib*.so*; do
-		[ -e "$entry" ] || [ -L "$entry" ] || continue
-
-		if [ -L "$entry" ]; then
-			real=`resolve_library_link "$entry"` || continue
-		elif [ -f "$entry" ]; then
-			real="$entry"
-		else
-			continue
-		fi
-
-		soname=`objdump -p -- "$real" 2>/dev/null | awk '$1 == "SONAME" { print $2; exit }'`
-		[ -n "$soname" ] || continue
-
-		case "$soname" in
-			""|"."|".."|*/*)
-				echo "Invalid SONAME '$soname' from $real" >&2
-				rm -rf "$stage"
-				return 1
-				;;
-		esac
-
-		staged="$stage/files/$soname"
-		if [ -f "$staged" ]; then
-			src_hash=`sha256sum "$real" | awk '{print $1}'`
-			staged_hash=`sha256sum "$staged" | awk '{print $1}'`
-			if [ "$src_hash" != "$staged_hash" ]; then
-				echo "Conflicting libraries advertise SONAME $soname: $real" >&2
-				rm -rf "$stage"
-				return 1
-			fi
-		else
-			cp -a -- "$real" "$staged" || {
-				rm -rf "$stage"
-				return 1
-			}
-		fi
-
-		printf '%s\n' "$entry" >> "$ledger"
-	done
-
-	# If nothing was safely reducible, leave the package untouched.
-	if [ ! -s "$ledger" ]; then
-		rm -rf "$stage"
-		return 0
-	fi
-
-	# All SONAME files are now staged successfully. Only now mutate the
-	# package tree. Delete each original path once, then install the staged
-	# regular files under their SONAMEs.
-	sort -u "$ledger" -o "$ledger"
-	while IFS= read -r entry; do
-		rm -f -- "$entry" || {
-			rm -rf "$stage"
-			return 1
-		}
-	done < "$ledger"
-
-	for staged in "$stage"/files/*; do
-		[ -f "$staged" ] || continue
-		mv -f -- "$staged" "$libdir/`basename "$staged"`" || {
-			rm -rf "$stage"
-			return 1
-		}
-	done
-
-	rm -rf "$stage"
+    python3 "${TS_LIBRARY_HELPER:-$(dirname "$(readlink -f "$0")")/ts-library-deps}" reduce "$pkgpath"
 }
 
 remove_libs()
@@ -571,19 +474,18 @@ remove_libs()
 
 main()
 {
-	package_path
-	extract_archive
-	preserve_empty_working
-	canonicalize_usr
-	move_run
-	extra_dirs
-	extra_files
-	remove_empty
-#	remove_libs
-	reduce_libs
+    package_path || return $?
+    extract_archive || return $?
+    preserve_empty_working || return $?
+    canonicalize_usr || return $?
+    move_run || return $?
+    extra_dirs || return $?
+    extra_files || return $?
+    remove_empty || return $?
+    reduce_libs || return $?
 }
 
-get_opts $@
-echo $package
-main $@
-exit 0
+get_opts "$@"
+echo "$package"
+main "$@"
+exit $?

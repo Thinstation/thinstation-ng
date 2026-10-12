@@ -80,6 +80,7 @@ stages:
 
 build-thinstation-ng:
   stage: build
+  needs: [test-library-payloads]
   tags: [fedora, shell]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $BUILD_THINSTATION_NG == "1"'
@@ -104,12 +105,18 @@ build-thinstation-ng:
     - sha256sum "thinstation-ng-$CI_PIPELINE_ID.iso" > "thinstation-ng-$CI_PIPELINE_ID.iso.sha256"
     - sudo chown gitlab-runner:gitlab-runner "thinstation-ng-$CI_PIPELINE_ID.iso" "thinstation-ng-$CI_PIPELINE_ID.iso.sha256"
   artifacts:
+    when: always
     name: "thinstation-ng-$CI_PIPELINE_ID"
     paths:
       - thinstation-ng-*.iso
       - thinstation-ng-*.iso.sha256
+      - thinstation-ng-diagnostics/
     expire_in: 30 days
   after_script:
+    - mkdir -p thinstation-ng-diagnostics
+    - sudo cp build-thinstation-ng/build.log thinstation-ng-diagnostics/build.log 2>/dev/null || true
+    - sudo cp -a build-thinstation-ng/ts/build/library-reports thinstation-ng-diagnostics/ 2>/dev/null || true
+    - sudo chown -R gitlab-runner:gitlab-runner thinstation-ng-diagnostics
     - sudo umount build-thinstation-ng || true
     - sudo rm -rf build-thinstation-ng
 
@@ -784,3 +791,16 @@ test-mcp-environments:
     - cd ts/build/packages/mcp-appliance/build/frontend
     - npm ci
     - npm run build
+
+# Exercise shared packaging behavior without compiling software or building an ISO.
+test-library-payloads:
+  stage: build
+  tags: [fedora, shell]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+    - when: never
+  script:
+    - bash -n ts/bin/repackage ts/bin/stb ts/build/build
+    - python3 -m unittest discover -s tests/library_payloads -p 'test_*.py' -v
+    - python3 -m unittest discover -s ts/build/packages/lightdm/build/tests -p 'test_*.py' -v

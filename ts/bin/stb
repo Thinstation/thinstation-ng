@@ -1,4 +1,4 @@
 #!/bin/bash
-
-cd /build
-time ./build --savedir --autodl --license ACCEPT $@ 2>&1 | tee /build.log
+set -o pipefail
+cd /build || exit $?
+time ./build --savedir --autodl --license ACCEPT "$@" 2>&1 | tee /build.log
