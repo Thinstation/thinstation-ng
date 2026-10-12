@@ -2,6 +2,11 @@
 
 LDM_CONF=/etc/lightdm/lightdm.conf
 
+# Older cached payloads can carry a reset intended for tty1 in the template
+# directory, invalidating every getty instance. Restore normal console units;
+# LightDM/logind retain responsibility for selecting the graphical VT.
+sh /build/lightdm-restore-console
+
 rm /etc/systemd/system/display-manager.service
 systemctl enable lightdm
 

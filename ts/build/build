@@ -21,8 +21,6 @@ CONFDIR=./conf
 DEF_SQUASHOPT="-always-use-fragments -no-recovery -no-exports"
 export TOOLSDIR
 
-ignore_libs='libcrypto.so.1.0.2|libssl.so.1.0.2|libcrypto.so.1.0.0|libssl.so.1.0.0|libKF5'
-export ignore_libs
 
 grub_modules="
 password_pbkdf2
@@ -180,116 +178,24 @@ mounted()
 	return $?
 }
 
-lib_in_path()
-{
-	for lpath in `cat lpaths.tmp` $filepath; do
-		if [ -e ./tmp-tree$lpath/$1 ] \
-		|| [ -e $pkgname$lpath/$1 ] \
-		|| [ -e ./tmp-tree/usr/lib64/*/$1 ] \
-		|| [ -e $pkgname/usr/lib64/*/$1 ] \
-		|| [ -e ./tmp-tree/usr/libexec/$1 ] \
-		|| [ -e ./tmp-tree/usr/libexec/*/$1 ] \
-		|| [ -e $pkgname/usr/libexec/$1 ] \
-		|| [ -e $pkgname/usr/libexec/*/$1 ]; then
-			return 0
-		fi
-	done
-	# Preserve the pre-usr-merge rpath depth semantics. /usr is only the
-	# canonical prefix now; it must not count as an extra path component.
-	rpath_source=$filepath
-	rpath_prefix=""
-	case "$rpath_source" in
-		/usr/*)
-			rpath_source="${rpath_source#/usr}"
-			rpath_prefix="/usr"
-			;;
-	esac
-	if [ "`echo $rpath_source |sed -e 's|/|/\n|g' |grep -c '/'`" -gt "2" ]; then
-		likely_rpath="$rpath_prefix`echo $rpath_source |cut -d '/' -f1-3`"
-		if [ -n "`find $pkgname$likely_rpath -name $1 2>/dev/null`" ]; then
-			return 0
-		fi
-	fi
-	return 1
-}
-export -f lib_in_path
-
-calculate_lib_dependencies()
-{
-	unset DISPLAYED
-	filename=$1
-	(objdump -x $filename 2>/dev/null |grep -e NEEDED |cut -c 24- |grep -Ev "$ignore_libs") \
-	|while read libfile; do
-		filepath=`dirname $filename | sed -e "s,$pkgname,,"`
-		export filepath
-		if ! lib_in_path $libfile && [ ! -e $pkgname/usr/lib64/$libfile ]; then
-			if [ "$DISPLAYED" != "TRUE" ]; then
-				echo "Adding library dependencies for `basename $filename`"
-				DISPLAYED=TRUE
-			fi
-			libsource="`find /usr/lib /usr/lib64 -name $libfile |grep -v vmware |tail -n1`"
-			if [ -n "$libsource" ] && [ -e $libsource ]; then
-				echo -e "\t\t\t$libfile"
-				linkdest=`readlink $libsource`
-				if [ -n "$linkdest" ]; then
-					[ ! -e $pkgname/usr/lib64/$libfile ] \
-					&& mkdir -p $pkgname/usr/lib64 \
-					&& $cputil `dirname $libsource`/$linkdest $pkgname/usr/lib64/$libfile 2>/dev/null \
-					&& echo "$pkgname/usr/lib64/$libfile" >> liblist.added
-				else
-					[ ! -e $pkgname/usr/lib64/$libfile ] \
-					&& mkdir -p $pkgname/usr/lib64 \
-					&& $cputil $libsource $pkgname/usr/lib64/$libfile 2>/dev/null \
-					&& echo "$pkgname/usr/lib64/$libfile" >> liblist.added
-				fi
-			else
-				echo "Could not find $libfile !"
-			fi
-		fi
-	done
-}
-export -f calculate_lib_dependencies
-
 lib_dependencies()
 {
-	echo -e "\nAdding Library Dependencies\n"
-	mkdir -p ./tmp-tree/usr/lib64
+    echo -e "\nAdding and validating ELF library dependencies\n"
+    mkdir -p ./library-reports || return 1
+    rm -f ./library-reports/*.json || return 1
+    local tree name
+    while IFS= read -r -d '' tree; do
+        name=$(basename "$tree")
+        /ts/bin/ts-library-deps collect "$tree" --base ./tmp-tree \
+            --download-missing --report "./library-reports/$name.json" || return 1
+    done < <(printf './tmp-tree\0'; find "$PKGDIR" -mindepth 1 -maxdepth 1 -type d -print0)
+    ldconfig -X -r tmp-tree || return 1
+}
 
-	if [ -e ./tmp-tree/etc/ld.so.conf ]; then
-		cat ./tmp-tree/etc/ld.so.conf |grep -v include > lpaths.tmp
-	fi
-	if [ -e ./tmp-tree/etc/ld.so.conf.d ] && [ -n "`ls -A ./tmp-tree/etc/ld.so.conf.d`" ]; then
-		cat ./tmp-tree/etc/ld.so.conf.d/* >> lpaths.tmp
-	fi
-	for pkgname in `echo "./tmp-tree" && find $PKGDIR -mindepth 1 -maxdepth 1`; do
-                export pkgname
-		if is_enabled $ts_stripelf; then
-			export cputil="cp -a"
-		else
-			export cputil=ln
-		fi
-		find $pkgname -type f |grep -Ev 'lib32|bin32' > filelist
-		file -e encoding -e tokens -e compress -e ascii -e apptype -e tar -e cdf -f filelist -n -r \
-		|grep -e ELF \
-		|cut -d: -f1 > liblist.final 2>/dev/null
-		rm filelist
-		while [ -s liblist.final ]; do
-			if is_enabled $ts_singlethread; then
-				procs=1
-			else
-				procs=`nproc`
-				let procs=( procs * 2 )
-			fi
-			cat liblist.final |sort -u|sort -R | \
-			xargs -P $procs -I {} bash -c 'calculate_lib_dependencies "$@"' _ {}
-			rm liblist.final
-			if [ -e liblist.added ]; then
-				mv liblist.added liblist.final
-			fi
-		done
-	done
-	ldconfig -X -r tmp-tree 2>/dev/null
-	rm lpaths.tmp
+verify_lib_dependencies()
+{
+    /ts/bin/ts-library-deps collect ./tmp-tree --verify-only \
+        --report ./library-reports/final-image.json
 }
 
 copy_module()
@@ -1240,7 +1146,7 @@ install_non_distributable()
 					exit 1
 				fi
 			elif [ "`cat $pkgpath/build/install |grep -c -e repackage`" -gt "0" ]; then
-				if $pkgpath/build/install ; then
+				if $pkgpath/build/install && [ -e "$pkgpath/build/installed" ]; then
 					touch $pkgpath/build/installed
 					echo -e "$package: Setup complete"
 				else
@@ -1679,7 +1585,7 @@ keymaps
 #set +x
 # Adding library dependencies
 
-lib_dependencies
+lib_dependencies || { echo "Build aborted: unresolved ELF libraries" >&2; exit 1; }
 
 # Add user defined defaults
 if [ -e ./$ts_defaultconfig ] && [ ! -z "$ts_defaultconfig" ] ; then
@@ -2035,7 +1941,7 @@ rm -rf boot-images/initrd/{kernel_parameters,initrd,ucode,image.md5,lib.squash,v
 # Check OS for required commands. If some are missing the build system may fail silently.
 echo -n "Checking for required commands... "
 
-required_commands="awk basename cat chmod comm cp cut diff dirname du echo file find ldd ln ls mkdir mv rm rmdir sed sleep sort tar touch"
+required_commands="awk basename cat chmod comm cp cut diff dirname du echo file find ldd ln ls mkdir mv objdump python3 rm rmdir sed sleep sort tar touch"
 
 # Check for sed first
 sed --version >/dev/null
@@ -2179,6 +2085,7 @@ fi
 # Build Image unless adding a buildtime file, for TS-O-Matic
 if [ -z "$BUILDTIME" ]; then
 	main
+	verify_lib_dependencies || { echo "Build aborted: final ELF dependency validation failed" >&2; exit 1; }
 	splash_setup
 	strip_files
 	make_initrd

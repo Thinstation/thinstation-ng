@@ -1,0 +1,477 @@
+#!/usr/bin/env python3
+"""Root-confined SONAME reduction and ELF dependency closure for image builds.
+
+RPM payloads are data: no package is installed and no scriptlet is executed.
+Only required ELF objects and their RPM license files enter the image.
+"""
+import argparse
+import concurrent.futures
+import functools
+import hashlib
+import json
+import os
+from pathlib import Path, PurePosixPath
+import shutil
+import stat
+import struct
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+
+class LibraryError(RuntimeError):
+    pass
+
+
+def run(argv):
+    p = subprocess.run([str(x) for x in argv], text=True, capture_output=True, timeout=300)
+    if p.returncode:
+        raise LibraryError(f'{argv[0]} failed ({p.returncode}): {p.stderr.strip()}')
+    return p.stdout
+
+
+def normalize(path):
+    parts = []
+    for part in str(path).split('/'):
+        if part in ('', '.'):
+            continue
+        if part == '..':
+            if not parts:
+                raise LibraryError(f'Path escapes image root: {path}')
+            parts.pop()
+        else:
+            parts.append(part)
+    return '/' + '/'.join(parts)
+
+
+def resolve(root, path, merged=False):
+    """Resolve EVERY component without ever following an absolute link on host."""
+    root = Path(root).absolute()
+    pending = str(path).split('/')
+    done = []
+    hops = 0
+    while pending:
+        part = pending.pop(0)
+        if part in ('', '.'):
+            continue
+        if part == '..':
+            if not done:
+                raise LibraryError(f'Link escapes image root: {path}')
+            done.pop()
+            continue
+        candidate = root.joinpath(*done, part)
+        try:
+            mode = candidate.lstat().st_mode
+        except FileNotFoundError:
+            # repackage has already canonicalized these directories, but has
+            # not created the runtime compatibility symlinks yet.
+            prefix = '/' + '/'.join(done + [part])
+            if merged and prefix in ('/lib', '/lib64', '/usr/lib'):
+                done = []
+                pending = ['usr', 'lib64'] + pending
+                continue
+            raise
+        if stat.S_ISLNK(mode):
+            hops += 1
+            if hops > 64:
+                raise LibraryError(f'Symlink cycle or excessive depth: {path}')
+            target = os.readlink(candidate)
+            if target.startswith('/'):
+                done = []
+            pending = target.split('/') + pending
+        else:
+            done.append(part)
+    return root.joinpath(*done)
+
+
+def elf_id(path):
+    try:
+        with open(path, 'rb') as f:
+            h = f.read(20)
+    except OSError:
+        return None
+    if len(h) < 20 or h[:4] != b'\x7fELF' or h[5] not in (1, 2):
+        return None
+    endian = '<' if h[5] == 1 else '>'
+    kind, machine = struct.unpack(endian + 'HH', h[16:20])
+    return (h[4], h[5], machine) if kind in (2, 3) else None
+
+
+@functools.lru_cache(maxsize=32768)
+def dynamic(path):
+    data = {'NEEDED': [], 'RPATH': [], 'RUNPATH': [], 'SONAME': []}
+    for line in run(['objdump', '-p', path]).splitlines():
+        fields = line.split(None, 1)
+        if len(fields) == 2 and fields[0] in data:
+            data[fields[0]].append(fields[1])
+    return data
+
+
+def sha(path):
+    with open(path, 'rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+
+def safe_destination(root, logical):
+    """Create parents without ever traversing a staged symlink."""
+    root = Path(root).absolute()
+    parts = normalize(logical).lstrip('/').split('/')
+    current = root
+    for part in parts[:-1]:
+        current = current / part
+        if current.is_symlink():
+            raise LibraryError(f'Symlink in output parent: {logical}')
+        current.mkdir(exist_ok=True)
+    return current / parts[-1]
+
+
+def atomic_copy(src, dest):
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp = tempfile.mkstemp(prefix='.library-', dir=dest.parent)
+    os.close(fd)
+    try:
+        shutil.copy2(src, temp)
+        os.replace(temp, dest)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def reduce_sonames(root):
+    root = Path(root).absolute()
+    lib = root / 'usr/lib64'
+    if not lib.is_dir():
+        return
+    if resolve(root, '/usr/lib64') != lib:
+        raise LibraryError('Noncanonical package library directory')
+    groups, ledger = {}, set()
+    for entry in sorted(lib.glob('lib*.so*')):
+        try:
+            real = resolve(root, '/' + str(entry.relative_to(root)), merged=True)
+        except FileNotFoundError:
+            continue  # A cross-package link may be satisfied during assembly.
+        if real.parent != lib or not elf_id(real):
+            continue  # Preserve cross-directory links and linker scripts.
+        names = dynamic(str(real))['SONAME']
+        if not names:
+            continue
+        name = names[0]
+        if name in ('.', '..') or '/' in name:
+            raise LibraryError(f'Invalid SONAME {name!r}: {real}')
+        if name in groups and sha(groups[name]) != sha(real):
+            raise LibraryError(f'Conflicting ELF payloads for SONAME {name}')
+        groups[name] = real
+        ledger.add(entry)
+    # Do not break aliases outside the reduction ledger. Retain an original
+    # versioned filename when another package-local path still references it.
+    protected = set()
+    for parent, dirs, files in os.walk(root, followlinks=False):
+        for name in dirs + files:
+            entry = Path(parent) / name
+            if entry.is_symlink() and entry not in ledger:
+                try:
+                    protected.add(resolve(root, '/' + str(entry.relative_to(root)), merged=True))
+                except (OSError, LibraryError):
+                    pass
+    with tempfile.TemporaryDirectory(prefix='.sonames-', dir=lib) as temp:
+        for name, real in groups.items():
+            shutil.copy2(real, Path(temp) / name)
+        # No mutation until every candidate has been resolved, checked, staged.
+        for entry in ledger - protected:
+            entry.unlink()
+        for name in groups:
+            os.replace(Path(temp) / name, lib / name)
+
+
+class RpmCache:
+    def __init__(self, caches, work, arch, download=False):
+        self.caches, self.work, self.arch = list(caches), Path(work), arch
+        self.download = download
+        self.attempted = set()
+        self.index = None
+        self.unpacked = {}
+
+    def headers(self, archive):
+        text = run(['rpm', '-qp', '--qf', '%{NAME}\t%{ARCH}\t%{EPOCHNUM}:%{VERSION}-%{RELEASE}\n[%{FILENAMES}\n]', archive])
+        header, *files = text.splitlines()
+        name, arch, evr = header.split('\t')
+        return archive, name, arch, evr, files
+
+    def build_index(self):
+        self.index = {}
+        archives = sorted({str(p) for root in self.caches for p in Path(root).rglob('*.rpm')})
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            for archive, name, arch, evr, files in pool.map(self.headers, archives):
+                if arch not in (self.arch, 'noarch'):
+                    continue
+                for path in files:
+                    if '.so' in Path(path).name and path.startswith(('/usr/lib/', '/usr/lib64/', '/lib/', '/lib64/')) and '/.build-id/' not in path:
+                        self.index.setdefault(Path(path).name, []).append((archive, path, name, evr))
+        print(f'Indexed {len(archives)} cached RPMs for {self.arch}', flush=True)
+
+    def unpack(self, archive):
+        if archive in self.unpacked:
+            return self.unpacked[archive]
+        self.work.mkdir(parents=True, exist_ok=True)
+        root = Path(tempfile.mkdtemp(prefix='rpm-', dir=self.work))
+        hardlinks = []
+        proc = subprocess.Popen(['rpm2archive', '-n', archive], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            with tarfile.open(fileobj=proc.stdout, mode='r|') as tar:
+                for item in tar:
+                    logical = normalize(item.name)
+                    keep = logical.startswith('/usr/share/licenses/') or (
+                        logical.startswith(('/usr/lib/', '/usr/lib64/', '/lib/', '/lib64/'))
+                        and '.so' in PurePosixPath(logical).name and '/.build-id/' not in logical)
+                    if not keep or item.isdir():
+                        continue
+                    dest = safe_destination(root, logical)
+                    # Never extract through a symlink, including one supplied
+                    # by an earlier archive member. Do not extract device nodes.
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    for parent in (dest, *dest.parents):
+                        if parent == root:
+                            break
+                        if parent.is_symlink():
+                            raise LibraryError(f'Unsafe RPM member path: {item.name}')
+                    if item.isfile():
+                        with tar.extractfile(item) as src, open(dest, 'wb') as out:
+                            shutil.copyfileobj(src, out)
+                        dest.chmod(item.mode & 0o777)
+                    elif item.issym():
+                        os.symlink(item.linkname, dest)
+                    elif item.islnk():
+                        hardlinks.append((dest, item.linkname))
+            stderr = proc.stderr.read().decode(errors='replace')
+            if proc.wait():
+                raise LibraryError(f'rpm2archive failed: {archive}: {stderr}')
+            for dest, target in hardlinks:
+                src = resolve(root, normalize(target))
+                atomic_copy(src, dest)
+        except Exception:
+            proc.kill()
+            proc.wait()
+            shutil.rmtree(root)
+            raise
+        finally:
+            proc.stdout.close()
+            proc.stderr.close()
+        self.unpacked[archive] = root
+        return root
+
+    def find(self, name, abi):
+        if self.index is None:
+            self.build_index()
+        candidates = self.index.get(name, [])
+        # A fresh DNF transaction normally has one EVR per name. Refuse an
+        # ambiguous stale cache rather than silently choosing a random ABI.
+        versions = {}
+        for archive, path, package, evr in candidates:
+            versions.setdefault(package, set()).add(evr)
+        if any(len(v) > 1 for v in versions.values()):
+            raise LibraryError(f'Ambiguous cached RPM versions for {name}: {versions}')
+        hits = []
+        for archive, path, package, evr in candidates:
+            root = self.unpack(archive)
+            try:
+                real = resolve(root, path)
+            except FileNotFoundError:
+                continue
+            if elf_id(real) == abi and dynamic(str(real))['SONAME'] in ([], [name]):
+                hits.append((real, root, archive))
+        if len({sha(h[0]) for h in hits}) > 1:
+            raise LibraryError(f'Conflicting cached providers for {name}: {[h[2] for h in hits]}')
+        if hits:
+            return hits[0]
+        if self.download and name not in self.attempted:
+            self.attempted.add(name)
+            capability = name + ('()(64bit)' if abi[0] == 2 else '')
+            specs = sorted(set(run([
+                'dnf', '-q', '-y', 'repoquery', '--available', '--arch=' + self.arch,
+                '--latest-limit=1', '--whatprovides=' + capability,
+                '--qf=%{name}-%{evr}.%{arch}\n',
+            ]).splitlines()))
+            if len(specs) > 1:
+                raise LibraryError(f'Ambiguous repository providers for {name}: {specs}')
+            if specs:
+                downloads = self.work / 'downloads'
+                downloads.mkdir(parents=True, exist_ok=True)
+                print(f'Downloading missing provider {specs[0]} (no installation)', flush=True)
+                run(['dnf', '-q', '-y', 'download', '--arch=' + self.arch,
+                     '--destdir=' + str(downloads), specs[0]])
+                if downloads not in self.caches:
+                    self.caches.append(downloads)
+                self.build_index()
+                return self.find(name, abi)
+        return None
+
+
+class Collector:
+    def __init__(self, root, base, sources, cache=None, allow=()):
+        self.root = Path(root).absolute()
+        self.base = Path(base).absolute() if base else self.root
+        if not self.root.is_dir() or not self.base.is_dir():
+            raise LibraryError('Image and base roots must exist')
+        self.sources = [Path(p).absolute() for p in sources]
+        self.cache, self.allow = cache, set(allow)
+        self.copied, self.errors, self.exemptions = [], [], []
+        self.source_index = None
+        self.config_dirs = []
+        for image in dict.fromkeys((self.root, self.base)):
+            for logical in ['/etc/ld.so.conf', *['/' + str(p.relative_to(image)) for p in sorted((image / 'etc/ld.so.conf.d').glob('*.conf'))]]:
+                try:
+                    config = resolve(image, logical)
+                except FileNotFoundError:
+                    continue
+                for line in config.read_text().splitlines():
+                    line = line.split('#', 1)[0].strip()
+                    if line.startswith('/'):
+                        self.config_dirs.append(normalize(line))
+
+    def dirs(self, logical, info):
+        origin = str(PurePosixPath(logical).parent)
+        result = []
+        for value in info['RUNPATH'] or info['RPATH']:
+            for path in value.split(':'):
+                path = path.replace('${ORIGIN}', origin).replace('$ORIGIN', origin)
+                path = path.replace('${LIB}', 'lib64').replace('$LIB', 'lib64')
+                if path.startswith('/') and '$' not in path:
+                    result.append(normalize(path))
+        return list(dict.fromkeys(result + self.config_dirs + ['/usr/lib64', '/lib64', '/usr/lib', '/lib']))
+
+    def present(self, name, abi, logical, info):
+        paths = [name] if name.startswith('/') else [d + '/' + name for d in self.dirs(logical, info)]
+        for root in dict.fromkeys((self.root, self.base)):
+            for path in paths:
+                try:
+                    p = resolve(root, path)
+                except FileNotFoundError:
+                    continue
+                if elf_id(p) == abi:
+                    return p
+        return None
+
+    def source(self, name, abi):
+        if self.source_index is None:
+            self.source_index = {}
+            for root in self.sources:
+                seen = set()
+                for directory in ('/usr/lib64', '/usr/lib', '/lib64', '/lib'):
+                    try:
+                        start = resolve(root, directory)
+                    except FileNotFoundError:
+                        continue
+                    if start in seen:
+                        continue
+                    seen.add(start)
+                    for parent, dirs, files in os.walk(start, followlinks=False):
+                        dirs[:] = sorted(d for d in dirs if d not in ('.build-id', 'modules', 'firmware') and 'vmware' not in d)
+                        for file in sorted(files):
+                            if '.so' in file:
+                                p = Path(parent) / file
+                                self.source_index.setdefault(file, []).append((root, '/' + str(p.relative_to(root))))
+        for root, path in self.source_index.get(name, []):
+            try:
+                real = resolve(root, path)
+            except FileNotFoundError:
+                continue
+            if elf_id(real) == abi and dynamic(str(real))['SONAME'] in ([], [name]):
+                return real, None, str(real)
+        return self.cache.find(name, abi) if self.cache else None
+
+    def collect(self):
+        queue = []
+        for directory in ('usr', 'bin', 'sbin', 'lib', 'lib64', 'opt'):
+            start = self.root / directory
+            if not start.is_dir() or start.is_symlink():
+                continue
+            for parent, dirs, files in os.walk(start, followlinks=False):
+                dirs[:] = sorted(d for d in dirs if d not in ('.build-id', 'modules', 'firmware'))
+                for name in sorted(files):
+                    path = Path(parent) / name
+                    if not path.is_symlink() and elf_id(path):
+                        queue.append(path)
+        seen = set()
+        for path in queue:
+            if path in seen:
+                continue
+            seen.add(path)
+            abi = elf_id(path)
+            info = dynamic(str(path))
+            logical = '/' + str(path.relative_to(self.root))
+            for needed in info['NEEDED']:
+                try:
+                    if self.present(needed, abi, logical, info):
+                        continue
+                    if needed in self.allow:
+                        self.exemptions.append({'file': logical, 'needed': needed})
+                        continue
+                    if '/' in needed:
+                        raise LibraryError('Missing path-valued DT_NEEDED entry')
+                    found = self.source(needed, abi)
+                    if not found:
+                        raise LibraryError('No compatible installed or cached RPM provider')
+                    real, payload, provenance = found
+                    destdir = self.root / 'usr/lib64'
+                    destdir.mkdir(parents=True, exist_ok=True)
+                    if resolve(self.root, '/usr/lib64') != destdir:
+                        raise LibraryError('Noncanonical destination /usr/lib64')
+                    dest = destdir / needed
+                    atomic_copy(real, dest)
+                    if payload:
+                        licenses = payload / 'usr/share/licenses'
+                        if licenses.is_dir():
+                            for parent, dirs, files in os.walk(licenses, followlinks=False):
+                                for filename in files:
+                                    src = Path(parent) / filename
+                                    logical_license = '/' + str(src.relative_to(payload))
+                                    resolved = resolve(payload, logical_license)
+                                    target = safe_destination(self.root, logical_license)
+                                    atomic_copy(resolved, target)
+                    self.copied.append({'file': logical, 'needed': needed, 'source': provenance, 'sha256': sha(dest)})
+                    print(f'  {needed} <- {provenance}', flush=True)
+                    queue.append(dest)
+                except (OSError, LibraryError, tarfile.TarError, subprocess.TimeoutExpired) as e:
+                    self.errors.append({'file': logical, 'needed': needed, 'error': str(e)})
+        for error in self.errors:
+            print(f"ERROR: {error['file']} needs {error['needed']}: {error['error']}", file=sys.stderr)
+        print(f'ELF closure: {len(seen)} objects, {len(self.copied)} added, {len(self.errors)} unresolved, {len(self.exemptions)} explicit exceptions', flush=True)
+        return not self.errors
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command', required=True)
+    reduce = sub.add_parser('reduce')
+    reduce.add_argument('root')
+    collect = sub.add_parser('collect')
+    collect.add_argument('root')
+    collect.add_argument('--base')
+    collect.add_argument('--verify-only', action='store_true')
+    collect.add_argument('--download-missing', action='store_true')
+    collect.add_argument('--source-root', action='append')
+    collect.add_argument('--rpm-cache', action='append')
+    collect.add_argument('--arch', default=os.environ.get('TARGET_ARCH') or os.uname().machine)
+    collect.add_argument('--report', required=True)
+    collect.add_argument('--allow-missing', action='append', default=[])
+    args = parser.parse_args()
+    try:
+        if args.command == 'reduce':
+            reduce_sonames(args.root)
+            return 0
+        with tempfile.TemporaryDirectory(prefix='ts-rpm-libraries-') as work:
+            cache = None if args.verify_only else RpmCache(args.rpm_cache or ['/var/cache/dnf'], work, args.arch, args.download_missing)
+            sources = [] if args.verify_only else (args.source_root or ['/'])
+            collector = Collector(args.root, args.base, sources, cache, args.allow_missing)
+            ok = collector.collect()
+            Path(args.report).write_text(json.dumps({'copied': collector.copied, 'unresolved': collector.errors, 'exceptions': collector.exemptions}, indent=2) + '\n')
+            return 0 if ok else 1
+    except (OSError, LibraryError, tarfile.TarError, subprocess.TimeoutExpired) as e:
+        print(f'ERROR: {e}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

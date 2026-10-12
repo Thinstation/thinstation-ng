@@ -1,4 +1,4 @@
-#8c600a1984e0434a340e4562108356bd  .dna
+#e8f8336ebd5ba9ead7698eb935846b99  .dna
 
 rm -f /ts/build/packages/base/etc/adjtime
 rm -f /ts/build/packages/base/etc/authselect/authselect.conf
@@ -46,6 +46,7 @@ rm -f /ts/build/packages/base/usr/bin/blkid
 rm -f /ts/build/packages/base/usr/bin/find
 rm -f /ts/build/packages/base/usr/bin/getcap
 rm -f /ts/build/packages/base/usr/bin/getent
+rm -f /ts/build/packages/base/usr/bin/gettext
 rm -f /ts/build/packages/base/usr/bin/grpconv
 rm -f /ts/build/packages/base/usr/bin/ldconfig
 rm -f /ts/build/packages/base/usr/bin/login
