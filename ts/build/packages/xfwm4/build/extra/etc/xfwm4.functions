@@ -65,6 +65,7 @@ xfconf_settings()
 	xfconf-query -c xfce4-session -p /shutdown/ShowHibernate -t bool -s false -n
 	xfconf-query -c xfce4-session -p /shutdown/ShowSwitchUser -t bool -s false -n
 
+
 	if is_disabled $DESKTOP_SHOWTRASH; then
 		xfconf-query -c xfce4-desktop -p /desktop-icons/file-icons/show-trash -t bool -s false -n
 	else
@@ -147,6 +148,7 @@ xfconf_settings()
 	else
 		xfconf-query -c xfce4-panel -p /plugins/plugin-2 --reset
 	fi
+
 
 	xfconf-query -c xfce4-panel -p /plugins/plugin-6/show-frame -t bool -s false -n
 
@@ -290,7 +292,12 @@ write_menu_directory()
 {
 	menu_key="$1"
 	menu_file="$menudir/$menu_key.directory"
-	menu_display="$(gettext "$menu_key")"
+	# Translation is display-only: a missing or failing runtime helper must
+	# never erase the category label or change its stable menu identifier.
+	if ! menu_display="$(gettext "$menu_key")"; then
+		menu_display="$menu_key"
+	fi
+	[ -n "$menu_display" ] || menu_display="$menu_key"
 	cat > "$menu_file" <<EOF
 [Desktop Entry]
 Version=1.0
