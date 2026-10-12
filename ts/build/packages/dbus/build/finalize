@@ -8,3 +8,7 @@ chmod u+s /usr/libexec/dbus-1/dbus-daemon-launch-helper
 /usr/lib/systemd/systemd-update-helper install-user-units dbus.socket
 #/usr/lib/systemd/systemd-update-helper install-system-units dbus-daemon.service
 #/usr/lib/systemd/systemd-update-helper install-user-units dbus-daemon.service
+
+# All selected package payloads are now in this image. Resolve only unambiguous
+# vendor activation filenames; retain collisions and report them visibly.
+bash /build/normalize-dbus-activation / || exit $?

@@ -1,0 +1,153 @@
+#!/bin/bash
+# Run on an assembled image, not individual RPMs or live user sessions.
+# Only rename vendor activation records; never edit contents or pick a provider.
+set -euo pipefail
+export LC_ALL=C
+
+dry_run=false
+if [ "${1:-}" = --dry-run ]; then dry_run=true; shift; fi
+if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+    echo "Usage: $0 [--dry-run] IMAGE_ROOT" >&2
+    exit 2
+fi
+root=$(cd -- "$1" && pwd -P)
+root=${root%/}
+shopt -s nullglob dotglob
+renamed=0
+skipped=0
+unchanged=0
+
+warn()
+{
+    printf 'D-Bus activation: WARNING: %s\n' "$*" >&2
+}
+
+# Do not traverse a package-supplied directory symlink against the build host.
+# Return 2 for an absent directory; 1 for an opaque/non-directory component.
+plain_directory()
+{
+    local relative=$1 part path=$root
+    local -a parts
+    IFS=/ read -r -a parts <<< "$relative"
+    for part in "${parts[@]}"; do
+        path="$path/$part"
+        [ ! -L "$path" ] || return 1
+        [ -e "$path" ] || return 2
+        [ -d "$path" ] || return 1
+    done
+}
+
+read_name()
+{
+    awk '
+        { sub(/\r$/, ""); line=$0; sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line) }
+        line == "" || line ~ /^[#;]/ { next }
+        line ~ /^\[/ { in_service=(line == "[D-BUS Service]"); sections+=in_service; next }
+        in_service && line ~ /^Name[ \t]*=/ {
+            sub(/^Name[ \t]*=[ \t]*/, "", line)
+            name=line; count++
+        }
+        END {
+            if (sections != 1 || count != 1 || name == "") exit 1
+            print name
+        }
+    ' "$1"
+}
+
+for bus in session system; do
+    # Other image-wide locations participate in collision detection only.
+    # Runtime XDG paths/custom servicedir settings are not rewritten here.
+    if [ "$bus" = session ]; then
+        vendor=usr/share/dbus-1/services
+        directories=("$vendor" usr/local/share/dbus-1/services)
+    else
+        vendor=usr/share/dbus-1/system-services
+        directories=("$vendor" usr/local/share/dbus-1/system-services
+                     etc/dbus-1/system-services run/dbus-1/system-services)
+    fi
+    declare -A names=() counts=() providers=() occupied=()
+    candidates=()
+    scanned=()
+    opaque=false
+    for relative in "${directories[@]}"; do
+        if plain_directory "$relative"; then
+            scanned+=("$root/$relative")
+        else
+            status=$?
+            if [ "$status" -ne 2 ]; then
+                warn "$bus: cannot safely inspect /$relative; leaving this bus unchanged"
+                opaque=true
+            fi
+            continue
+        fi
+        for file in "$root/$relative"/*.service; do
+            occupied["$file"]=1
+            # A symlink can advertise another provider, including an absolute
+            # target outside a staged root. Leave the bus unchanged if unsure.
+            if [ -L "$file" ] || [ ! -f "$file" ]; then
+                warn "$bus: non-regular activation entry ${file#"$root"}; leaving this bus unchanged"
+                opaque=true
+                continue
+            fi
+            if ! name=$(read_name "$file"); then
+                warn "$bus: ambiguous/missing Name in ${file#"$root"}; leaving this bus unchanged"
+                opaque=true
+                continue
+            fi
+            if [ "${#name}" -gt 247 ] ||
+               [[ ! "$name" =~ ^[A-Za-z_-][A-Za-z0-9_-]*(\.[A-Za-z_-][A-Za-z0-9_-]*)+$ ]]; then
+                warn "$bus: invalid or overlong bus Name in ${file#"$root"}; leaving this bus unchanged"
+                opaque=true
+                continue
+            fi
+            names["$file"]=$name
+            counts["$name"]=$(( ${counts["$name"]:-0} + 1 ))
+            providers["$name"]="${providers["$name"]:-} ${file#"$root"}"
+            [ "$relative" != "$vendor" ] || candidates+=("$file")
+        done
+    done
+    for file in "${candidates[@]}"; do
+        name=${names["$file"]}
+        canonical="$name.service"
+        if [ "${file##*/}" = "$canonical" ]; then
+            unchanged=$((unchanged + 1))
+            continue
+        fi
+        reason=''
+        if "$opaque"; then
+            reason='incomplete provider inventory'
+        elif [ "${counts["$name"]}" -ne 1 ]; then
+            reason="multiple providers for $name:${providers["$name"]}"
+        else
+            for directory in "${scanned[@]}"; do
+                if [ "${occupied["$directory/$canonical"]:-0}" = 1 ] ||
+                   [ -e "$directory/$canonical" ] || [ -L "$directory/$canonical" ]; then
+                    reason="preferred filename occupied: ${directory#"$root"}/$canonical"
+                    break
+                fi
+            done
+        fi
+        if [ -n "$reason" ]; then
+            warn "$bus: keep ${file#"$root"}: $reason"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        dest="${file%/*}/$canonical"
+        if "$dry_run"; then
+            printf 'D-Bus activation: WOULD RENAME %s -> %s\n' "${file#"$root"}" "${dest#"$root"}"
+        else
+            # -n forbids replacement; -T forbids interpreting DEST as a folder.
+            # A concurrent destination creation therefore cannot be overwritten.
+            mv -nT -- "$file" "$dest"
+            if [ -e "$file" ] || [ -L "$file" ]; then
+                warn "$bus: keep ${file#"$root"}: destination appeared before rename"
+                skipped=$((skipped + 1))
+                continue
+            fi
+            printf 'D-Bus activation: RENAMED %s -> %s\n' "${file#"$root"}" "${dest#"$root"}"
+        fi
+        renamed=$((renamed + 1))
+    done
+done
+printf 'D-Bus activation: renamed=%s skipped=%s already-canonical=%s dry-run=%s\n' \
+    "$renamed" "$skipped" "$unchanged" "$dry_run"
