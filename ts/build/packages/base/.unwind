@@ -1,4 +1,4 @@
-#8c600a1984e0434a340e4562108356bd  .dna
+#e8f8336ebd5ba9ead7698eb935846b99  .dna
 
 mkdir -p /ts/build/packages/base/etc
 mkdir -p /ts/build/packages/base/etc/authselect
@@ -47,6 +47,7 @@ ln /usr/bin/blkid /ts/build/packages/base/usr/bin/blkid
 ln /usr/bin/find /ts/build/packages/base/usr/bin/find
 ln /usr/bin/getcap /ts/build/packages/base/usr/bin/getcap
 ln /usr/bin/getent /ts/build/packages/base/usr/bin/getent
+ln /usr/bin/gettext /ts/build/packages/base/usr/bin/gettext
 ln /usr/bin/grpconv /ts/build/packages/base/usr/bin/grpconv
 ln /usr/bin/ldconfig /ts/build/packages/base/usr/bin/ldconfig
 ln /usr/bin/login /ts/build/packages/base/usr/bin/login
