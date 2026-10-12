@@ -801,6 +801,14 @@ test-library-payloads:
       when: on_success
     - when: never
   script:
-    - bash -n ts/bin/repackage ts/bin/stb ts/build/build
-    - python3 -m unittest discover -s tests/library_payloads -p 'test_*.py' -v
-    - python3 -m unittest discover -s ts/build/packages/lightdm/build/tests -p 'test_*.py' -v
+    - |
+      set -euo pipefail
+      # The runner deliberately mounts /tmp noexec. Fixtures include mocked
+      # executables; keep them in this job's executable workspace instead.
+      export TMPDIR="$(mktemp -d "$CI_PROJECT_DIR/.library-tests.XXXXXX")"
+      trap 'rm -rf -- "$TMPDIR"' EXIT
+      for script in ts/bin/repackage ts/bin/stb ts/build/build; do
+        bash -n "$script"
+      done
+      python3 -m unittest discover -s tests/library_payloads -p 'test_*.py' -v
+      python3 -m unittest discover -s ts/build/packages/lightdm/build/tests -p 'test_*.py' -v
