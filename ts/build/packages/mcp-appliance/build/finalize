@@ -1,5 +1,34 @@
 #mcp-appliance 90
 set -eu
+# BEGIN MCP BUILD-TIME NETBIOS CLEANUP
+# Check modules in the staged image, never the build host's running kernel.
+# Keep these legacy rules only when the image includes nf_conntrack_netbios_ns.
+mcp_netbios_module_present=false
+for mcp_module_root in ${MCP_MODULE_ROOTS:-/usr/lib64/modules /lib/modules}; do
+  [ -d "$mcp_module_root" ] || continue
+  if [ -n "$(find "$mcp_module_root" -type f -name 'nf_conntrack_netbios_ns.ko*' -print -quit)" ] ||
+     grep -s -q '/nf_conntrack_netbios_ns\.ko' "$mcp_module_root"/*/modules.builtin; then
+    mcp_netbios_module_present=true
+    break
+  fi
+done
+if [ "$mcp_netbios_module_present" = false ]; then
+  # The image still supports modern SMB/CIFS (TCP 445); only retire the
+  # NetBIOS/UDP 137-138 rules which depend on the omitted conntrack helper.
+  for mcp_zone_dir in ${MCP_FIREWALL_ZONE_DIRS:-/etc/firewalld/zones /usr/lib/firewalld/zones}; do
+    for mcp_zone in home internal FedoraWorkstation; do
+      mcp_zone_file="$mcp_zone_dir/$mcp_zone.xml"
+      [ -f "$mcp_zone_file" ] || continue
+      sed -i '/name="samba-client"/d' "$mcp_zone_file"
+    done
+  done
+  for mcp_service_dir in ${MCP_FIREWALL_SERVICE_DIRS:-/usr/lib/firewalld/services /etc/firewalld/services}; do
+    mcp_service_file="$mcp_service_dir/netbios-ns.xml"
+    [ -f "$mcp_service_file" ] || continue
+    sed -i '/<helper name="netbios-ns"\/>/d' "$mcp_service_file"
+  done
+fi
+# END MCP BUILD-TIME NETBIOS CLEANUP
 mkdir -p /etc/mcp-appliance \
   /root/.ssh \
   /var/prstnt/mcp-appliance/config \
