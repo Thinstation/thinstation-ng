@@ -180,6 +180,12 @@ class KeyringPackagingTests(unittest.TestCase):
                 (pam/name).write_text(original)
             for name in ('lightdm-autologin', 'system-auth', 'sshd'):
                 (pam/name).write_text('auth required pam_unix.so\n')
+            auto = root/'etc/xdg/autostart'
+            auto.mkdir(parents=True)
+            for component in ('secrets', 'pkcs11', 'ssh'):
+                (auto/f'gnome-keyring-{component}.desktop').write_text(
+                    '[Desktop Entry]\nOnlyShowIn=GNOME;XFCE;Unity;MATE;\nExec=vendor\n')
+            self.assertEqual(len(list(auto.glob('*.desktop'))), 3)
             snapshots = []
             for _ in range(2):
                 p = subprocess.run(['bash', str(CONFIGURE), str(root)], text=True, capture_output=True)
