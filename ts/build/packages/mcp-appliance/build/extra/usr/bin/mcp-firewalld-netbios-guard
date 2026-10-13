@@ -1,0 +1,12 @@
+#!/bin/sh
+# Executed by firewalld.service before it parses zone configuration.
+# Keep NetBIOS rules only when the running kernel supports their helper.
+set -eu
+if modprobe -n -q nf_conntrack_netbios_ns >/dev/null 2>&1; then
+    exit 0
+fi
+for zone in home internal FedoraWorkstation; do
+    file="${FIREWALL_ZONE_DIR:-/etc/firewalld/zones}/$zone.xml"
+    [ -f "$file" ] || continue
+    sed -i '/<service[[:space:]]\+name="samba-client"[[:space:]]*\/>/d' "$file"
+done

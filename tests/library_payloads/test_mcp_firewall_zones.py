@@ -1,65 +1,50 @@
-"""MCP firewall cleanup must not alter the shared ThinStation firewalld recipe."""
+"""Check conditional NetBIOS cleanup hooked into appliance firewalld startup."""
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-MCP_FINALIZE = ROOT / "ts/build/packages/mcp-appliance/build/finalize"
-FIREWALL_FINALIZE = ROOT / "ts/build/packages/firewalld/build/finalize"
+PACKAGE = ROOT / "ts/build/packages/mcp-appliance"
+GUARD = PACKAGE / "build/extra/usr/bin/mcp-firewalld-netbios-guard"
+DROPIN = PACKAGE / "build/extra/etc/systemd/system/firewalld.service.d/20-mcp-netbios.conf"
 
+class NetbiosGuardTests(unittest.TestCase):
+    def test_dropin_runs_before_firewalld(self):
+        data = DROPIN.read_text()
+        self.assertIn("ExecStartPre=/usr/bin/mcp-firewalld-netbios-guard", data)
+        self.assertIn("After=persistent-files.service persistent-dirs.service", data)
 
-class McpFirewallZonesTests(unittest.TestCase):
-    def test_cleanup_only_targets_mcp_appliance(self):
-        script = MCP_FINALIZE.read_text()
-        self.assertIn("# BEGIN MCP FIREWALL NETBIOS CLEANUP", script)
-        self.assertIn("# END MCP FIREWALL NETBIOS CLEANUP", script)
-        self.assertNotIn("samba-client", FIREWALL_FINALIZE.read_text())
-        self.assertNotIn("netbios", FIREWALL_FINALIZE.read_text().lower())
-
-    def test_removes_only_legacy_helper_from_unused_zones(self):
-        script = MCP_FINALIZE.read_text()
-        commands = script.split("# BEGIN MCP FIREWALL NETBIOS CLEANUP", 1)[1].split(
-            "# END MCP FIREWALL NETBIOS CLEANUP", 1)[0]
-        with tempfile.TemporaryDirectory(prefix="mcp-firewall-zones-") as temp:
-            zones = Path(temp) / "zones"
+    def test_conditional_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            zones = root / "zones"
             zones.mkdir()
-            base = """<?xml version="1.0" encoding="utf-8"?>
-<zone>
-  <service name="ssh"/>
-  <service name="samba-client"/>
-  <port port="445" protocol="tcp"/>
-</zone>
-"""
-            for zone in ("home", "internal", "FedoraWorkstation", "public"):
-                (zones / (zone + ".xml")).write_text(base)
-            for name in ("home", "internal", "FedoraWorkstation"):
-                target = zones / (name + ".xml")
-                self.assertIn("samba-client", target.read_text())
-            # Test the exact finalizer shell fragment, not a second copy of
-            # its sed expression. Keep the fixture isolated from host zones.
-            commands = commands.replace("/etc/firewalld/zones/", str(zones) + "/")
-            for _ in range(2):  # Idempotent on repeated finalization
-                result = subprocess.run(["sh", "-eu", "-c", commands],
-                                        capture_output=True, text=True, timeout=10)
+            tools = root / "bin"
+            tools.mkdir()
+            mod = tools / "modprobe"
+            mod.write_text("#!/bin/sh\nexit ${MODULE_PRESENT:-1}\n")
+            mod.chmod(0o755)
+            sample = '<zone>\n  <service name="samba-client"/>\n  <service name="ssh"/>\n</zone>\n'
+            for name in ("home", "internal", "FedoraWorkstation", "public"):
+                (zones / (name + ".xml")).write_text(sample)
+            env = dict(os.environ, FIREWALL_ZONE_DIR=str(zones),
+                       PATH=str(tools) + os.pathsep + os.environ["PATH"])
+            # Module present: don't touch any zone.
+            env["MODULE_PRESENT"] = "0"
+            result = subprocess.run(["sh", str(GUARD)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((zones / "home.xml").read_text(), sample)
+            # Module missing: change only target zones, repeat safely.
+            env["MODULE_PRESENT"] = "1"
+            for _ in range(2):
+                result = subprocess.run(["sh", str(GUARD)], env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
             for name in ("home", "internal", "FedoraWorkstation"):
-                value = (zones / (name + ".xml")).read_text()
-                self.assertNotIn("samba-client", value)
-                self.assertIn('<service name="ssh"/>', value)
-                self.assertIn('<port port="445" protocol="tcp"/>', value)
-            self.assertEqual((zones / "public.xml").read_text(), base)
-
-    def test_missing_optional_zones_do_not_fail(self):
-        script = MCP_FINALIZE.read_text()
-        commands = script.split("# BEGIN MCP FIREWALL NETBIOS CLEANUP", 1)[1].split(
-            "# END MCP FIREWALL NETBIOS CLEANUP", 1)[0]
-        with tempfile.TemporaryDirectory(prefix="mcp-firewall-empty-") as temp:
-            commands = commands.replace("/etc/firewalld/zones/", temp + "/")
-            result = subprocess.run(["sh", "-eu", "-c", commands],
-                                    capture_output=True, text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stderr)
-
+                self.assertNotIn("samba-client", (zones / (name + ".xml")).read_text())
+                self.assertIn('name="ssh"', (zones / (name + ".xml")).read_text())
+            self.assertEqual((zones / "public.xml").read_text(), sample)
 
 if __name__ == "__main__":
     unittest.main()

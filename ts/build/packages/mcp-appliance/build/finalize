@@ -1,16 +1,5 @@
 #mcp-appliance 90
 set -eu
-# BEGIN MCP FIREWALL NETBIOS CLEANUP
-# Fedora's inactive zones still include samba-client. That service pulls in
-# nf_conntrack_netbios_ns, which the small MCP kernel intentionally omits.
-# Retain modern SMB/CIFS clients (TCP 445) without legacy UDP 137 helpers.
-for zone in home internal FedoraWorkstation; do
-  zone_file="/etc/firewalld/zones/${zone}.xml"
-  if [ -f "$zone_file" ]; then
-    sed -i '/<service name="samba-client"\/>/d' "$zone_file"
-  fi
-done
-# END MCP FIREWALL NETBIOS CLEANUP
 mkdir -p /etc/mcp-appliance \
   /root/.ssh \
   /var/prstnt/mcp-appliance/config \
