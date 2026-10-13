@@ -27,6 +27,12 @@ class NetbiosGuardTests(unittest.TestCase):
             root = Path(temp)
             zones = root / "zones"
             zones.mkdir()
+            services = root / "services"
+            services.mkdir()
+            service = services / "netbios-ns.xml"
+            service_sample = '<service>\\n  <helper name="netbios-ns"/>\\n  <port protocol="udp" port="137"/>\\n</service>\\n'
+            service_sample = service_sample.replace('\\n', '\n')
+            service.write_text(service_sample)
             tools = root / "bin"
             tools.mkdir()
             mod = tools / "modprobe"
@@ -35,13 +41,14 @@ class NetbiosGuardTests(unittest.TestCase):
             sample = '<zone>\n  <service name="samba-client"/>\n  <service name="ssh"/>\n</zone>\n'
             for name in ("home", "internal", "FedoraWorkstation", "public"):
                 (zones / (name + ".xml")).write_text(sample)
-            env = dict(os.environ, FIREWALL_ZONE_DIR=str(zones),
+            env = dict(os.environ, FIREWALL_ZONE_DIR=str(zones), FIREWALL_SERVICE_DIR=str(services),
                        PATH=str(tools) + os.pathsep + os.environ["PATH"])
             # Module present: don't touch any zone.
             env["MODULE_PRESENT"] = "0"
             result = subprocess.run(["sh", str(GUARD)], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((zones / "home.xml").read_text(), sample)
+            self.assertEqual(service.read_text(), service_sample)
             # Module missing: change only target zones, repeat safely.
             env["MODULE_PRESENT"] = "1"
             for _ in range(2):
@@ -51,6 +58,8 @@ class NetbiosGuardTests(unittest.TestCase):
                 self.assertNotIn("samba-client", (zones / (name + ".xml")).read_text())
                 self.assertIn('name="ssh"', (zones / (name + ".xml")).read_text())
             self.assertEqual((zones / "public.xml").read_text(), sample)
+            self.assertNotIn('<helper name="netbios-ns"/>', service.read_text())
+            self.assertIn('port="137"', service.read_text())
 
 if __name__ == "__main__":
     unittest.main()
