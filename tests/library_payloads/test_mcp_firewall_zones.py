@@ -7,10 +7,16 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "ts/build/packages/mcp-appliance"
-GUARD = PACKAGE / "build/extra/usr/bin/mcp-firewalld-netbios-guard"
-DROPIN = PACKAGE / "build/extra/etc/systemd/system/firewalld.service.d/20-mcp-netbios.conf"
+GUARD = PACKAGE / "usr/bin/mcp-firewalld-netbios-guard"
+DROPIN = PACKAGE / "etc/systemd/system/firewalld.service.d/20-mcp-netbios.conf"
 
 class NetbiosGuardTests(unittest.TestCase):
+    def test_files_are_in_direct_payload_not_repackage_extra(self):
+        self.assertTrue(GUARD.is_file())
+        self.assertTrue(DROPIN.is_file())
+        self.assertFalse((PACKAGE / "build/extra/usr/bin/mcp-firewalld-netbios-guard").exists())
+        self.assertFalse((PACKAGE / "build/extra/etc/systemd/system/firewalld.service.d/20-mcp-netbios.conf").exists())
+
     def test_dropin_runs_before_firewalld(self):
         data = DROPIN.read_text()
         self.assertIn("ExecStartPre=/usr/bin/mcp-firewalld-netbios-guard", data)
