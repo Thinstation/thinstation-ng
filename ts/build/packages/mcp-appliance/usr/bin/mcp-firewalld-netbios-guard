@@ -8,5 +8,5 @@ fi
 for zone in home internal FedoraWorkstation; do
     file="${FIREWALL_ZONE_DIR:-/etc/firewalld/zones}/$zone.xml"
     [ -f "$file" ] || continue
-    sed -i '/<service[[:space:]]\+name="samba-client"[[:space:]]*\/>/d' "$file"
+    sed -i '/name="samba-client"/d' "$file"
 done
