@@ -26,7 +26,7 @@ rpm() {
             esac
             return 9
         fi
-        [ "$2" = foo.x86_64 ] && [ -e "$TEST_STATE" ]
+        [ "$2" = "foo.${TEST_PACKAGE_ARCH:-x86_64}" ] && [ -e "$TEST_STATE" ]
         return
     fi
     if [ "$1" = -qp ]; then
@@ -35,6 +35,7 @@ rpm() {
                 '%{NAME} %{ARCH}')
                     case "$4" in *foo-extra-*) printf 'foo-extra x86_64' ;;
                         *.i686.rpm) printf 'foo i686' ;;
+                        *.noarch.rpm) printf 'foo noarch' ;;
                         *) printf 'foo x86_64' ;;
                     esac ;;
                 *) printf '/usr/bin/foo (none)\n' ;;
@@ -47,6 +48,15 @@ rpm() {
 }
 dnf() {
     printf 'DNF:%s\n' "$*" >> "$TEST_LOG"
+    if [ "$1" = -q ]; then shift; fi
+    if [ "$1" = repoquery ]; then
+        case "${TEST_REPO_ARCH:-x86_64}" in
+            noarch) printf 'foo noarch\n' ;;
+            mixed) printf 'foo i686\nfoo noarch\nfoo x86_64\n' ;;
+            *) printf 'foo x86_64\n' ;;
+        esac
+        return 0
+    fi
     if [ "$1" = install ]; then
         [ "$TEST_COLLISION" != 1 ] || return 1
         touch "$TEST_STATE"
@@ -56,7 +66,8 @@ dnf() {
         local a dest=''
         for a in "$@"; do case "$a" in --destdir=*) dest="$(printf '%s' "$a" | cut -d= -f2-)" ;; esac; done
         [ -n "$dest" ] || return 1
-        cp "$TEST_ARCHIVE" "$dest/foo-1.0-1.x86_64.rpm"
+        local arch="${TEST_PACKAGE_ARCH:-x86_64}"
+        cp "$TEST_ARCHIVE" "$dest/foo-1.0-1.$arch.rpm"
         return 0
     fi
     return 99
@@ -86,10 +97,12 @@ class HybridRepackageTests(unittest.TestCase):
         self.env = dict(os.environ,
                         TEST_ROOT=str(self.root), TEST_STATE=str(self.state),
                         TEST_LOG=str(self.log), TEST_ARCHIVE=str(self.archive),
-                        TEST_COLLISION="0", TS_REPACKAGE_DNF_CACHE=str(self.cache))
+                        TEST_COLLISION="0", TEST_REPO_ARCH="x86_64",
+                        TEST_PACKAGE_ARCH="x86_64", TS_REPACKAGE_DNF_CACHE=str(self.cache))
 
-    def run_case(self, collision=False):
-        env = dict(self.env, TEST_COLLISION="1" if collision else "0")
+    def run_case(self, collision=False, arch="x86_64"):
+        env = dict(self.env, TEST_COLLISION="1" if collision else "0",
+                   TEST_REPO_ARCH=arch, TEST_PACKAGE_ARCH=("x86_64" if arch == "mixed" else arch))
         result = subprocess.run(["bash", "-c", HARNESS, "test", str(REPACKAGE)],
                                 env=env, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -141,6 +154,25 @@ class HybridRepackageTests(unittest.TestCase):
         log = self.run_case(collision=True)
         self.assertIn("DNF:download --arch=x86_64 ", log)
         self.assertIn("RPM2ARCHIVE:", log)
+
+    def test_noarch_only_installs_without_native_probe(self):
+        log = self.run_case(arch="noarch")
+        self.assertIn("DNF:install --setopt=keepcache=1 --setopt=install_weak_deps=False -y foo.noarch", log)
+        self.assertNotIn("foo.x86_64", log)
+        self.assertNotIn("DNF:download ", log)
+
+    def test_noarch_only_collision_downloads_noarch_directly(self):
+        log = self.run_case(collision=True, arch="noarch")
+        self.assertIn("DNF:install --setopt=keepcache=1 --setopt=install_weak_deps=False -y foo.noarch", log)
+        self.assertIn("DNF:download --arch=noarch ", log)
+        self.assertNotIn("DNF:download --arch=x86_64 ", log)
+        self.assertIn("RPM2ARCHIVE:", log)
+
+    def test_native_preferred_in_mixed_arch_repo(self):
+        log = self.run_case(collision=True, arch="mixed")
+        self.assertIn("DNF:install --setopt=keepcache=1 --setopt=install_weak_deps=False -y foo.x86_64", log)
+        self.assertIn("DNF:download --arch=x86_64 ", log)
+        self.assertNotIn("DNF:download --arch=i686", log)
 
     def test_source_does_not_use_allowerasing(self):
         src = REPACKAGE.read_text()

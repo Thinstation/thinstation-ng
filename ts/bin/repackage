@@ -177,9 +177,27 @@ find_cached_rpm()
 }
 
 
+# Probe available RPM metadata only after the installed/cache fast paths miss.
+# DNF5 otherwise rejects native-qualified names for noarch-only packages.
+select_available_arch()
+{
+    local wanted="$1" native="$2" candidates rpm_name rpm_arch has_native=0 has_noarch=0
+    candidates="$(dnf -q repoquery --available --queryformat '%{name} %{arch}\\n' "$wanted")" || return $?
+    while read -r rpm_name rpm_arch; do
+        [ "$rpm_name" = "$wanted" ] || continue
+        case "$rpm_arch" in
+            "$native") has_native=1 ;;
+            noarch) has_noarch=1 ;;
+        esac
+    done <<< "$candidates"
+    if [ "$has_native" -eq 1 ]; then printf '%s\\n' "$native"; return 0; fi
+    if [ "$has_noarch" -eq 1 ]; then printf 'noarch\\n'; return 0; fi
+    return 1
+}
+
 extract_archive()
 {
-    local archive rpm_file native_arch package_spec installed_spec dnf_cache cache_dir
+    local archive rpm_file native_arch package_spec installed_spec dnf_cache cache_dir selected_arch
 
     if [ -n "$RPM" ]; then
         # Explicit external RPM: preserve archive-only behavior.
@@ -211,9 +229,11 @@ extract_archive()
             if [ -n "$rpm_file" ]; then
                 package_spec="$rpm_file"
             else
-                # Qualify the native architecture; DNF5 can otherwise resolve a
-                # conflicting x86_64 package by installing i686 and dependencies.
-                package_spec="$package.$native_arch"
+                # Probe once for native or noarch; a native-qualified name is
+                # invalid for noarch-only packages. If metadata is unavailable,
+                # retain the existing native/noarch fallback behavior.
+                selected_arch="$(select_available_arch "$package" "$native_arch")" || selected_arch="$native_arch"
+                package_spec="$package.$selected_arch"
             fi
             echo "Trying conflict-safe installation: $package_spec"
             if dnf install --setopt=keepcache=1 --setopt=install_weak_deps=False -y "$package_spec"; then
@@ -246,8 +266,11 @@ extract_archive()
         if [ -z "$rpm_file" ]; then
             mkdir -p "$cache_dir" || return $?
             echo "Downloading collision-safe RPM archive: $package"
-            # DNF5 only accepts one arch in --arch. Prefer native, then noarch.
-            if ! dnf download --arch="$native_arch" --destdir="$cache_dir" "$package"; then
+            # Download only the discovered architecture. Keep a noarch
+            # fallback if the native repository candidate disappears.
+            selected_arch="${selected_arch:-$native_arch}"
+            if ! dnf download --arch="$selected_arch" --destdir="$cache_dir" "$package"; then
+                if [ "$selected_arch" = noarch ]; then return 1; fi
                 dnf download --arch=noarch --destdir="$cache_dir" "$package" || return $?
             fi
             rpm_file="$(find_cached_rpm "$package" "$native_arch" "$cache_dir" || true)"
