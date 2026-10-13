@@ -30,8 +30,7 @@ class NetbiosGuardTests(unittest.TestCase):
             services = root / "services"
             services.mkdir()
             service = services / "netbios-ns.xml"
-            service_sample = '<service>\\n  <helper name="netbios-ns"/>\\n  <port protocol="udp" port="137"/>\\n</service>\\n'
-            service_sample = service_sample.replace('\\n', '\n')
+            service_sample = '<service>\n  <helper name="netbios-ns"/>\n  <port protocol="udp" port="137"/>\n</service>\n'
             service.write_text(service_sample)
             tools = root / "bin"
             tools.mkdir()
