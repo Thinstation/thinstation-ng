@@ -1,0 +1,4 @@
+#cd2ede546d69b62e403d04406e54ba8b  .dna
+
+mkdir -p /ts/build/packages/mcp-appliance/usr/bin
+ln /usr/bin/cp /ts/build/packages/mcp-appliance/usr/bin/cp

@@ -1,0 +1,3 @@
+#cd2ede546d69b62e403d04406e54ba8b  .dna
+
+rm -f /ts/build/packages/mcp-appliance/usr/bin/cp
