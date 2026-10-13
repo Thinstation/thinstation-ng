@@ -1,0 +1,5 @@
+# The shared X11 hook now owns keyring initialization and environment import.
+# Do not ask XFCE to initialize those same components a second time.
+if [ -x /usr/bin/thinstation-keyring-session ]; then
+    xfconf-query -c xfce4-session -p /compat/LaunchGNOME -t bool -s false -n
+fi

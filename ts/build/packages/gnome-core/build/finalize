@@ -26,4 +26,5 @@ fi
 setcap cap_ipc_lock=+ep /usr/bin/gnome-keyring-daemon
 dconf update
 
+bash /build/configure-keyring || exit $?
 systemctl enable gnome-core.service

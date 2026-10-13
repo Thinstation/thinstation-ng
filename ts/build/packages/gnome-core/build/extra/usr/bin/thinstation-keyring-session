@@ -1,0 +1,109 @@
+#!/bin/bash
+# Emit only KEY=value environment records; callers must not eval this output.
+# No password is read here: authentication belongs to pam_gnome_keyring.
+set -euo pipefail
+umask 077
+export LC_ALL=C
+fail() { printf 'ThinStation keyring: %s\n' "$*" >&2; exit 1; }
+mode=${KEYRING_MODE:-auto}
+case "$mode" in auto|login|session|off) ;; *) fail 'KEYRING_MODE must be auto, login, session or off';; esac
+if [[ "$mode" == off || -z ${DISPLAY:-} ]]; then
+    printf 'TS_KEYRING_READY=0\n'
+    exit 0
+fi
+for tool in busctl flock stat gnome-keyring-daemon timeout; do
+    command -v "$tool" >/dev/null || fail "required command is missing: $tool"
+done
+uid=$(id -u)
+runtime=${XDG_RUNTIME_DIR:-}
+[[ "$runtime" == /* && -d "$runtime" && ! -L "$runtime" ]] || fail 'a real XDG_RUNTIME_DIR is required'
+[[ $(stat -c %u "$runtime") == "$uid" ]] || fail 'XDG_RUNTIME_DIR is owned by another user'
+permissions=$(stat -c %a "$runtime")
+(( (8#$permissions & 077) == 0 )) || fail 'XDG_RUNTIME_DIR must not be accessible to other users'
+[[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]] || fail 'the graphical session has no D-Bus session address'
+_bus() { busctl --user --auto-start=no --timeout=5 "$@"; }
+_bus call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus GetId >/dev/null || fail 'session D-Bus is unavailable'
+[[ ! -L "$runtime/thinstation-keyring.lock" ]] || fail 'refusing a symlink lock'
+exec 9>"$runtime/thinstation-keyring.lock"
+flock -x -w 15 9 || fail 'another keyring initialization did not finish'
+control=${GNOME_KEYRING_CONTROL:-$runtime/keyring}
+case "$control" in /*) ;; *) fail 'invalid keyring control directory';; esac
+[[ "$control" != *$'\n'* && "$control" != *$'\r'* ]] || fail 'invalid keyring control directory'
+if [[ -e "$control" || -L "$control" ]]; then
+    [[ -d "$control" && ! -L "$control" && $(stat -c %u "$control") == "$uid" ]] || fail 'unsafe keyring control directory'
+fi
+has_owner() {
+    [[ $(_bus call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s org.freedesktop.secrets) == 'b true' ]]
+}
+# Complete a PAM --login daemon, or start one directly. Do not initialize an
+# already available Secret Service again. Close the lock FD in child daemons.
+if ! has_owner; then
+    if [[ -S "$control/control" ]]; then
+        output=$(timeout -k 2 10 gnome-keyring-daemon --start --components=pkcs11,secrets,ssh --control-directory="$control" 9>&-) || fail 'PAM keyring initialization failed'
+    else
+        output=$(timeout -k 2 10 gnome-keyring-daemon --daemonize --components=pkcs11,secrets,ssh --control-directory="$control" 9>&-) || fail 'keyring startup failed'
+    fi
+    # Parse known environment keys without executing daemon output as code.
+    while IFS='=' read -r key value; do
+        case "$key" in
+            GNOME_KEYRING_CONTROL)
+                [[ "$value" == "$control" ]] || fail 'unexpected keyring control directory';;
+            SSH_AUTH_SOCK|GNOME_KEYRING_PID|'') ;; # Resolved below; no eval.
+            *) fail 'unexpected keyring startup output';;
+        esac
+    done <<< "$output"
+    # Bounded readiness polling, not an unconditional boot delay.
+    ready=0
+    for ((attempt=0; attempt<50; attempt++)); do
+        if has_owner; then ready=1; break; fi
+        sleep 0.1
+    done
+    (( ready == 1 )) || fail 'Secret Service did not become ready'
+fi
+alias_path() {
+    local reply
+    reply=$(_bus call org.freedesktop.secrets /org/freedesktop/secrets org.freedesktop.Secret.Service ReadAlias s "$1") || return 1
+    [[ "$reply" =~ ^o\ \"(/[A-Za-z0-9_/]*)\"$ ]] || return 1
+    printf '%s\n' "${BASH_REMATCH[1]}"
+}
+is_unlocked() {
+    [[ $(_bus get-property org.freedesktop.secrets "$1" org.freedesktop.Secret.Collection Locked) == 'b false' ]]
+}
+set_default() {
+    _bus call org.freedesktop.secrets /org/freedesktop/secrets org.freedesktop.Secret.Service SetAlias so default "$1" >/dev/null
+}
+session=/org/freedesktop/secrets/collection/session
+default=$(alias_path default) || fail 'cannot read default collection'
+login=$(alias_path login) || fail 'cannot read login collection'
+if [[ "$mode" == auto ]]; then
+    if [[ ${TS_KEYRING_AUTH:-} == password ]]; then
+        mode=login
+    elif [[ "$default" != / && "$default" != "$session" ]] || [[ "$login" != / ]]; then
+        # Never bypass a locked persistent collection with an empty/session one.
+        mode=login
+    else
+        mode=session
+    fi
+fi
+if [[ "$mode" == session ]]; then
+    [[ "$default" == / || "$default" == "$session" ]] || fail 'existing persistent default is preserved; select login policy'
+    [[ "$login" == / ]] || fail 'existing login keyring is preserved; select login policy'
+    is_unlocked "$session" || fail 'session collection is not unlocked'
+    [[ "$default" == "$session" ]] || set_default "$session"
+    selected=$session
+else
+    selected=$default
+    if [[ "$selected" == / || "$selected" == "$session" ]]; then
+        [[ "$login" != / ]] || fail 'login keyring is absent; verify PAM password integration or provision it explicitly'
+        selected=$login
+    fi
+    is_unlocked "$selected" || fail 'persistent keyring is locked; unlock with its password (no empty-password fallback)'
+    [[ "$default" == "$selected" ]] || set_default "$selected"
+fi
+[[ $(alias_path default) == "$selected" ]] && is_unlocked "$selected" || fail 'default collection is not ready'
+printf 'GNOME_KEYRING_CONTROL=%s\n' "$control"
+# Preserve a separately provisioned SSH agent instead of replacing it.
+if [[ -z ${SSH_AUTH_SOCK:-} && -S "$control/ssh" ]]; then
+    printf 'SSH_AUTH_SOCK=%s\n' "$control/ssh"
+fi
+printf 'TS_KEYRING_STORAGE=%s\nTS_KEYRING_READY=1\n' "$mode"

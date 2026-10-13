@@ -1,0 +1,26 @@
+# Sourced by the common X11 hook and by the Chrome wrapper (both Bash).
+thinstation_keyring_init() {
+    local output key value
+    export KEYRING_MODE="${KEYRING_MODE:-auto}"
+    export TS_KEYRING_READY=0
+    if ! output=$(/usr/bin/thinstation-keyring-session); then
+        return 1
+    fi
+    while IFS='=' read -r key value; do
+        case "$key" in
+            GNOME_KEYRING_CONTROL|SSH_AUTH_SOCK|TS_KEYRING_READY|TS_KEYRING_STORAGE)
+                export "$key=$value";;
+            '') ;;
+            *) printf 'ThinStation keyring: unexpected environment record\n' >&2; return 1;;
+        esac
+    done <<< "$output"
+    if [[ ${TS_KEYRING_READY:-0} == 1 ]] && command -v dbus-update-activation-environment >/dev/null; then
+        # Import only non-secret socket metadata, never the entire environment.
+        local variables=(GNOME_KEYRING_CONTROL)
+        [[ -z ${SSH_AUTH_SOCK:-} ]] || variables+=(SSH_AUTH_SOCK)
+        dbus-update-activation-environment "${variables[@]}" || return 1
+        if systemctl --user show-environment >/dev/null 2>&1; then
+            systemctl --user import-environment "${variables[@]}" || return 1
+        fi
+    fi
+}
