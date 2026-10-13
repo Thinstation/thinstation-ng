@@ -10,3 +10,4 @@ libgcc
 authselect
 liblastlog2
 hwdata
+pam-hooks
