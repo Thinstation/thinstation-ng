@@ -1,0 +1,5 @@
+#!/bin/sh
+# XDG autostart has no VMware-only condition. Avoid vmblock probes on KVM,
+# bare metal, and other hypervisors, without changing the vendor desktop file.
+[ "$(systemd-detect-virt --vm 2>/dev/null)" = vmware ] || exit 0
+exec /usr/bin/vmware-user-suid-wrapper.orig "$@"

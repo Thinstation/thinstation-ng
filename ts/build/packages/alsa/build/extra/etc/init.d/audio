@@ -2,6 +2,10 @@
 
 . `dirname $0`/common
 
+# ALSA may be absent on headless hardware or before snd modules are ready.
+# Do not invoke grep on a missing procfs entry.
+[ -r /proc/asound/cards ] || exit 0
+
 #set -x
 #exec </dev/null >/var/log/audio.log  2>&1
 

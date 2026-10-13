@@ -2,3 +2,28 @@
 #systemctl enable vgauthd
 systemctl enable vmtoolsd
 systemctl enable vmware-mounts
+
+# The vendor XDG autostart invokes vmware-user-suid-wrapper on every desktop,
+# including non-VMware guests. Preserve its Exec entry and install a shim at
+# the original executable path so the agent runs only on VMware.
+wrapper=/usr/bin/vmware-user-suid-wrapper
+original=${wrapper}.orig
+shim=${wrapper}.shim
+
+if [ -x "$shim" ]; then
+    if [ ! -e "$original" ]; then
+        if [ ! -x "$wrapper" ]; then
+            echo "open-vm-tools: missing upstream vmware-user-suid-wrapper" >&2
+            exit 1
+        fi
+        mv "$wrapper" "$original" || exit 1
+    fi
+    if [ ! -x "$original" ]; then
+        echo "open-vm-tools: original vmware-user-suid-wrapper is not executable" >&2
+        exit 1
+    fi
+    mv "$shim" "$wrapper" || exit 1
+elif [ ! -x "$original" ] || [ ! -x "$wrapper" ]; then
+    echo "open-vm-tools: missing vmware-user-suid-wrapper shim or original" >&2
+    exit 1
+fi
