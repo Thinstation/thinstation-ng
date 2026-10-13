@@ -43,7 +43,7 @@ class KeyringPolicyTests(unittest.TestCase):
         self.work = Path(self.tmp.name)
         # UNIX-domain socket paths must stay below the kernel path limit.
         # Only sockets/state live here; executable fixtures stay in ROOT.
-        runtime = tempfile.TemporaryDirectory(prefix='ts-keyring-runtime-')
+        runtime = tempfile.TemporaryDirectory(prefix='ts-keyring-runtime-', dir='/tmp')
         self.addCleanup(runtime.cleanup)
         self.runtime = Path(runtime.name)
         self.bin = self.work / 'bin'
