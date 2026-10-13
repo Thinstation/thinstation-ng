@@ -61,10 +61,14 @@ extract_scripts()
 	mkdir -p "$script_dir" || return $?
 
 	# Extract all scripts into a temporary file
-	rpm -qp --scripts "$rpm_file" > all_scripts.txt || return $?
+	if [ "$2" = installed ]; then
+        rpm -q --scripts "$rpm_file" > all_scripts.txt || return $?
+    else
+        rpm -qp --scripts "$rpm_file" > all_scripts.txt || return $?
+    fi
 
 	# Extract the base RPM name without version
-	rpm_name=$(basename "$rpm_file" | sed -r 's/-[0-9].*//')
+	rpm_name="${3:-$(basename "$rpm_file" | sed -r 's/-[0-9].*//')}"
 
 	# Split the scripts into separate files
 	csplit --digits=2 --quiet --prefix=script_ all_scripts.txt '/scriptlet (/' '{*}'
@@ -119,102 +123,152 @@ apply_caps() {
     rm -f $pkgpath/file_caps.txt
 }
 
+
+# When an RPM is installed into the long-lived build chroot, copy its recorded
+# payload directly. Unlike re-extracting the archive, this works with no RPM
+# cache and never accidentally copies other packages' files from shared dirs.
+extract_installed()
+{
+    local spec="$1" staging filename relative status=0
+    staging="$(mktemp -d "${TMPDIR:-/tmp}/ts-repackage-installed.XXXXXXXX")" || return $?
+    if ! rpm -q --qf '[%{FILENAMES}\n]' "$spec" > "$staging/paths"; then
+        rm -rf -- "$staging"
+        return 1
+    fi
+    : > "$staging/manifest"
+    while IFS= read -r filename; do
+        case "$filename" in
+            /*) relative="${filename#/}" ;;
+            *) echo "Invalid installed RPM path: $filename" >&2; status=1; break ;;
+        esac
+        case "/$relative/" in
+            */../*) echo "Unsafe installed RPM path: $filename" >&2; status=1; break ;;
+        esac
+        if [ -e "$filename" ] || [ -L "$filename" ]; then
+            printf '%s\0' "$relative" >> "$staging/manifest"
+        fi
+    done < "$staging/paths"
+    if [ "$status" -eq 0 ] && [ -s "$staging/manifest" ]; then
+        ( set -o pipefail
+          tar -C / --xattrs --selinux --no-recursion --null -cf - -T "$staging/manifest" |
+              tar -C "$pkgpath" --xattrs --selinux -xf -
+        ) || status=$?
+    fi
+    rm -rf -- "$staging"
+    return "$status"
+}
+
+# Do not trust glob prefixes: foo-*.rpm also matches foo-plugins-*.rpm.
+# Always validate the RPM header and native/noarch architecture.
+find_cached_rpm()
+{
+    local wanted="$1" arch="$2" root="$3" candidate meta rpm_name rpm_arch
+    [ -d "$root" ] || return 1
+    while IFS= read -r candidate; do
+        [ -f "$candidate" ] || continue
+        meta="$(rpm -qp --qf '%{NAME} %{ARCH}' "$candidate" 2>/dev/null)" || continue
+        read -r rpm_name rpm_arch <<< "$meta"
+        if [ "$rpm_name" = "$wanted" ] && { [ "$rpm_arch" = "$arch" ] || [ "$rpm_arch" = noarch ]; }; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done < <(find "$root" -type f \( -name "$wanted-*.$arch.rpm" -o -name "$wanted-*.noarch.rpm" \) -print 2>/dev/null | LC_ALL=C sort -r)
+    return 1
+}
+
+
 extract_archive()
 {
-	local archive ppath rpm_file native_arch package_spec installed_nevra cache_dir
+    local archive rpm_file native_arch package_spec installed_spec dnf_cache cache_dir
 
-	if [ -n "$RPM" ]; then
-		archive=`basename "$RPM" .rpm`
-		rpm_file="/build/wget_tmp/$archive.rpm"
-		if [ ! -f "$rpm_file" ]; then
-			echo "RPM not found: $rpm_file"
-			return 1
-		fi
-		ppath=/build/wget_tmp
-	else
-		native_arch="$(rpm --eval '%{_arch}')"
-		rpm_file=""
+    if [ -n "$RPM" ]; then
+        # Explicit external RPM: preserve archive-only behavior.
+        archive="$(basename "$RPM" .rpm)"
+        rpm_file="/build/wget_tmp/$archive.rpm"
+        if [ ! -f "$rpm_file" ]; then
+            echo "RPM not found: $rpm_file" >&2
+            return 1
+        fi
+    else
+        native_arch="$(rpm --eval '%{_arch}')" || return $?
+        installed_spec=""
+        for spec in "$package.$native_arch" "$package.noarch"; do
+            if rpm -q "$spec" >/dev/null 2>&1; then
+                installed_spec="$spec"
+                break
+            fi
+        done
 
-		# Fast path 1: exact installed NEVRA, no repo metadata.
-		installed_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$package" 2>/dev/null || true)"
-		if [ -n "$installed_nevra" ]; then
-			rpm_file="$(find /var/cache/dnf -type f -name "$installed_nevra.rpm" -print -quit 2>/dev/null)"
-			[ -n "$rpm_file" ] || rpm_file="$(find /var/cache -type f -name "$installed_nevra.rpm" -print -quit 2>/dev/null)"
-		fi
+        dnf_cache="${TS_REPACKAGE_DNF_CACHE:-/var/cache/dnf}"
+        cache_dir="$dnf_cache/thinstation-repackage/packages"
+        rpm_file=""
+        if [ -z "$installed_spec" ]; then
+            rpm_file="$(find_cached_rpm "$package" "$native_arch" "$dnf_cache" || true)"
 
-		# Fast path 2: narrow native/noarch cache lookup.
-		if [ -z "$rpm_file" ]; then
-			for candidate in 				$(find /var/cache/dnf -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print 2>/dev/null | sort -r); do
-				name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
-				arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
-				if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
-					rpm_file="$candidate"
-					break
-				fi
-			done
-		fi
+            # Try normal installation first. DNF must never erase or replace
+            # conflicting packages to satisfy this request (--allowerasing is
+            # deliberately absent). Installed RPMs are reused on later builds.
+            if [ -n "$rpm_file" ]; then
+                package_spec="$rpm_file"
+            else
+                package_spec="$package"
+            fi
+            echo "Trying conflict-safe installation: $package_spec"
+            if dnf install --setopt=keepcache=1 --setopt=install_weak_deps=False -y "$package_spec"; then
+                for spec in "$package.$native_arch" "$package.noarch"; do
+                    if rpm -q "$spec" >/dev/null 2>&1; then
+                        installed_spec="$spec"
+                        break
+                    fi
+                done
+            fi
+        fi
 
-		# Slow path: repository lookup and dependency-resolving download-only transaction.
-		if [ -z "$rpm_file" ]; then
-			package_spec="$package"
-			if dnf repoquery --available "$package.$native_arch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
-				package_spec="$package.$native_arch"
-			elif dnf repoquery --available "$package.noarch" --qf '%{name}' 2>/dev/null | grep -qx "$package"; then
-				package_spec="$package.noarch"
-			else
-				echo "No native or noarch RPM available for $package"
-				return 1
-			fi
+        if [ -n "$installed_spec" ]; then
+            # No rpm2archive or cache lookup necessary for installed RPMs.
+            mkdir -p "$pkgpath" || return $?
+            echo "Reusing installed RPM payload: $installed_spec"
+            extract_scripts "$installed_spec" installed "$package" || return $?
+            extract_installed "$installed_spec" || return $?
+            rpm -q --qf '[%{filenames} %{filecaps}\n]' "$installed_spec" > "$pkgpath/file_caps.txt" || return $?
+            apply_caps || return $?
+            rm -rf "$pkgpath/usr/lib/.build-id" "$pkgpath/usr/lib64/.build-id"
+            if [ "$package" = ncurses ] && [ -d "$pkgpath/usr/lib64" ]; then
+                find "$pkgpath/usr/lib64" -type l -name terminfo -delete
+            fi
+            return 0
+        fi
 
-			echo "Caching $package_spec and its dependency transaction"
-			dnf install --downloadonly --allowerasing --setopt=keepcache=1 -y "$package_spec" || return 1
+        # An installation collision or unsupported transaction must not force
+        # an erase. Extract the exact native/noarch RPM instead, with no solver.
+        if [ -z "$rpm_file" ]; then
+            mkdir -p "$cache_dir" || return $?
+            echo "Downloading collision-safe RPM archive: $package"
+            dnf download --arch="$native_arch,noarch" --destdir="$cache_dir" "$package" || return $?
+            rpm_file="$(find_cached_rpm "$package" "$native_arch" "$cache_dir" || true)"
+        fi
+        if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
+            echo "Unable to locate native/noarch RPM for $package" >&2
+            return 1
+        fi
+    fi
 
-			for candidate in 				$(find /var/cache/dnf -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print 2>/dev/null | sort -r); do
-				name="$(rpm -qp --qf '%{NAME}' "$candidate" 2>/dev/null || true)"
-				arch="$(rpm -qp --qf '%{ARCH}' "$candidate" 2>/dev/null || true)"
-				if [ "$name" = "$package" ] && { [ "$arch" = "$native_arch" ] || [ "$arch" = "noarch" ]; }; then
-					rpm_file="$candidate"
-					break
-				fi
-			done
+    mkdir -p "$pkgpath" || return $?
+    extract_scripts "$rpm_file" || return $?
+    ( set -o pipefail; rpm2archive "$rpm_file" | tar --xattrs --selinux -xzf - -C "$pkgpath" ) || return $?
+    rpm -qp --qf '[%{filenames} %{filecaps}\n]' "$rpm_file" > "$pkgpath/file_caps.txt" || return $?
+    apply_caps || return $?
 
-			if [ -z "$rpm_file" ]; then
-				cache_dir="/var/cache/dnf/thinstation-repackage/packages"
-				mkdir -p "$cache_dir"
-				dnf download --destdir "$cache_dir" "$package_spec" || return 1
-				rpm_file="$(find "$cache_dir" -type f \( -name "$package-*.${native_arch}.rpm" -o -name "$package-*.noarch.rpm" \) -print -quit 2>/dev/null)"
-			fi
-		fi
-
-		if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
-			echo "Unable to locate RPM archive for $package"
-			return 1
-		fi
-
-		archive="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$rpm_file")"
-		ppath="$(dirname "$rpm_file")"
-	fi
-
-	if [ ! -d "$pkgpath" ]; then
-		mkdir -p "$pkgpath"
-	fi
-
-	extract_scripts "$rpm_file" || return $?
-	( set -o pipefail; rpm2archive "$rpm_file" | tar --xattrs --selinux -xzf - -C "$pkgpath" ) || return $?
-	rpm -qp --qf '[%{filenames} %{filecaps}\n]' "$rpm_file" > "$pkgpath/file_caps.txt" || return $?
-	apply_caps || return $?
-
-	rm -rf "$pkgpath/usr/lib/.build-id" "$pkgpath/usr/lib64/.build-id"
-	if [ -e "$pkgpath/usr/lib" ] && [ -z "$(ls -A "$pkgpath/usr/lib")" ]; then
-		rmdir "$pkgpath/usr/lib"
-	fi
-	if [ -e "$pkgpath/usr/lib64" ] && [ -z "$(ls -A "$pkgpath/usr/lib64")" ]; then
-		rmdir "$pkgpath/usr/lib64"
-	fi
-
-	if [ "$package" == "ncurses" ] && [ -d "$pkgpath/usr/lib64" ]; then
-		find "$pkgpath/usr/lib64" -type l -name terminfo -delete
-	fi
+    rm -rf "$pkgpath/usr/lib/.build-id" "$pkgpath/usr/lib64/.build-id"
+    if [ -d "$pkgpath/usr/lib" ] && [ -z "$(ls -A "$pkgpath/usr/lib")" ]; then
+        rmdir "$pkgpath/usr/lib"
+    fi
+    if [ -d "$pkgpath/usr/lib64" ] && [ -z "$(ls -A "$pkgpath/usr/lib64")" ]; then
+        rmdir "$pkgpath/usr/lib64"
+    fi
+    if [ "$package" = ncurses ] && [ -d "$pkgpath/usr/lib64" ]; then
+        find "$pkgpath/usr/lib64" -type l -name terminfo -delete
+    fi
 }
 
 preserve_empty_working()
