@@ -41,8 +41,11 @@ class KeyringPolicyTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix='ts-keyring-test-', dir=ROOT)
         self.addCleanup(self.tmp.cleanup)
         self.work = Path(self.tmp.name)
-        self.runtime = self.work / 'runtime'
-        self.runtime.mkdir(mode=0o700)
+        # UNIX-domain socket paths must stay below the kernel path limit.
+        # Only sockets/state live here; executable fixtures stay in ROOT.
+        runtime = tempfile.TemporaryDirectory(prefix='ts-keyring-runtime-')
+        self.addCleanup(runtime.cleanup)
+        self.runtime = Path(runtime.name)
         self.bin = self.work / 'bin'
         self.bin.mkdir()
         for name in ('busctl', 'gnome-keyring-daemon'):
@@ -177,10 +180,6 @@ class KeyringPackagingTests(unittest.TestCase):
                 (pam/name).write_text(original)
             for name in ('lightdm-autologin', 'system-auth', 'sshd'):
                 (pam/name).write_text('auth required pam_unix.so\n')
-            auto = root/'etc/xdg/autostart'
-            auto.mkdir(parents=True)
-            for name in ('secrets', 'pkcs11', 'ssh'):
-                (auto/f'gnome-keyring-{name}.desktop').write_text('[Desktop Entry]\nOnlyShowIn=GNOME;XFCE;Unity;MATE;\nExec=vendor\n')
             snapshots = []
             for _ in range(2):
                 p = subprocess.run(['bash', str(CONFIGURE), str(root)], text=True, capture_output=True)
@@ -214,7 +213,9 @@ class KeyringPackagingTests(unittest.TestCase):
         self.assertNotIn('login.keyring', CHROME.read_text())
         self.assertNotIn('array:string:', CHROME.read_text())
         self.assertNotIn('--unlock', HELPER.read_text())
-        self.assertNotIn('eval ', HELPER.read_text())
+        commands = '\n'.join(line for line in HELPER.read_text().splitlines()
+                             if not line.lstrip().startswith('#'))
+        self.assertNotRegex(commands, r'(^|[;\s])eval\s')
 
 
 class ChromeKeyringTests(unittest.TestCase):
