@@ -182,7 +182,7 @@ find_cached_rpm()
 select_available_arch()
 {
     local wanted="$1" native="$2" candidates rpm_name rpm_arch has_native=0 has_noarch=0
-    candidates="$(dnf -q repoquery --available --queryformat '%{name} %{arch}\\n' "$wanted")" || return $?
+    candidates="$(dnf -q repoquery --available --queryformat '%{name} %{arch}\n' "$wanted")" || return $?
     while read -r rpm_name rpm_arch; do
         [ "$rpm_name" = "$wanted" ] || continue
         case "$rpm_arch" in
@@ -190,8 +190,8 @@ select_available_arch()
             noarch) has_noarch=1 ;;
         esac
     done <<< "$candidates"
-    if [ "$has_native" -eq 1 ]; then printf '%s\\n' "$native"; return 0; fi
-    if [ "$has_noarch" -eq 1 ]; then printf 'noarch\\n'; return 0; fi
+    if [ "$has_native" -eq 1 ]; then printf '%s\n' "$native"; return 0; fi
+    if [ "$has_noarch" -eq 1 ]; then printf 'noarch\n'; return 0; fi
     return 1
 }
 
