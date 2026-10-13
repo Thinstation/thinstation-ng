@@ -288,7 +288,7 @@ package xfwm4                # XFCE window manager
 #package xfce4-screensaver    # Session locker for xfce4
 
 # Display Manager
-package lightdm              # Lightweight display manager
+#package lightdm              # Lightweight display manager
 #package lightdm-guest        # Enable guest session for lightdm
                               # (Hint) Also disable tsuser
 #package light-locker         # Session locker for LightDM
