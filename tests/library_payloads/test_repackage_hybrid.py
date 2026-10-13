@@ -126,7 +126,9 @@ class HybridRepackageTests(unittest.TestCase):
 
     def test_uncached_collision_downloads_single_rpm(self):
         log = self.run_case(collision=True)
-        self.assertIn("DNF:download --arch=x86_64,noarch", log)
+        self.assertIn("DNF:download --arch=x86_64 ", log)
+        self.assertIn("DNF:install --setopt=keepcache=1 --setopt=install_weak_deps=False -y foo.x86_64", log)
+        self.assertNotIn("--arch=x86_64,noarch", log)
         self.assertNotIn("--resolve", log)
         self.assertIn("RPM2ARCHIVE:", log)
         self.assertTrue((self.root / "output/usr/bin/foo").exists())
@@ -137,7 +139,7 @@ class HybridRepackageTests(unittest.TestCase):
         (dest / "foo-extra-9.0-1.x86_64.rpm").touch()
         (dest / "foo-9.0-1.i686.rpm").touch()
         log = self.run_case(collision=True)
-        self.assertIn("DNF:download --arch=x86_64,noarch", log)
+        self.assertIn("DNF:download --arch=x86_64 ", log)
         self.assertIn("RPM2ARCHIVE:", log)
 
     def test_source_does_not_use_allowerasing(self):

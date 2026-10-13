@@ -211,7 +211,9 @@ extract_archive()
             if [ -n "$rpm_file" ]; then
                 package_spec="$rpm_file"
             else
-                package_spec="$package"
+                # Qualify the native architecture; DNF5 can otherwise resolve a
+                # conflicting x86_64 package by installing i686 and dependencies.
+                package_spec="$package.$native_arch"
             fi
             echo "Trying conflict-safe installation: $package_spec"
             if dnf install --setopt=keepcache=1 --setopt=install_weak_deps=False -y "$package_spec"; then
@@ -244,7 +246,10 @@ extract_archive()
         if [ -z "$rpm_file" ]; then
             mkdir -p "$cache_dir" || return $?
             echo "Downloading collision-safe RPM archive: $package"
-            dnf download --arch="$native_arch,noarch" --destdir="$cache_dir" "$package" || return $?
+            # DNF5 only accepts one arch in --arch. Prefer native, then noarch.
+            if ! dnf download --arch="$native_arch" --destdir="$cache_dir" "$package"; then
+                dnf download --arch=noarch --destdir="$cache_dir" "$package" || return $?
+            fi
             rpm_file="$(find_cached_rpm "$package" "$native_arch" "$cache_dir" || true)"
         fi
         if [ -z "$rpm_file" ] || [ ! -f "$rpm_file" ]; then
