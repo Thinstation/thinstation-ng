@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs && python3 -m unittest discover -s tests -p 'test_*.py'",
-    "build": "npm test && vite build && node normalize.mjs",
-    "dev": "vite --host 0.0.0.0"
+    "build": "vite build && node normalize.mjs",
+    "dev": "vite --host 0.0.0.0",
+    "build:debug": "npm test && npm run build"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.0.0",
