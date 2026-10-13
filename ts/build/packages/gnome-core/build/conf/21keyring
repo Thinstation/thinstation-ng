@@ -1,0 +1,27 @@
+# KEYRING_MODE   Graphical session Secret Service policy: auto (default), login,
+#                session, or off. Applies to the common X11 startup path and
+#                GUI Chrome, whether launched by LightDM or agetty/xinit.
+# auto           Password-authenticated PAM logins require an unlocked login
+#                collection. Passwordless sessions use the unlocked in-memory
+#                session collection only when no persistent default/login
+#                collection exists. Existing persistent collections are reused
+#                only when already unlocked; never overwritten or decrypted
+#                with an empty or hard-coded password.
+# login          Require the existing PAM-unlocked persistent collection.
+# session        Use transient RAM-only storage, but refuse to replace any
+#                existing persistent default/login collection.
+# off            Do not initialize keyring or force Chrome's password store.
+#                An explicit administrator opt-out, not an automatic fallback.
+#
+# A session collection is lost when its daemon/session ends. Chrome profiles
+# using transient keys must also be disposable: stored passwords and encrypted
+# cookies cannot be promised to survive reboot. Persistent profiles need login
+# mode and a provisioned encrypted keyring/unlock mechanism. Automatic login
+# is NOT a way to recover a password for an existing encrypted keyring.
+#
+# TS_KEYRING_AUTH is a non-secret PAM-generated mode hint, not a credential.
+# Never put keyring passwords in thinstation.conf, process arguments or logs.
+# Console-only server images that omit gnome-core do not gain keyring PAM or
+# X11 startup hooks. The static/default autologin setting is not changed here.
+# Multiple concurrent sessions sharing one user bus also share its keyring;
+# configure one compatible policy for that user.

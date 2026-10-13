@@ -1,0 +1,46 @@
+#!/bin/bash
+# Build-time integration. An alternate root is supported for isolated tests.
+set -euo pipefail
+root=${1:-/}
+[[ -d "$root" ]] || exit 1
+root=${root%/}
+# No XFCE addition to the vendor desktop filters, including cached payloads.
+for component in secrets pkcs11 ssh; do
+    file=$root/etc/xdg/autostart/gnome-keyring-$component.desktop
+    [[ -f "$file" && ! -L "$file" ]] || continue
+    tmp=$(mktemp "${file}.XXXXXX")
+    awk '
+    /^OnlyShowIn=/ {
+        split(substr($0,12), entries, ";"); out="OnlyShowIn="
+        for (i=1; i<=length(entries); i++)
+            if (entries[i]!="" && entries[i]!="XFCE") out=out entries[i] ";"
+        print out; next
+    }
+    { print }' "$file" > "$tmp"
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
+done
+# Leave authselect-managed shared stacks and server/SSH PAM services alone.
+# gnome-core is a graphical package. Without it no keyring PAM hook is added.
+for service in login lightdm; do
+    file=$root/etc/pam.d/$service
+    [[ -f "$file" && ! -L "$file" ]] || continue
+    tmp=$(mktemp "${file}.XXXXXX")
+    awk '
+    /^# BEGIN ThinStation keyring$/ { managed=1; next }
+    /^# END ThinStation keyring$/ { managed=0; next }
+    managed { next }
+    /^[[:space:]]*-?(auth|session)[[:space:]]/ && /pam_gnome_keyring[.]so/ { next }
+    { print }' "$file" > "$tmp"
+    cat >> "$tmp" <<'PAM'
+# BEGIN ThinStation keyring
+# Authentication is handled by the existing stack; these entries are optional.
+-auth optional pam_gnome_keyring.so
+-auth optional pam_env.so conffile=/etc/security/thinstation-keyring-auth.conf readenv=0 user_readenv=0
+# Run after pam_systemd and ThinStation's home/session setup.
+-session optional pam_gnome_keyring.so auto_start
+# END ThinStation keyring
+PAM
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
+done

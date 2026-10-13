@@ -2,41 +2,50 @@
 
 . /etc/thinstation.global
 
-# Ensure the login keyring exists
-if [ ! -f ~/.local/share/keyrings/login.keyring ]; then
-	printf "[keyring]\npassword=" > ~/.local/share/keyrings/login.keyring
+# The X11 session hook normally initializes this. Recheck on direct/restarted
+# launches without restarting a healthy daemon or writing keyring files.
+headless=false
+kiosk=false
+explicit_profile=false
+for arg in "$@"; do
+    case "$arg" in
+        --headless|--headless=*) headless=true;;
+        --kiosk) kiosk=true;;
+        --user-data-dir|--user-data-dir=*) explicit_profile=true;;
+    esac
+done
+keyring_args=()
+if ! "$headless" && [[ ${KEYRING_MODE:-auto} != off ]]; then
+    [[ -r /etc/thinstation-keyring.functions ]] || { echo 'Chrome: keyring integration is missing' >&2; exit 1; }
+    . /etc/thinstation-keyring.functions
+    thinstation_keyring_init && [[ ${TS_KEYRING_READY:-0} == 1 ]] || { echo 'Chrome: no unlocked keyring; refusing automatic basic-storage fallback' >&2; exit 1; }
+    for arg in "$@"; do
+        case "$arg" in
+            --password-store=gnome-libsecret) ;;
+            --password-store|--password-store=*) echo 'Chrome: conflicting password-store option; configure KEYRING_MODE explicitly' >&2; exit 1;;
+        esac
+    done
+    keyring_args=(--password-store=gnome-libsecret)
 fi
 
-# Unlock the keyring explicitly
-dbus-send --session \
-	--dest=org.freedesktop.secrets \
-	--type=method_call \
-	--print-reply \
-		/org/freedesktop/secrets \
-		org.freedesktop.Secret.Service.Unlock \
-		array:string:"login"
-
-if [ -e ~/.proxy ] ; then
-	. ~/.proxy
-	if [ "$PROXY_HTTP" == "TRUE" ] ; then
-		if [ -n "$PROXY_AUTH" ] ; then
-			proxyline="--proxy-server=http://${PROXY_AUTH}@$PROXY_SERVER:$PROXY_PORT"
-		else
-			proxyline="--proxy-server=http://$PROXY_SERVER:$PROXY_PORT"
-		fi
-	fi
+proxy_args=()
+if [[ -e "$HOME/.proxy" ]]; then
+    . "$HOME/.proxy"
+    if [[ ${PROXY_HTTP:-} == TRUE ]]; then
+        auth=${PROXY_AUTH:+${PROXY_AUTH}@}
+        proxy_args=("--proxy-server=http://${auth}${PROXY_SERVER}:${PROXY_PORT}")
+    fi
 fi
-
-[ "`id -u`" == "0" ] && sandbox="--no-sandbox" || unset sandbox
-
-if [ -n "`echo $@ |grep -e '--kiosk'`" ] && [ -z "`pgrep /opt/google/chrome/chrome`" ]; then
-	cp -a /etc/skel/.config/google-chrome ~/.config/.
-	chown -R `id` ~/.config/google-chrome
-#	if [ -n "$KIOSK_DELAY" ]; then
-		# We just killed crash detection, so now sleep incase were in a flapping state, also gives
-		# local web servers enough time to get started
-#		sleep $KIOSK_DELAY
-#	fi
+sandbox_args=()
+# Preserve the existing root-only behavior; ordinary sessions keep the sandbox.
+[[ $(id -u) != 0 ]] || sandbox_args=(--no-sandbox)
+profile_args=()
+if ! "$explicit_profile"; then
+    profile="$HOME/.config/google-chrome"
+    if "$kiosk" && [[ ! -e "$profile" && -d /etc/skel/.config/google-chrome ]]; then
+        mkdir -p "$HOME/.config"
+        cp -a /etc/skel/.config/google-chrome "$profile" || exit 1
+    fi
+    profile_args=("--user-data-dir=$profile")
 fi
-
-exec /opt/google/chrome/google-chrome $sandbox $proxyline --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' --user-data-dir "$@"
+exec /opt/google/chrome/google-chrome "${sandbox_args[@]}" "${proxy_args[@]}" "${keyring_args[@]}" --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' "${profile_args[@]}" "$@"

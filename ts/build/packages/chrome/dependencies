@@ -6,7 +6,7 @@ dbus
 gtk-3.0
 nss
 #curl
-#gnome-core
+gnome-core
 bash
 #ca-bundle
 ca-certificates
