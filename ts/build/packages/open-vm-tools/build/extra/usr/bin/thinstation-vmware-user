@@ -1,0 +1,5 @@
+#!/bin/sh
+# XDG autostart is not gated by ConditionVirtualization=vmware.
+# The VMware user agent attempts to use vmblock even on non-VMware guests.
+[ "$(systemd-detect-virt --vm 2>/dev/null)" = vmware ] || exit 0
+exec /usr/bin/vmware-user-suid-wrapper "$@"

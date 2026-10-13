@@ -2,3 +2,9 @@
 #systemctl enable vgauthd
 systemctl enable vmtoolsd
 systemctl enable vmware-mounts
+
+# The vendor XDG autostart runs in every desktop environment, including KVM.
+# Keep vmware-user available on VMware, without attempting vmblock on other VMs.
+if [ -f /etc/xdg/autostart/vmware-user.desktop ]; then
+    sed -i 's#^Exec=/usr/bin/vmware-user-suid-wrapper$#Exec=/usr/bin/thinstation-vmware-user#' /etc/xdg/autostart/vmware-user.desktop
+fi
