@@ -76,9 +76,7 @@ session=/org/freedesktop/secrets/collection/session
 default=$(alias_path default) || fail 'cannot read default collection'
 login=$(alias_path login) || fail 'cannot read login collection'
 if [[ "$mode" == auto ]]; then
-    if [[ ${TS_KEYRING_AUTH:-} == password ]]; then
-        mode=login
-    elif [[ "$default" != / && "$default" != "$session" ]] || [[ "$login" != / ]]; then
+    if [[ "$default" != / && "$default" != "$session" ]] || [[ "$login" != / ]]; then
         # Never bypass a locked persistent collection with an empty/session one.
         mode=login
     else
