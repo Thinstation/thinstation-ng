@@ -266,7 +266,7 @@ class ClosureTests(TreeCase):
             tools = temp / 'bin'
             tools.mkdir()
             stub = tools / 'repackage'
-            stub.write_text('#!/bin/sh\\nexit 0\\n')
+            stub.write_text('#!/bin/sh\nexit 0\n')
             stub.chmod(0o755)
             env = dict(os.environ, TSWRKNG=str(temp),
                        PATH=str(tools) + os.pathsep + os.environ['PATH'])
