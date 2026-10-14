@@ -3,7 +3,7 @@
 export PACKAGE="firewalld"
 export PORTS="firewalld firewall-config firewalld-filesystem ipset ipset-libs libcap-ng-python3 python3-firewall python3-nftables libnfnetlink libnetfilter_conntrack"
 export DROP_FILES=""
-export DROP_DIRS="lib64/rpm"
+export DROP_DIRS="usr/lib64/rpm"
 export CREATE_EMPTY_DIRS=""
 repackage -e
 

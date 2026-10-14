@@ -3,7 +3,7 @@
 export PACKAGE="crypto-policies"
 export PORTS="crypto-policies"
 export DROP_FILES="default-config default-fips-config reload-cmds.sh"
-export DROP_DIRS="lib64/crypto-policies/back-ends lib64/crypto-policies/policies lib64/crypto-policies/EMPTY lib64/crypto-policies/FUTURE  etc/crypto-policies/back-ends etc/crypto-policies/local.d etc/crypto-policies/policies etc/crypto-policies/state"
+export DROP_DIRS="usr/lib64/crypto-policies/back-ends usr/lib64/crypto-policies/policies usr/lib64/crypto-policies/EMPTY usr/lib64/crypto-policies/FUTURE  etc/crypto-policies/back-ends etc/crypto-policies/local.d etc/crypto-policies/policies etc/crypto-policies/state"
 export CREATE_EMPTY_DIRS=""
 repackage -e
 

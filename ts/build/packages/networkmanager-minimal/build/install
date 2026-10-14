@@ -4,7 +4,7 @@ export PACKAGE=networkmanager-minimal
 export PORTS="NetworkManager NetworkManager-libnm openresolv"
 export CREATE_EMPTY_DIRS="lib64/NetworkManager"
 export DROP_FILES=""
-export DROP_DIRS="etc/rc.d lib64/pppd lib64/doc"
+export DROP_DIRS="etc/rc.d usr/lib64/pppd usr/lib64/doc"
 repackage -e
 
 returnval=$?

@@ -3,7 +3,7 @@
 export PACKAGE=alsa
 export PORTS="alsa-utils alsa-sof-firmware"
 export DROP_FILES=""
-export DROP_DIRS="lib64/sounds lib64/alsa/speaker-test"
+export DROP_DIRS="usr/lib64/sounds usr/lib64/alsa/speaker-test"
 repackage -e
 
 returnval=$?

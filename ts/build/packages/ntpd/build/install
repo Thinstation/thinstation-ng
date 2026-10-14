@@ -2,7 +2,7 @@
 
 export PACKAGE=ntpd
 export PORTS=ntpsec
-export DROP_DIRS="lib64/ntp lib64/python3.13"
+export DROP_DIRS="usr/lib64/ntp usr/lib64/python3.13"
 export DROP_FILES="calc_tickadj ntpkeygen ntpwait ntpdate ntpdc ntpq ntptime ntptrace sntp tickadj update-leap ntpdate.service ntp-wait.service"
 repackage -e
 

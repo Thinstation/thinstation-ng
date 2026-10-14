@@ -3,7 +3,7 @@
 export PACKAGE=terminal
 export PORTS="xfce4-terminal vte291 vte-profile"
 export DROP_FILES=vte
-export DROP_DIRS=lib/Terminal/doc
+export DROP_DIRS="usr/lib64/Terminal/doc"
 repackage -e
 
 returnval=$?

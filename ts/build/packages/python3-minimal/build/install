@@ -4,7 +4,7 @@ export PACKAGE=python3-minimal
 # Headless Python runtime: standard interpreter and libraries only.
 # Deliberately excludes tkinter, PyGObject/GTK and ABRT integration.
 export PORTS="python3 python-unversioned-command python3-libs"
-export DROP_DIRS="lib64/python3/lib2to3 lib64/python3.13/ensurepip lib64/python3.13/turtledemo lib64/python3/distutils lib64x/python3/test"
+export DROP_DIRS="usr/lib64/python3/lib2to3 usr/lib64/python3.13/ensurepip usr/lib64/python3.13/turtledemo usr/lib64/python3/distutils lib64x/python3/test"
 export DROP_FILES="turtle.py"
 repackage -e
 

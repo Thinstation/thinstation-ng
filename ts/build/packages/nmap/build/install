@@ -2,7 +2,7 @@
 
 export PACKAGE=nmap
 export PORTS=$PACKAGE
-export DROP_DIRS=lib/ncat
+export DROP_DIRS="usr/lib64/ncat"
 repackage -e
 returnval=$?
 

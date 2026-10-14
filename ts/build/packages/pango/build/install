@@ -3,7 +3,7 @@
 export PACKAGE=pango
 export PORTS=$PACKAGE
 export DROP_FILES="pango-querymodules pango-view"
-export DROP_DIRS="lib64/installed-tests libexec/installed-tests"
+export DROP_DIRS="usr/lib64/installed-tests usr/libexec/installed-tests"
 repackage -e
 
 returnval=$?

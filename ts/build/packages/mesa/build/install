@@ -3,7 +3,7 @@
 export PACKAGE="mesa"
 export PORTS="mesa-filesystem mesa-libEGL mesa-libGL mesa-libGLU mesa-libgbm libglvnd-gles libglvnd-egl libglvnd-glx libglvnd-opengl mesa-dri-drivers"
 export DROP_FILES=""
-export DROP_DIRS="lib64/gallium-pipe"
+export DROP_DIRS="usr/lib64/gallium-pipe"
 export CREATE_EMPTY_DIRS=""
 repackage -e
 

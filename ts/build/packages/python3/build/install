@@ -2,7 +2,7 @@
 
 export PACKAGE=python3
 export PORTS="python3 python-unversioned-command python3-libs python3-tkinter python3-gobject-base python3-gobject python3-abrt-addon"
-export DROP_DIRS="lib64/python3/lib2to3 lib64/python3.13/ensurepip lib64/python3.13/turtledemo lib64/python3/distutils lib64x/python3/test"
+export DROP_DIRS="usr/lib64/python3/lib2to3 usr/lib64/python3.13/ensurepip usr/lib64/python3.13/turtledemo usr/lib64/python3/distutils lib64x/python3/test"
 export DROP_FILES="turtle.py"
 repackage -e
 

@@ -3,7 +3,7 @@
 export PACKAGE=ghostscript
 export PORTS="libgs ghostscript ghostscript-tools-fontutils ghostscript-tools-printing adobe-mappings-cmap"
 #export DROP_FILES="gsc gsx libgs.so* gpcl6 gxps"
-#xexport DROP_DIRS="lib/ghostscript/fonts"
+#xexport DROP_DIRS="usr/lib64/ghostscript/fonts"
 repackage -e
 
 returnval=$?

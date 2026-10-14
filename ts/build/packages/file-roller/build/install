@@ -2,7 +2,7 @@
 
 export PACKAGE=file-roller
 export PORTS="file-roller libportal libportal-gtk4"
-export DROP_DIRS="lib/gnome lib/omf"
+export DROP_DIRS="usr/lib64/gnome usr/lib64/omf"
 repackage -e
 
 returnval=$?

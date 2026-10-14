@@ -3,7 +3,7 @@
 export PACKAGE=alsa-lib
 export PORTS="alsa-lib"
 export DROP_FILES="speaker-test alsa aconnect alsaloop alsaucm amidi aplay aplaymidi arecord arecordmidi aseqdump aseqnet iecset alsaconf aserver alsamixer"
-export DROP_DIRS="lib/sounds lib/alsa/speaker-test lib/udev"
+export DROP_DIRS="usr/lib64/sounds usr/lib64/alsa/speaker-test usr/lib64/udev"
 repackage -e
 
 returnval=$?

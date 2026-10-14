@@ -2,7 +2,7 @@
 
 export PACKAGE=evince
 export PORTS="evince evince-libs"
-export DROP_DIRS="lib64/gnome"
+export DROP_DIRS="usr/lib64/gnome"
 repackage -e
 
 returnval=$?
