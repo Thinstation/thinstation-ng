@@ -339,6 +339,13 @@ class Collector:
                 path = path.replace('${LIB}', 'lib64').replace('$LIB', 'lib64')
                 if path.startswith('/') and '$' not in path:
                     result.append(normalize(path))
+        # A private ELF several directories below /usr/lib64 may depend on
+        # neighboring libraries injected by its application wrapper.
+        # Inspect an actual ABI-compatible sibling before global fallbacks.
+        # Explicit RUNPATH/RPATH remains authoritative.
+        parts = PurePosixPath(logical).parts
+        if not (info['RUNPATH'] or info['RPATH']) and len(parts) >= 6:
+            result.append(origin)
         return list(dict.fromkeys(result + self.config_dirs + ['/usr/lib64', '/lib64', '/usr/lib', '/lib']))
 
     def present(self, name, abi, logical, info):

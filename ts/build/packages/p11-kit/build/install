@@ -5,8 +5,25 @@ export PORTS="p11-kit p11-kit-trust"
 export DROP_FILES=""
 export DROP_DIRS=""
 export CREATE_EMPTY_DIRS=""
-repackage -e
+repackage -e || exit $?
 
-returnval=$?
+# The versioned RPM library is the same ELF as the regular SONAME created by
+# repackage. Unlike a general resolver change, this only removes p11-kit's
+# duplicate after all of its packages have been repackaged.
+pkg_root="${TSWRKNG}/packages/p11-kit"
+if [ -n "${XTRWRKNG:-}" ] && [ -d "${XTRWRKNG}/packages/p11-kit" ]; then
+    pkg_root="${XTRWRKNG}/packages/p11-kit"
+fi
+libdir="$pkg_root/usr/lib64"
+soname="$libdir/libp11-kit.so.0"
+for versioned in "$libdir"/libp11-kit.so.0.*; do
+    [ -f "$versioned" ] || continue
+    [ -L "$versioned" ] && continue
+    if [ ! -f "$soname" ] || [ -L "$soname" ] || ! cmp -s "$soname" "$versioned"; then
+        echo "p11-kit: cannot remove non-identical SONAME payload: $versioned" >&2
+        exit 1
+    fi
+    rm -f -- "$versioned" || exit $?
+done
 
-exit $returnval
+exit 0

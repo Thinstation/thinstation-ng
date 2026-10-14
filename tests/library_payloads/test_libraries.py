@@ -223,6 +223,67 @@ class ClosureTests(TreeCase):
         found = collector.present('libc.so.6', m.elf_id(self.libc), '/usr/bin/probe', info)
         self.assertEqual(found, self.image / 'usr/bin/private/libc.so.6')
 
+    def test_deep_private_sibling_satisfies_dependency_without_global_copy(self):
+        # Private modules can be launched with a wrapper's library path.
+        (self.image / 'usr/bin/probe').unlink()
+        self.put('/usr/lib64/vendor/plugins/plugin.so', Path('/usr/bin/true').read_bytes())
+        local = self.put('/usr/lib64/vendor/plugins/libc.so.6', self.libc.read_bytes())
+        ok, collector = self.collect()
+        self.assertTrue(ok, collector.errors)
+        self.assertEqual(collector.present(
+            'libc.so.6', m.elf_id(self.libc), '/usr/lib64/vendor/plugins/plugin.so',
+            dict(NEEDED=['libc.so.6'], RPATH=[], RUNPATH=[], SONAME=[])), local)
+        self.assertFalse((self.image / 'usr/lib64/libc.so.6').exists())
+        self.assertFalse(any(x['needed'] == 'libc.so.6' for x in collector.copied))
+
+    def test_flat_library_does_not_assume_sibling_directory(self):
+        local = self.put('/usr/lib64/security/libc.so.6', self.libc.read_bytes())
+        info = dict(NEEDED=['libc.so.6'], RPATH=[], RUNPATH=[], SONAME=[])
+        collector = m.Collector(self.image, None, [])
+        self.assertIsNone(collector.present('libc.so.6', m.elf_id(self.libc),
+                                            '/usr/lib64/security/pam_probe.so', info))
+        self.assertTrue(local.is_file())
+
+    def test_explicit_runpath_takes_precedence_over_private_sibling(self):
+        self.put('/usr/lib64/vendor/plugins/libc.so.6', self.libc.read_bytes())
+        info = dict(NEEDED=['libc.so.6'], RPATH=[], RUNPATH=['$ORIGIN/other'], SONAME=[])
+        collector = m.Collector(self.image, None, [])
+        self.assertIsNone(collector.present('libc.so.6', m.elf_id(self.libc),
+                                            '/usr/lib64/vendor/plugins/plugin.so', info))
+
+    def test_p11_kit_install_drops_only_identical_versioned_file(self):
+        script = REPO / 'ts/build/packages/p11-kit/build/install'
+        with tempfile.TemporaryDirectory(prefix='p11-install-') as directory:
+            temp = Path(directory)
+            pkg = temp / 'packages/p11-kit/usr/lib64'
+            pkg.mkdir(parents=True)
+            canonical = pkg / 'libp11-kit.so.0'
+            versioned = pkg / 'libp11-kit.so.0.4.11'
+            canonical.write_bytes(self.libc.read_bytes())
+            versioned.write_bytes(self.libc.read_bytes())
+            proxy = pkg / 'p11-kit-proxy.so'
+            proxy.symlink_to('libp11-kit.so.0')
+            tools = temp / 'bin'
+            tools.mkdir()
+            stub = tools / 'repackage'
+            stub.write_text('#!/bin/sh\nexit 0\n')
+            stub.chmod(0o755)
+            env = dict(os.environ, TSWRKNG=str(temp),
+                       PATH=str(tools) + os.pathsep + os.environ['PATH'])
+            for _ in range(2):
+                result = subprocess.run(['sh', str(script)], env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(versioned.exists())
+            self.assertTrue(proxy.is_symlink())
+            self.assertEqual(proxy.resolve(), canonical)
+            self.assertEqual(canonical.read_bytes(), self.libc.read_bytes())
+            versioned.write_bytes(b'not the same library')
+            result = subprocess.run(['sh', str(script)], env=env,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertTrue(versioned.exists())
+
     def test_missing_image_root_is_rejected(self):
         with self.assertRaises(m.LibraryError):
             m.Collector(self.root / 'missing-image', None, [])
