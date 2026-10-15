@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+export PACKAGE=mcp-appliance
+export PORTS="" RPM="" DROP_FILES="" DROP_DIRS="" CREATE_EMPTY_DIRS=""
+package_root="${TSWRKNG}/packages/$PACKAGE"
+if [ -n "${XTRWRKNG:-}" ] && [ -d "$XTRWRKNG/packages/$PACKAGE" ]; then
+    package_root="$XTRWRKNG/packages/$PACKAGE"
+fi
+ca_bundle=""
+cleanup() {
+    [ -z "$ca_bundle" ] || rm -f "$ca_bundle"
+    rm -f "$package_root/build/installed"
+}
+trap cleanup EXIT HUP INT TERM
+# Use the existing repackage recipe lifecycle and installed-marker contract.
+# The payload itself is a pinned Python application archive, not another RPM.
+repackage -e
+# The image's site anchors are staged, but its CA finalizer has not run yet.
+# Combine them with the build chroot's normal trust for this verified download.
+ca_bundle=$(mktemp "$package_root/build/bundle-ca.XXXXXX")
+for cert in /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt \
+    "${TSWRKNG}/packages/site/etc/pki/ca-trust/source/anchors/"*.pem \
+    "${TSWRKNG}/packages/site/etc/pki/ca-trust/source/anchors/"*.crt; do
+    if [ -f "$cert" ]; then
+        cat "$cert" >> "$ca_bundle"
+        printf '\n' >> "$ca_bundle"
+    fi
+done
+if [ -s "$ca_bundle" ]; then
+    export CURL_CA_BUNDLE="$ca_bundle"
+fi
+python3 "$package_root/build/install-bundled.py" "$package_root"
+rm -f "$ca_bundle"
+ca_bundle=""
+touch "$package_root/build/installed"
+trap - EXIT HUP INT TERM

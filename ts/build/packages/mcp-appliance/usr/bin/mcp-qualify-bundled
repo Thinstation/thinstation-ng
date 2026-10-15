@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+root=/usr/lib64/mcp-fallback
+rm -f "$root/qualification.json"
+/usr/bin/mcp-selftest qualify "$root" --output "$root/qualification.json"
+chmod 0444 "$root/qualification.json"
