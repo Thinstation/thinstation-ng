@@ -64,22 +64,22 @@ def unpack(archive, target, generation):
             os.link(source_path, target / relative)
         for relative, link in links:
             dest = target / relative
-            interpreter = relative.parent == Path('.venv/bin') and relative.name in ('python', 'python3', 'python3.14')
             if Path(link).is_absolute():
-                if not interpreter or link not in PYTHONS:
+                if relative.parent != Path('.venv/bin') or link not in PYTHONS:
                     raise ValueError('unsafe absolute symlink: ' + str(relative))
             else:
                 logical = Path(os.path.normpath(str(relative.parent / link)))
                 if logical.is_absolute() or '..' in logical.parts:
                     raise ValueError('unsafe relative symlink: ' + str(relative))
             dest.symlink_to(link)
-        # Check completed chains, allowing only the deliberate interpreter aliases.
+        # Preserve interpreter aliases regardless of their spelling, but only
+        # leaf links in .venv/bin may terminate at the explicit system Python.
         for relative, _ in links:
             resolved = (target / relative).resolve()
             try:
                 resolved.relative_to(target.resolve())
             except ValueError:
-                interpreter = relative.parent == Path('.venv/bin') and relative.name in ('python', 'python3', 'python3.14')
+                interpreter = relative.parent == Path('.venv/bin')
                 if not interpreter or not any(resolved == Path(p).resolve() for p in PYTHONS):
                     raise ValueError('archive link chain escapes payload: ' + str(relative))
 
