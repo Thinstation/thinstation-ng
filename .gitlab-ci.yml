@@ -5,6 +5,9 @@ include:
 # The full fallback must qualify against the actual assembled image, not only
 # the build runner's larger operating system. All other jobs inherit the base.
 build-mcp-appliance:
+  before_script:
+    - node --test ts/build/packages/mcp-appliance/build/tests/test_frontend_fallback.mjs
+    - sh -n ts/build/packages/mcp-appliance/build/install
   script:
     - python3 -m unittest discover -s ts/build/packages/mcp-appliance/build/tests -p 'test_full_fallback.py' -v
     - python3 -m py_compile ts/build/packages/mcp-appliance/usr/bin/mcp_runtime.py ts/build/packages/mcp-appliance/usr/bin/mcp-selftest ts/build/packages/mcp-appliance/build/install-bundled.py
