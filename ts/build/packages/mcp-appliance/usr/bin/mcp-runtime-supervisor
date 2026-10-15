@@ -1,72 +1,79 @@
 #!/usr/bin/python3
-import configparser, json, shlex, signal, subprocess, sys, time
+"""Supervise one selected runtime; scope immutable failures to the current boot."""
+import os
 from pathlib import Path
-CFG=Path('/etc/mcp-appliance/node.conf')
-ENV=Path('/run/mcp-appliance/runtime.env')
-SELECTED=Path('/run/mcp-appliance/selected.json')
-STATE=Path('/var/prstnt/mcp-appliance/state/mcp-runtime.state')
-FAILED=Path('/var/prstnt/mcp-appliance/state/mcp-failed-generations.json')
-child=None; stop=False
+import shlex
+import signal
+import subprocess
+import time
+from mcp_runtime import BASE, RUN, Selector, read_json
 
-def write_state(v): STATE.parent.mkdir(parents=True,exist_ok=True); STATE.write_text(v+'\n')
-def sig(*_):
-    global stop; stop=True
-    if child and child.poll() is None: child.terminate()
-signal.signal(signal.SIGTERM,sig); signal.signal(signal.SIGINT,sig)
+child = None
+stopping = False
 
-def read_env():
-    out={}
-    if ENV.exists():
-        for line in ENV.read_text().splitlines():
-            if '=' in line:
-                k,v=line.split('=',1); out[k]=v
-    return out
 
-def selected():
-    try: return json.loads(SELECTED.read_text())
-    except Exception: return {}
+def stop(*_):
+    global stopping
+    stopping = True
+    if child is not None and child.poll() is None:
+        child.terminate()
 
-def mark_failed(gen):
-    if not gen or gen=='immutable': return
-    try: data=json.loads(FAILED.read_text()) if FAILED.exists() else {}
-    except Exception: data={}
-    failed=set(data.get('failed',[])); failed.add(gen)
-    FAILED.parent.mkdir(parents=True,exist_ok=True)
-    FAILED.write_text(json.dumps({'failed':sorted(failed)},indent=2)+'\n')
 
-def load_runtime():
-    env=read_env(); sel=selected()
-    command=env.get('MCP_COMMAND','').strip()
-    workdir=env.get('MCP_WORKDIR','').strip() or '/var/prstnt/mcp-appliance/work'
-    source=env.get('MCP_SOURCE','unknown')
-    if not command:
-        cfg=configparser.ConfigParser(); cfg.read(CFG)
-        command=cfg.get('mcp','command',fallback='').strip()
-        workdir=cfg.get('mcp','working_directory',fallback=workdir)
-    return command,workdir,source,sel
+def state(message):
+    target = BASE / 'state/mcp-runtime.state'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(message + '\n')
+    print(message, flush=True)
 
-rapid_failures=0
-while not stop:
-    command,workdir,source,sel=load_runtime()
-    if not command:
-        write_state('unconfigured'); time.sleep(5); continue
-    Path(workdir).mkdir(parents=True,exist_ok=True)
-    write_state(f'starting source={source}')
-    started=time.monotonic()
-    child=subprocess.Popen(shlex.split(command),cwd=workdir)
-    write_state(f'running source={source} pid={child.pid}')
-    rc=child.wait(); runtime=time.monotonic()-started
-    if stop: break
-    if runtime >= 30:
-        rapid_failures=0
-    else:
-        rapid_failures+=1
-    write_state(f'exited source={source} rc={rc} runtime={runtime:.1f}s failures={rapid_failures}')
-    if sel.get('kind')=='persistent' and rapid_failures>=3:
-        gen=sel.get('generation'); mark_failed(gen)
-        write_state(f'quarantined generation={gen}; selecting fallback')
-        subprocess.run(['/usr/bin/mcp-alert','critical','MCP generation quarantined'],input=f'Generation {gen} failed repeatedly and was quarantined. The appliance is selecting a fallback generation.\n',text=True,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(['/usr/bin/mcp-selector'],check=False)
-        rapid_failures=0
-    time.sleep(2)
-write_state('stopped')
+
+def main():
+    global child
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    selector = Selector()
+    failures, previous_key = 0, None
+    while not stopping:
+        selected = read_json(RUN / 'selected.json', {}) or selector.apply()
+        key = (selected['kind'], selected['generation'], selected.get('archive_sha256'))
+        if key != previous_key:
+            failures = 0
+            previous_key = key
+        source = '{kind}:{slot}:{generation}'.format(**selected)
+        work = Path(selected['working_directory'])
+        work.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env.setdefault('MCP_AUDIT_LOG', str(BASE / 'log/command-audit.log'))
+        env.setdefault('MCP_WORKSPACE_ROOT', str(BASE))
+        env['PYTHONDONTWRITEBYTECODE'] = '1'
+        (BASE / 'log').mkdir(parents=True, exist_ok=True)
+        started = time.monotonic()
+        state('starting source=' + source)
+        try:
+            child = subprocess.Popen(shlex.split(selected['command']), cwd=work, env=env)
+            state('running source=' + source + ' pid=' + str(child.pid))
+            rc = child.wait()
+        except OSError as exc:
+            state('spawn failed source=' + source + ': ' + str(exc))
+            rc = 127
+        if stopping:
+            break
+        runtime = time.monotonic() - started
+        failures = 0 if runtime >= 30 else failures + 1
+        state(f'exited source={source} rc={rc} runtime={runtime:.1f}s failures={failures}')
+        if selected['kind'] in ('persistent', 'bundled') and failures >= 3:
+            selector.quarantine(selected, f'rc={rc}; three rapid failures')
+            state('quarantined source=' + source + '; selecting fallback')
+            try:
+                subprocess.run(['/usr/bin/mcp-alert', 'critical', 'MCP runtime fallback'],
+                               input='Runtime ' + source + ' failed repeatedly; selecting fallback.\n',
+                               text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            selector.apply()
+            failures = 0
+        time.sleep(2)
+    state('stopped')
+
+
+if __name__ == '__main__':
+    main()

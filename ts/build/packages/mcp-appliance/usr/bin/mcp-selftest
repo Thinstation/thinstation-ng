@@ -1,0 +1,171 @@
+#!/usr/bin/python3
+"""Native import and loopback-only MCP qualification; never execute tools."""
+import argparse
+import http.client
+import json
+import os
+from pathlib import Path
+import runpy
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+
+def protocol_probe(port=8000):
+    session = None
+    version = '2025-03-26'
+
+    def request(body, verb='POST'):
+        nonlocal session
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=3)
+        headers = {'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream',
+                   'MCP-Protocol-Version': version}
+        if session:
+            headers['Mcp-Session-Id'] = session
+        try:
+            conn.request(verb, '/mcp', json.dumps(body) if body is not None else None, headers)
+            response = conn.getresponse()
+            session = response.getheader('Mcp-Session-Id') or session
+            raw = response.read(4 * 1024 * 1024 + 1)
+            if response.status not in (200, 202, 204):
+                raise RuntimeError('MCP HTTP ' + str(response.status))
+            if len(raw) > 4 * 1024 * 1024:
+                raise RuntimeError('MCP response exceeds qualification limit')
+            if not raw:
+                return {}
+            if response.getheader('Content-Type', '').startswith('text/event-stream'):
+                raw = next(line[5:].strip() for line in raw.splitlines() if line.startswith(b'data:'))
+            result = json.loads(raw)
+            if not isinstance(result, dict) or result.get('error'):
+                raise RuntimeError('MCP returned a protocol error')
+            return result
+        finally:
+            conn.close()
+
+    try:
+        reply = request({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize',
+                         'params': {'protocolVersion': version, 'capabilities': {},
+                                    'clientInfo': {'name': 'appliance-qualification', 'version': '1'}}})
+        info = reply['result']
+        version = info['protocolVersion']
+        request({'jsonrpc': '2.0', 'method': 'notifications/initialized'})
+        tools = []
+        cursor = None
+        for page in range(20):
+            params = {'cursor': cursor} if cursor else {}
+            response = request({'jsonrpc': '2.0', 'id': page + 2, 'method': 'tools/list', 'params': params})['result']
+            tools.extend(response.get('tools', []))
+            cursor = response.get('nextCursor')
+            if not cursor:
+                break
+        else:
+            raise RuntimeError('MCP tool list pagination exceeded limit')
+        names = {tool['name'] for tool in tools}
+        required = {'operator_context', 'run_local_linux', 'list_remote_hosts'}
+        if not required <= names:
+            raise RuntimeError('Full MCP tools missing: ' + ', '.join(sorted(required - names)))
+        return {'responding': True, 'tool_count': len(names), 'protocol_version': version,
+                'server': info.get('serverInfo', {}), 'tools_executed': 0}
+    finally:
+        if session:
+            try:
+                request(None, 'DELETE')
+            except Exception:
+                pass
+
+
+def child(root, serve, port):
+    root = Path(root).resolve()
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(root / 'app'))
+    import pydantic_core
+    namespace = runpy.run_path(str(root / 'app/server.py'), run_name='mcp_qualification')
+    if serve:
+        namespace['mcp'].run(transport='streamable-http', host='127.0.0.1', port=port,
+                             streamable_http_path='/mcp', json_response=True)
+    else:
+        print(json.dumps({'imports': 'passed', 'pydantic_core': pydantic_core.__version__}))
+
+
+def qualify(root, serve=False):
+    root = Path(root).resolve(strict=True)
+    python = root / '.venv/bin/python'
+    if not python.is_file():
+        raise RuntimeError('generation Python interpreter is missing')
+    with tempfile.TemporaryDirectory(prefix='mcp-qualify-') as scratch:
+        work = Path(scratch)
+        (work / 'hosts.json').write_text('{"hosts":{},"groups":{}}\n')
+        env = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8',
+               'MCP_HOSTS_FILE': str(work / 'hosts.json'),
+               'THINSTATION_MCP_HOSTS_FILE': str(work / 'hosts.json'),
+               'MCP_AUDIT_LOG': str(work / 'audit.log'),
+               'MCP_WORKSPACE_ROOT': str(work / 'workspace'),
+               'MCP_RDP_STATE_ROOT': str(work / 'rdp'),
+               'HOME': str(work), 'TMPDIR': str(work), 'PYTHONDONTWRITEBYTECODE': '1'}
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+        argv = [str(python), '-B', '-E', '-s', str(Path(__file__).resolve()),
+                '_serve' if serve else '_imports', str(root), '--port', str(port)]
+        with (work / 'server.log').open('w+') as log:
+            process = subprocess.Popen(argv, cwd=work, env=env, stdin=subprocess.DEVNULL,
+                                       stdout=log, stderr=log)
+            try:
+                if not serve:
+                    rc = process.wait(timeout=20)
+                    log.seek(0)
+                    output = log.read()[-3000:]
+                    if rc:
+                        raise RuntimeError(output or 'native import check failed')
+                    return {'imports': 'passed'}
+                deadline, last_error = time.monotonic() + 25, ''
+                while time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        log.seek(0)
+                        raise RuntimeError(log.read()[-4000:] or 'MCP exited before readiness')
+                    try:
+                        result = protocol_probe(port)
+                        if process.poll() is not None:
+                            raise RuntimeError('MCP exited during protocol test')
+                        return dict(result, imports='passed', startup='passed')
+                    except (OSError, ValueError, RuntimeError, KeyError, StopIteration) as exc:
+                        last_error = str(exc)
+                    time.sleep(0.25)
+                log.seek(0)
+                raise RuntimeError(last_error + '\n' + log.read()[-3000:])
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=5)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mode', choices=('imports', 'qualify', 'probe', '_imports', '_serve'))
+    parser.add_argument('root', nargs='?')
+    parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument('--output')
+    args = parser.parse_args()
+    try:
+        if args.mode.startswith('_'):
+            child(args.root, args.mode == '_serve', args.port)
+            return 0
+        result = protocol_probe(args.port) if args.mode == 'probe' else qualify(args.root, args.mode == 'qualify')
+        text = json.dumps(result, indent=2) + '\n'
+        if args.output:
+            Path(args.output).write_text(text)
+        print(text, end='')
+        return 0
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
