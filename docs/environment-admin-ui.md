@@ -1,0 +1,59 @@
+# Environment administration interface
+
+## Scope
+
+Installed, Catalog, Staging & recovery, Operations, and Settings share the existing
+appliance page, panel, typography, tab and button styles. Environment-specific
+responsive rules live in `environments.css`; view-model helpers are separately tested.
+Long environment IDs wrap within table cells instead of spilling across the page.
+On narrow screens, OS/base information moves below the environment or profile name.
+
+## Operations
+
+Installed uses search, row selection, a global Check all updates action, and confirmed
+Update selected / Redeploy selected actions. Select-all means visible eligible rows;
+Check all updates includes eligible installed rows regardless of the filter.
+The confirmation explicitly lists the eligible target subset.
+
+Bulk submission is sequential within this browser page, not a persistent global queue.
+A failed job stops remaining submissions. Missing job status pauses progress. Leaving
+the Environments component stops submitting the remaining browser queue but does not
+cancel an already submitted backend job. Other clients retain the backend's existing
+per-environment lock behavior; no new cross-client scheduler is claimed.
+
+Redeploy is offered only for a stored definition with a valid package list. The worker
+still performs its own source, manifest, and replacement checks. This change does not
+alter the package/update/rebuild worker. Delete remains unavailable because the worker
+has no guarded deletion endpoint. Catalog profile installation is not exposed either.
+
+## Read-only metadata
+
+Inventory separates dot-prefixed staging and retained directories from installed roots,
+reports matching job metadata when available, and never claims an untracked stage is a
+failed deployment. Nothing is deleted or automatically cleaned. Job metadata is loaded
+once per inventory request. Recent job summaries omit owner and raw log/error content.
+The existing authenticated job endpoint supplies details on request.
+
+Worker completion and available package updates are separate states. A successful check
+without a machine-readable result says to inspect its log, not Up to date. Later update
+or rebuild jobs invalidate a prior update observation. Redeploy availability describes
+the stored definition, not a guarantee that a deployment will succeed.
+
+## Settings
+
+Repository drafts survive inventory refresh and tab switches. Reset changes restores
+the last loaded/saved values; Save changes retains existing HTTPS validation. No package
+operation is triggered by saving sources. Automatic mirror fallback remains unsupported.
+
+## Validation
+
+Run `npm test` and `npm run build` from the frontend directory. The fixture-only browser
+suite `tests/environment-browser.cjs` requires Playwright Chromium and tests all five
+views, long names, selection across filters, modal confirmation, serialized submission,
+stop-on-failure, stale inventory, and draft preservation. It never contacts a live
+appliance or runs a real environment action. `ENV_QA_OUTPUT` chooses screenshot/report
+output outside the source tree. The tested viewports are 1440x1000, 844x390, and 390x844.
+
+Deploy the UI and `mcp_environments.py` together for all metadata. With an older backend,
+dot directories still separate correctly, but history and definition-dependent redeploy
+controls remain unavailable until the metadata endpoint is updated.

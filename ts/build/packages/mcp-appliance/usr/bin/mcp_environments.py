@@ -10,6 +10,8 @@ import re
 import fcntl
 
 ROOT = Path(os.environ.get('MCP_CHROOT_ROOT', '/var/prstnt/mcp-appliance/chroots'))
+STATE = Path('/var/prstnt/mcp-appliance/state/environments')
+MANIFESTS = Path('/var/prstnt/mcp-appliance/config/environment-manifests')
 CATALOG = [["ai","AI & LLM","Inference runtimes and local model execution"],["avatar","Avatar & 3D","Real-time avatar and GPU rendering tools"],["browser","Browser Automation","Chromium-based automation and authenticated browsing"],["cad","CAD & Mesh","Parametric modeling, STL inspection and mesh repair"],["cuda","GPU Compute","NVIDIA CUDA toolchain and GPU diagnostics"],["media","Video & Audio","FFmpeg, codecs, optimization and color processing"],["photo","Photography","Image processing, batch transforms and metadata"],["wireshark","Network Analysis","Wireshark CLI and capture analysis tools"]]
 
 KEY_PACKAGES = {
@@ -89,39 +91,89 @@ class Environments:
         return job
 
     def status(self):
+        # One pass over job metadata, not one full rescan per chroot.
         known = {name:(title,desc) for name,title,desc in CATALOG}
-        installed = []
+        history = []
+        for jobfile in STATE.glob('*.json'):
+            if jobfile.is_symlink():
+                continue
+            try:
+                entry = json.loads(jobfile.read_text())
+            except (OSError, ValueError):
+                continue
+            if not isinstance(entry, dict) or not re.fullmatch(r'[a-f0-9]{32}', str(entry.get('id', ''))):
+                continue
+            history.append(entry)
+        history.sort(key=lambda entry: str(entry.get('created_at', '')))
+        by_id = {entry['id']:entry for entry in history}
+        by_name = {}
+        for entry in history:
+            by_name.setdefault(str(entry.get('name', '')), []).append(entry)
+        installed, staging = [], []
         if ROOT.is_dir():
             for path in sorted(ROOT.iterdir()):
-                if not path.is_dir() or path.is_symlink(): continue
+                if path.is_symlink() or not path.is_dir():
+                    continue
                 name = path.name
-                kind = name.rsplit('-f',1)[0]
-                title,description = known.get(kind,(name,'Custom persistent execution environment'))
+                if name.startswith('.'):
+                    kind = 'previous' if name.startswith('.previous-') else 'stage' if name.startswith('.stage-') else 'internal'
+                    ident = name.partition('-')[2]
+                    previous = by_id.get(ident, {})
+                    try:
+                        modified = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
+                    except OSError:
+                        modified = None
+                    staging.append(dict(name=name, kind=kind, state=previous.get('state'),
+                        environment=previous.get('name'), latest_job=previous.get('id'), modified_at=modified))
+                    continue
+                kind = name.rsplit('-f', 1)[0]
+                title, description = known.get(kind, (name, 'Custom persistent execution environment'))
                 dnf = (path/'usr/bin/dnf').exists() or (path/'usr/bin/dnf5').exists()
                 apt = (path/'usr/bin/apt-get').exists()
                 manager = 'dnf' if dnf else ('apt' if apt else 'none')
-                manifest_file=Path('/var/prstnt/mcp-appliance/config/environment-manifests')/(name+'.json')
-                try: manifest=json.loads(manifest_file.read_text())
-                except (OSError,ValueError): manifest={}
-                keys=manifest.get('key_packages', KEY_PACKAGES.get(kind,[]))
-                if not isinstance(keys,list):keys=[]
+                manifest_file = MANIFESTS/(name+'.json')
+                try:
+                    manifest = json.loads(manifest_file.read_text()) if not manifest_file.is_symlink() else {}
+                except (OSError, ValueError):
+                    manifest = {}
+                if not isinstance(manifest, dict):
+                    manifest = {}
+                packages = manifest.get('packages', [])
+                definition_ready = bool(isinstance(packages, list) and 0 < len(packages) <= 200
+                    and all(isinstance(item, str) and re.fullmatch(r'[A-Za-z0-9_+][A-Za-z0-9_+.-]{0,99}', item) for item in packages)
+                    and re.fullmatch(r'[a-z][a-z0-9-]{0,62}', name))
+                keys = manifest.get('key_packages', KEY_PACKAGES.get(kind, []))
+                keys = [item for item in keys if isinstance(item, str)] if isinstance(keys, list) else []
                 release = 'Unknown'
                 try:
-                    data=(path/'etc/os-release').read_text(errors='replace')
-                    release=next((line.split('=',1)[1].strip().strip('"') for line in data.splitlines() if line.startswith('PRETTY_NAME=')),release)
-                except OSError: pass
-                history=[]
-                for jobfile in (Path('/var/prstnt/mcp-appliance/state/environments')).glob('*.json'):
-                    try: entry=json.loads(jobfile.read_text())
-                    except (OSError,ValueError): continue
-                    if entry.get('name')==name:history.append(entry)
-                history.sort(key=lambda entry: entry.get('created_at',''))
-                latest=history[-1] if history else {}
-                installed.append(dict(name=name,title=title,description=description,os=release,
-                    dnf_available=dnf,apt_available=apt,package_manager=manager,key_packages=keys,update_status=latest.get('state','Not checked') if manager!='none' else 'Package manager missing',
-                    update_progress=latest.get('progress'),latest_job=latest.get('id'),installed=True))
-        types = {e['name'].rsplit('-f',1)[0] for e in installed}
-        return dict(root=str(ROOT),installed=installed,sources=self.sources(),catalog=[
-            dict(id=n,title=t,description=d,installed=n in types,key_packages=KEY_PACKAGES.get(n,[]),supported_bases=['fedora','ubuntu'])
-            for n,t,d in CATALOG],
-            note='Chroots contain no durable user data. Recovery uses removal and redeployment from an environment definition; automated rebuild remains under development.')
+                    text = (path/'etc/os-release').read_text(errors='replace')
+                    release = next((line.split('=',1)[1].strip().strip('"') for line in text.splitlines() if line.startswith('PRETTY_NAME=')), release)
+                except OSError:
+                    pass
+                records = by_name.get(name, [])
+                latest = records[-1] if records else {}
+                checks = [entry for entry in records if entry.get('action') == 'check' and entry.get('state') in ('completed', 'succeeded')]
+                check = checks[-1] if checks else {}
+                # Mutations invalidate a prior package-state observation, including
+                # failed updates which may have partially changed the environment.
+                if check and any(entry.get('action') in ('update', 'rebuild')
+                                 and str(entry.get('created_at', '')) > str(check.get('created_at', '')) for entry in records):
+                    check = {}
+                installed.append(dict(name=name, title=title, description=description, os=release,
+                    dnf_available=dnf, apt_available=apt, package_manager=manager, key_packages=keys,
+                    update_status=latest.get('state', 'Not checked') if manager != 'none' else 'Package manager missing',
+                    update_progress=latest.get('progress'), latest_job=latest.get('id'), installed=True,
+                    rebuild_available=definition_ready, operation_state=latest.get('state'),
+                    operation_action=latest.get('action'),
+                    last_checked=check.get('finished_at') or check.get('created_at'),
+                    updates_available=check.get('updates_available')))
+        types = {entry['name'].rsplit('-f', 1)[0] for entry in installed}
+        fields = ('id', 'name', 'action', 'state', 'created_at', 'finished_at', 'progress')
+        return dict(root=str(ROOT), installed=installed, staging=staging,
+            jobs=[{key:entry[key] for key in fields if key in entry} for entry in reversed(history[-50:])],
+            capabilities={'check': True, 'update': True, 'rebuild': True, 'delete': False, 'install': False},
+            sources=self.sources(), catalog=[
+                dict(id=name, title=title, description=description, installed=name in types,
+                     key_packages=KEY_PACKAGES.get(name, []), supported_bases=['fedora', 'ubuntu'])
+                for name,title,description in CATALOG],
+            note='Temporary and retained directories are inspection-only. Redeploy requires a stored environment definition; deletion and direct catalog installation are not exposed by this worker.')
