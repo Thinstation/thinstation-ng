@@ -1,6 +1,6 @@
 """Small deterministic selection tests; no live services or credentials."""
-import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -13,7 +13,8 @@ from mcp_runtime import Selector, write_json
 
 class SelectionTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        # CI intentionally mounts /tmp noexec; use its executable workspace.
+        self.temp = tempfile.TemporaryDirectory(prefix='.fallback-test-', dir=os.environ.get('CI_PROJECT_DIR'))
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.base = self.root / 'persistent'
@@ -37,28 +38,28 @@ class SelectionTests(unittest.TestCase):
         return path
 
     def test_fresh_install_uses_bundle_without_creating_active(self):
-        selected, _ = self.selector.choose()
-        self.assertEqual(selected['kind'], 'bundled')
+        selected, attempts = self.selector.choose()
+        self.assertEqual(selected['kind'], 'bundled', attempts)
         self.assertFalse((self.base / 'mcp/active').exists())
 
     def test_active_wins(self):
         self.slot('active', 'upgrade-1')
-        selected, _ = self.selector.choose()
-        self.assertEqual((selected['kind'], selected['slot']), ('persistent', 'active'))
+        selected, attempts = self.selector.choose()
+        self.assertEqual((selected['kind'], selected['slot']), ('persistent', 'active'), attempts)
 
     def test_previous_wins_after_failed_active(self):
         self.slot('active', 'upgrade-1', 'exit 7')
         self.slot('previous', 'upgrade-0')
         selected, attempts = self.selector.choose()
-        self.assertEqual(selected['slot'], 'previous')
+        self.assertEqual(selected['slot'], 'previous', attempts)
         self.assertIn('preflight', attempts[0]['reason'])
 
     def test_persistent_quarantine_does_not_block_same_version_bundle(self):
         name = 'thinstation-mcp-build-309'
         self.slot('active', name)
         write_json(self.selector.failed_file, {'failed': [name]})
-        selected, _ = self.selector.choose()
-        self.assertEqual(selected['kind'], 'bundled')
+        selected, attempts = self.selector.choose()
+        self.assertEqual(selected['kind'], 'bundled', attempts)
         self.assertEqual(selected['bundled_generation'], name)
         self.assertNotEqual(selected['generation'], name)
 
@@ -73,8 +74,8 @@ class SelectionTests(unittest.TestCase):
         selected, _ = self.selector.choose()
         self.selector.quarantine(selected, 'test crash')
         write_json(self.bundle / 'bundled.json', {'archive_sha256': 'b' * 64})
-        selected, _ = self.selector.choose()
-        self.assertEqual(selected['kind'], 'bundled')
+        selected, attempts = self.selector.choose()
+        self.assertEqual(selected['kind'], 'bundled', attempts)
 
     def test_invalid_manifest_keeps_recovery_available(self):
         (self.bundle / 'manifest.json').write_text('{bad')

@@ -10,6 +10,8 @@ import sys
 import tarfile
 import tempfile
 
+PYTHONS = {'/usr/bin/python3', '/usr/bin/python3.14'}
+
 
 def digest(path):
     with Path(path).open('rb') as stream:
@@ -62,12 +64,24 @@ def unpack(archive, target, generation):
             os.link(source_path, target / relative)
         for relative, link in links:
             dest = target / relative
+            interpreter = relative.parent == Path('.venv/bin') and relative.name in ('python', 'python3', 'python3.14')
             if Path(link).is_absolute():
-                if relative.parent != Path('.venv/bin') or not relative.name.startswith('python') or link not in ('/usr/bin/python3', '/usr/bin/python3.14'):
+                if not interpreter or link not in PYTHONS:
                     raise ValueError('unsafe absolute symlink: ' + str(relative))
             else:
-                (dest.parent / link).resolve().relative_to(target.resolve())
+                logical = Path(os.path.normpath(str(relative.parent / link)))
+                if logical.is_absolute() or '..' in logical.parts:
+                    raise ValueError('unsafe relative symlink: ' + str(relative))
             dest.symlink_to(link)
+        # Check completed chains, allowing only the deliberate interpreter aliases.
+        for relative, _ in links:
+            resolved = (target / relative).resolve()
+            try:
+                resolved.relative_to(target.resolve())
+            except ValueError:
+                interpreter = relative.parent == Path('.venv/bin') and relative.name in ('python', 'python3', 'python3.14')
+                if not interpreter or not any(resolved == Path(p).resolve() for p in PYTHONS):
+                    raise ValueError('archive link chain escapes payload: ' + str(relative))
 
 
 def install(package):
@@ -103,8 +117,6 @@ def install(package):
                 raise ValueError('bundled manifest hash mismatch: ' + rel)
         if not (tree / 'app/server.py').is_file() or not (tree / '.venv/bin/python').is_file():
             raise ValueError('full MCP runtime is absent from archive')
-        # The downloaded release is a candidate until the final image passes
-        # imports, startup, initialize and tools/list in its own chroot.
         (tree / 'qualification.json').unlink(missing_ok=True)
         receipt = dict(generation=generation, version=descriptor['version'],
                        source_sha=descriptor['source_sha'], archive_sha256=expected)
