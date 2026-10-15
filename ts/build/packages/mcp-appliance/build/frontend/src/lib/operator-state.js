@@ -9,9 +9,11 @@ export function runtimeView(snapshot, busy='', stale=false, now=Date.now()/1000)
   const base = {start:false,stop:false,restart:false,tone:'neutral'};
   if (state === 'active') {
     const p=snapshot.probe, fresh=p && now-p.checked_at < 60;
-    return {...base,label:fresh&&p.responding?'Running · responding':'Running',tone:fresh&&p.responding?'good':'neutral',
-      detail:fresh?(p.responding?'Local MCP handshake verified.':p.error||'MCP did not answer the local check.'):'Process is running; protocol response has not been checked recently.',
-      stop:!busy,restart:!busy};
+    const selected=snapshot.selected||{}, bundled=selected.kind==='bundled', rescue=selected.kind==='recovery';
+    const label=bundled?'Bundled MCP - '+buildInfo(selected.bundled_generation,selected).label:rescue?'Minimal rescue':fresh&&p.responding?'Running - responding':'Running';
+    const evidence=fresh?(p.responding?'Local MCP handshake verified.':p.error||'MCP did not answer the local check.'):'Process is running; protocol response has not been checked recently.';
+    const detail=bundled?'The full ISO baseline is running; persistent upgrade selections are unchanged. '+evidence:rescue?'The minimal rescue helper is selected, not the full MCP server. '+evidence:evidence;
+    return {...base,label,tone:rescue?'bad':fresh&&p.responding?'good':'neutral',detail,stop:!busy,restart:!busy};
   }
   if (state==='inactive'||state==='failed') return {...base,label:state==='failed'?'Failed':'Stopped',tone:state==='failed'?'bad':'neutral',detail:state==='failed'?'Inspect runtime details before restarting.':'The MCP service is not running.',start:!busy};
   if (state==='activating'||state==='deactivating'||state==='reloading') return {...base,label:state==='deactivating'?'Stopping':'Starting',detail:'The runtime is changing state.'};
@@ -27,9 +29,10 @@ export function buildInfo(generation, metadata={}) {
 export function updateView(catalog, snapshot) {
   if (!catalog) return {label:'Checking updates',tone:'neutral'};
   if (!catalog.available) return {label:'Update check unavailable',tone:'neutral',detail:'The running MCP is unaffected.'};
-  const rows=catalog.mcps||[], active=snapshot?.active;
+  const rows=catalog.mcps||[], selected=snapshot?.selected||{};
+  const active=snapshot?.active||selected.bundled_generation;
   if (!active) return {label:rows.length?'Choose an MCP':'No releases listed',tone:'neutral'};
-  const meta=snapshot?.versions?.find(v=>v.generation===active)||{};
+  const meta=snapshot?.versions?.find(v=>v.generation===active)||(selected.kind==='bundled'?selected:{});
   const current=buildInfo(active,meta);
   const comparable=rows.filter(r=>{const i=buildInfo(r.generation,r);return current.family && i.family===current.family && i.number!==null;});
   const newer=current.number===null?[]:comparable.filter(r=>buildInfo(r.generation,r).number>current.number).sort((a,b)=>buildInfo(b.generation,b).number-buildInfo(a.generation,a).number);
@@ -37,6 +40,7 @@ export function updateView(catalog, snapshot) {
     const target=newer[0], installed=(snapshot?.versions||[]).some(v=>v.generation===target.generation);
     return {label:installed?'Update ready to apply':'Update available',tone:'warn',target,installed};
   }
+  if(selected.kind==='bundled') return {label:'Bundled baseline active',tone:'neutral',detail:snapshot?.active?'The configured persistent upgrade is not running. Inspect Diagnostics before reactivating it.':'The ISO provides the full MCP. Installing a persistent upgrade is optional.'};
   if(rows.some(r=>r.generation===active)) return {label:'Up to date',tone:'good'};
   if(comparable.length&&current.number!==null) return {label:'No newer build listed',tone:'neutral'};
   return {label:'Version comparison unavailable',tone:'neutral',detail:'No matching release family is listed.'};
