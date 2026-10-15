@@ -1,8 +1,6 @@
 #mcp-appliance 90
 set -eu
-# BEGIN MCP BUILD-TIME NETBIOS CLEANUP
 # Check modules in the staged image, never the build host's running kernel.
-# Keep these legacy rules only when the image includes nf_conntrack_netbios_ns.
 mcp_netbios_module_present=false
 for mcp_module_root in ${MCP_MODULE_ROOTS:-/usr/lib64/modules /lib/modules}; do
   [ -d "$mcp_module_root" ] || continue
@@ -13,8 +11,6 @@ for mcp_module_root in ${MCP_MODULE_ROOTS:-/usr/lib64/modules /lib/modules}; do
   fi
 done
 if [ "$mcp_netbios_module_present" = false ]; then
-  # The image still supports modern SMB/CIFS (TCP 445); only retire the
-  # NetBIOS/UDP 137-138 rules which depend on the omitted conntrack helper.
   for mcp_zone_dir in ${MCP_FIREWALL_ZONE_DIRS:-/etc/firewalld/zones /usr/lib/firewalld/zones}; do
     for mcp_zone in home internal FedoraWorkstation; do
       mcp_zone_file="$mcp_zone_dir/$mcp_zone.xml"
@@ -28,7 +24,6 @@ if [ "$mcp_netbios_module_present" = false ]; then
     sed -i '/<helper name="netbios-ns"\/>/d' "$mcp_service_file"
   done
 fi
-# END MCP BUILD-TIME NETBIOS CLEANUP
 mkdir -p /etc/mcp-appliance \
   /root/.ssh \
   /var/prstnt/mcp-appliance/config \
@@ -48,7 +43,6 @@ chmod 0755 /etc/init.d/mcp-appliance-config /usr/bin/mcp-bootstrap /usr/bin/mcp-
 chmod 0755 /usr/bin/mcp-generation /usr/bin/mcp-recovery /usr/bin/mcp-appliance-info /usr/bin/mcp-appliance-init /usr/bin/mcp-appliance-register /usr/bin/mcp-appliance-web /usr/bin/mcp-gateway-selftest /usr/bin/mcp-console-reset
 systemctl set-default multi-user.target
 systemctl enable mcp-bootstrap.service
-# The unit is skipped unless a user has explicitly connected this appliance.
 systemctl enable mcp-openai-tunnel.service
 systemctl disable display-manager.service 2>/dev/null || true
 rm -f /etc/systemd/system/display-manager.service
@@ -64,3 +58,6 @@ if [ -r "$thin_list" ] && [ -x /usr/bin/busybox.shared ]; then
   done < "$thin_list"
   /usr/bin/busybox.shared --install -s
 fi
+# This is the target image's interpreter, loader and native libraries.
+# The CI artifact gate requires the success report written by this command.
+/usr/bin/mcp-qualify-bundled
