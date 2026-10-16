@@ -10,7 +10,7 @@
 
   let data=null,loading=false,loadError='',error='',notice='',tab='installed';
   let installedQuery='',catalogQuery='',stagingQuery='',selected=[],stageSelected=[],expanded='';
-  let creator=null,deletePhrase='',queueFailures=[];
+  let creator=null,queueFailures=[];
   let menu=null,menuTrigger=null,confirmation=null,acknowledged=false,dialog;
   let job=null,logError='',polling=false,disposed=false;
   let pending=[],queueJob=null,queueRunning=false,submitting=false,total=0,completed=0;
@@ -27,8 +27,7 @@
   $: selectedDelete=chooseTargets(inventory.installed,selected,'delete');
   $: stageDelete=chooseTargets(inventory.staging,stageSelected,'delete');
   $: visibleStages=staging.filter(row=>actionState(row,'delete').enabled);
-  $: confirmationGate=confirmationState(confirmation,acknowledged,deletePhrase,disabled);
-  $: deleteExpected=confirmationGate.expected;
+  $: confirmationGate=confirmationState(confirmation,acknowledged,disabled);
   $: allCheck=inventory.installed.filter(row=>actionState(row,'check').enabled);
   $: sourcesDirty=fedoraUrl!==sourceBase.fedora_url||updatesUrl!==sourceBase.updates_url;
   $: disabled=loading||!!loadError||queueRunning||submitting||!!creator;
@@ -89,10 +88,10 @@
     closeMenu();error='';notice='';
     if(disabled||!rows.length)return;
     if(action==='check'){runQueue(action,rows);return;}
-    confirmation={action,rows:[...rows]};acknowledged=false;deletePhrase='';
+    confirmation={action,rows:[...rows]};acknowledged=false;
   }
   async function confirmOperation() {
-    if(!confirmationState(confirmation,acknowledged,deletePhrase,disabled).ready)return;
+    if(!confirmationState(confirmation,acknowledged,disabled).ready)return;
     const {action,rows}=confirmation;
     await runQueue(action,rows);
   }
@@ -234,14 +233,6 @@
         <ul aria-label="Selected targets">{#each confirmation.rows as row}<li>{#if row.title&&row.title!==row.name}{row.title} {/if}<code>{row.name}</code></li>{/each}</ul>
         <p class="env-caption">Operations are submitted one at a time. Keep this page open; a failed job stops the remaining queue.</p>
         <label for="env-confirm-reviewed" class="env-confirm-review"><input id="env-confirm-reviewed" type="checkbox" bind:checked={acknowledged}/><span>I have reviewed these targets and the effect of this operation.</span></label>
-        {#if confirmation.action==='delete'}
-          <div class="env-delete-challenge">
-            <p id="env-delete-instruction">Type or paste this entire confirmation phrase:</p>
-            <code class="env-confirm-phrase" data-testid="delete-confirmation-phrase">{deleteExpected}</code>
-            <label class="field" for="env-delete-phrase"><span>Deletion confirmation</span><input id="env-delete-phrase" type="text" bind:value={deletePhrase} autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="env-delete-help env-confirm-status" aria-invalid={deletePhrase.length>0&&!confirmationGate.phraseMatches}/></label>
-            <p id="env-delete-help" class="env-caption">Include DELETE and the name or item count. Extra space at either end and capitalization of DELETE or ITEMS are ignored. Environment names must still match exactly.</p>
-          </div>
-        {/if}
         <p id="env-confirm-status" class="env-confirm-status" class:good={confirmationGate.ready} role="status" aria-live="polite">{confirmationGate.message}</p>
       </div>
       <div class="modal-actions"><button class="btn" on:click={cancelConfirmation}>Cancel</button><span class="spacer"></span><button class="btn" class:danger={confirmation.action==='delete'} class:primary={confirmation.action!=='delete'} disabled={!confirmationGate.ready} aria-describedby="env-confirm-status" on:click={confirmOperation}>Confirm {actionLabels[confirmation.action].toLowerCase()}</button></div>

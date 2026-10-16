@@ -1,50 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deletionPhrase,matchesDeletionPhrase,confirmationState} from '../src/lib/environment-confirmation.js';
-const name='.stage-00000000000000000000000000001bbd';
-const one={action:'delete',rows:[{name}]};
+import {confirmationState} from '../src/lib/environment-confirmation.js';
+const one={action:'delete',rows:[{name:'.stage-00000000000000000000000000001bbd'}]};
 const two={action:'delete',rows:[{name:'media-1'},{name:'photo-1'}]};
-const phrase='DELETE '+name;
-test('single and bulk phrases name their exact target set',()=>{
- assert.equal(deletionPhrase(one.rows),phrase);assert.equal(deletionPhrase(two.rows),'DELETE 2 ITEMS');
- for(const value of [[],null,[{}],[{name:''}],[{name:1}]])assert.equal(deletionPhrase(value),'');
+test('single delete requires only the review acknowledgment',()=>{
+ assert.equal(confirmationState(one,false).ready,false);
+ assert.equal(confirmationState(one,true).ready,true);
 });
-test('no selected operation cannot be confirmed',()=>{
- for(const value of [null,{action:'delete',rows:[]},{action:'install',rows:one.rows}])assert.equal(confirmationState(value,true,phrase).ready,false);
+test('bulk delete has the same single acknowledgment',()=>{
+ assert.equal(confirmationState(two,false).ready,false);
+ assert.equal(confirmationState(two,true).ready,true);
 });
-test('acknowledgment and full phrase are both required',()=>{
- assert.equal(confirmationState(one,false,'').ready,false);
- assert.equal(confirmationState(one,false,phrase).ready,false);
- assert.equal(confirmationState(one,true,'').ready,false);
- assert.equal(confirmationState(one,true,phrase).ready,true);
+test('malformed operations cannot be confirmed',()=>{
+ for(const value of [null,{}, {action:'delete',rows:[]},{action:'delete',rows:null},{action:'install',rows:one.rows},{action:'delete',rows:[{}]},{action:'delete',rows:[{name:''}]},{action:'delete',rows:[{name:1}]}])
+  assert.equal(confirmationState(value,true).ready,false);
 });
-test('action word and outer whitespace do not cause silent mismatch',()=>{
- for(const value of [phrase,'delete '+name,'  DELETE '+name+'  ','Delete    '+name,'\nDELETE '+name+'\n'])assert.equal(matchesDeletionPhrase(value,phrase),true,value);
+test('unchecking disables an acknowledged deletion',()=>{
+ assert.equal(confirmationState(one,true).ready,true);
+ assert.equal(confirmationState(one,false).ready,false);
 });
-test('target names are exact and are not lowercased',()=>{
- for(const value of [name,'DELETE '+name.toUpperCase(),'DELETE '+name+'x','DELETE '+name+' '+name,'DELETE '+name.slice(1),'DELETE\u200b '+name])assert.equal(matchesDeletionPhrase(value,phrase),false,value);
+test('feedback explains only the outstanding requirement',()=>{
+ assert.match(confirmationState(one,false).message,/review box/);
+ assert.match(confirmationState(one,true).message,/now enabled/);
+ assert.doesNotMatch(confirmationState(one,false).message,/type|phrase|paste/i);
 });
-test('bulk action words normalize but count remains exact',()=>{
- for(const value of ['DELETE 2 ITEMS',' delete 2 items ','Delete   2   Items'])assert.equal(matchesDeletionPhrase(value,'DELETE 2 ITEMS'),true);
- for(const value of ['DELETE 3 ITEMS','DELETE 02 ITEMS','2 ITEMS','DELETE 2','DELETE 2 ITEM','DELETE 2 ITEMS extra'])assert.equal(matchesDeletionPhrase(value,'DELETE 2 ITEMS'),false);
+test('in-flight or stale inventory still blocks confirmation',()=>{
+ assert.equal(confirmationState(one,true,true).ready,false);
+ assert.match(confirmationState(one,true,true).message,/inventory/);
 });
-test('unchecking review disables a previously ready delete',()=>{
- assert.equal(confirmationState(one,true,phrase).ready,true);
- assert.equal(confirmationState(one,false,phrase).ready,false);
- assert.match(confirmationState(one,false,phrase).message,/review box/);
-});
-test('feedback explains a missing or mismatched phrase',()=>{
- assert.match(confirmationState(one,true,'').message,/Enter the full/);
- assert.match(confirmationState(one,true,'wrong').message,/does not match/);
- assert.match(confirmationState(one,true,phrase).message,/now enabled/);
-});
-test('in-flight or stale inventory blocks otherwise ready confirmation',()=>{
- assert.equal(confirmationState(one,true,phrase,true).ready,false);
- assert.match(confirmationState(one,true,phrase,true).message,/inventory/);
-});
-test('update and redeploy retain acknowledgment without a delete phrase',()=>{
+test('update and redeploy retain their existing acknowledgment',()=>{
  for(const action of ['update','rebuild']){
-  const value={action,rows:one.rows};assert.equal(confirmationState(value,false,'').ready,false);
-  assert.equal(confirmationState(value,true,'').ready,true);assert.equal(confirmationState(value,true,'',true).ready,false);
+  const value={action,rows:one.rows};assert.equal(confirmationState(value,false).ready,false);
+  assert.equal(confirmationState(value,true).ready,true);assert.equal(confirmationState(value,true,true).ready,false);
  }
+});
+test('acknowledgment must be an explicit boolean',()=>{
+ for(const value of [null,undefined,0,1,'true',{}])assert.equal(confirmationState(one,value).ready,false);
 });

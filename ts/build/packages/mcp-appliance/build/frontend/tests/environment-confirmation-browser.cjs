@@ -45,19 +45,15 @@ const server=http.createServer(async(req,res)=>{
  const row=table.locator('tbody tr').filter({hasText:stage});
  await row.getByRole('button',{name:'Delete',exact:true}).click();
  const modal=page.getByRole('dialog'),button=modal.getByRole('button',{name:'Confirm delete',exact:true});
- const field=modal.getByRole('textbox',{name:'Deletion confirmation',exact:true});
  const ack=modal.getByRole('checkbox',{name:/I have reviewed/});
  const feedback=modal.locator('#env-confirm-status');
  assert.deepEqual(await modal.getByRole('list',{name:'Selected targets'}).locator('li').allTextContents(),[stage]);
- assert.equal(await modal.getByTestId('delete-confirmation-phrase').textContent(),'DELETE '+stage);
+ assert.equal(await modal.getByRole('textbox').count(),0);
+ assert.equal(await modal.getByRole('checkbox').count(),1);
  assert(await button.isDisabled());assert.match(await feedback.textContent(),/review box/);
- await field.fill('DELETE '+stage);assert(await button.isDisabled());assert.match(await feedback.textContent(),/review box/);
  // A programmatic click still must not bypass confirmation.
  await button.evaluate(node=>node.dispatchEvent(new MouseEvent('click',{bubbles:true})));assert.equal(actions.length,0);
  await ack.check();assert(await button.isEnabled());
- await field.fill('DELETE '+stage+'x');assert(await button.isDisabled());assert.equal(await field.getAttribute('aria-invalid'),'true');
- assert.match(await feedback.textContent(),/does not match/);
- await field.fill('  delete   '+stage+'  ');assert(await button.isEnabled());assert.equal(await field.getAttribute('aria-invalid'),'false');
  assert.match(await feedback.textContent(),/now enabled/);
  await ack.uncheck();assert(await button.isDisabled());await ack.check();assert(await button.isEnabled());
  for(const [width,height] of [[1440,1000],[844,390],[390,844]]){
@@ -68,17 +64,17 @@ const server=http.createServer(async(req,res)=>{
  await page.setViewportSize({width:1440,height:1000});await button.click();
  await page.getByText('Finished 1 of 1 environment operations.',{exact:true}).waitFor({timeout:12000});
  assert.equal(actions.length,1);assert.equal(actions[0].confirmation,'DELETE '+stage);
- // Bulk state uses the displayed item count and emits exact per-target confirmations.
+ // Bulk review lists the exact targets and emits canonical per-target confirmations.
  await page.getByRole('checkbox',{name:'Select staging '+stage,exact:true}).check();
  await page.getByRole('checkbox',{name:'Select staging '+extra,exact:true}).check();
  await page.getByRole('button',{name:'Delete selected staging (2)',exact:true}).click();
- assert.equal(await modal.getByTestId('delete-confirmation-phrase').textContent(),'DELETE 2 ITEMS');assert.equal(await field.inputValue(),'');
- assert(!(await ack.isChecked()));await ack.check();await field.fill('DELETE 3 ITEMS');assert(await button.isDisabled());
- await field.fill(' delete  2  items ');assert(await button.isEnabled());await button.click();
+ assert.equal(await modal.getByRole('textbox').count(),0);
+ assert.deepEqual(await modal.getByRole('list',{name:'Selected targets'}).locator('code').allTextContents(),[stage,extra]);
+ assert(!(await ack.isChecked()));assert(await button.isDisabled());await ack.check();assert(await button.isEnabled());await button.click();
  await page.getByText('Finished 2 of 2 environment operations.',{exact:true}).waitFor({timeout:15000});assert.equal(actions.length,3);
  assert.deepEqual(actions.slice(1).map(x=>x.confirmation),['DELETE '+stage,'DELETE '+extra]);
- // While an inventory refresh fails, a completed challenge remains blocked with an explanation.
- await row.getByRole('button',{name:'Delete',exact:true}).click();await ack.check();await field.fill('DELETE '+stage);assert(await button.isEnabled());
+ // While an inventory refresh fails, an acknowledged review remains blocked with an explanation.
+ await row.getByRole('button',{name:'Delete',exact:true}).click();await ack.check();assert(await button.isEnabled());
  inventoryError=true;
  await page.getByRole('button',{name:'Refresh',exact:true}).evaluate(node=>node.click());
  await page.getByRole('alert').filter({hasText:'Showing the last inventory'}).waitFor();
@@ -89,7 +85,7 @@ const server=http.createServer(async(req,res)=>{
  const update=modal.getByRole('button',{name:'Confirm update',exact:true});assert(await update.isDisabled());
  await ack.check();assert(await update.isEnabled());await modal.getByRole('button',{name:'Cancel',exact:true}).click();
  assert.equal(actions.length,3);assert.deepEqual(errors,[]);
- const report={fixture_only:true,no_live_deletions:true,acknowledgment_required:true,exact_target_required:true,spacing_and_action_case:true,bulk_count_exact:true,visible_feedback:true,programmatic_click_guard:true,stale_inventory_guard:true,update_unchanged:true,viewports:[1440,844,390],page_errors:errors};
+ const report={fixture_only:true,no_live_deletions:true,acknowledgment_required:true,single_acknowledgment:true,no_typed_phrase:true,exact_backend_targets:true,visible_feedback:true,programmatic_click_guard:true,stale_inventory_guard:true,update_unchanged:true,viewports:[1440,844,390],page_errors:errors};
  fs.writeFileSync(path.join(out,'confirmation-browser-report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

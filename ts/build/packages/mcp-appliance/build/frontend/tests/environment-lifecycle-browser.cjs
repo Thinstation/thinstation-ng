@@ -62,9 +62,10 @@ const server=http.createServer(async(req,res)=>{
   await page.getByRole('checkbox',{name:'Select staging '+stage,exact:true}).check();
   await page.getByRole('button',{name:'Delete selected staging (1)',exact:true}).click();
   let dialog=page.getByRole('dialog');assert(await dialog.isVisible());
-  await dialog.getByRole('checkbox').check();assert(await dialog.getByRole('button',{name:'Confirm delete',exact:true}).isDisabled());
-  await dialog.getByRole('textbox').fill('wrong');assert(await dialog.getByRole('button',{name:'Confirm delete',exact:true}).isDisabled());
-  await dialog.getByRole('textbox').fill('DELETE '+stage);assert(await dialog.getByRole('button',{name:'Confirm delete',exact:true}).isEnabled());
+  assert.equal(await dialog.getByRole('textbox').count(),0);
+  assert.equal(await dialog.getByRole('checkbox').count(),1);
+  assert(await dialog.getByRole('button',{name:'Confirm delete',exact:true}).isDisabled());
+  await dialog.getByRole('checkbox').check();assert(await dialog.getByRole('button',{name:'Confirm delete',exact:true}).isEnabled());
   assert.equal(actions.length,0);
   await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'delete-review-mobile.png'),fullPage:true});await page.setViewportSize({width:1440,height:1000});
   await dialog.getByRole('button',{name:'Confirm delete',exact:true}).click();
@@ -90,7 +91,7 @@ const server=http.createServer(async(req,res)=>{
   await page.reload();await table.waitFor();assert.equal(await table.getByText('Up to date',{exact:true}).count(),2);assert.equal(await table.getByText('Check failed',{exact:true}).count(),1);
   await page.screenshot({path:path.join(output,'verified-statuses.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  const result={fixture_only:true,typed_delete:true,staging_cleanup:true,busy_stage_blocked:true,missing_manager_deletable:true,naming_wizard:true,creation_review:true,checks_continue_after_failure:true,status_persists_after_reload:true,page_errors:errors};
+  const result={fixture_only:true,single_acknowledgment_delete:true,staging_cleanup:true,busy_stage_blocked:true,missing_manager_deletable:true,naming_wizard:true,creation_review:true,checks_continue_after_failure:true,status_persists_after_reload:true,page_errors:errors};
   fs.writeFileSync(path.join(output,'lifecycle-browser-report.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

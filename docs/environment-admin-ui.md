@@ -101,3 +101,13 @@ review box; a trailing space or lowercase action silently kept it disabled. This
 is a confirmed usability defect, not evidence of an always-disabled Svelte binding.
 Dedicated local-fixture tests cover single/bulk confirmation, mismatch feedback,
 acknowledgment, whitespace, stale state, disabled-button events and narrow viewports.
+
+## Single acknowledgment (review follow-up)
+
+Deletion now requires only the review checkbox followed by the final Delete button,
+for both individual and bulk operations. The typed phrase field has been removed.
+This supersedes the earlier dual-checkbox-and-phrase confirmation description.
+Selected targets and warnings remain visible, and acknowledgment resets when a
+new operation is opened. In-flight and stale-inventory guards remain unchanged.
+The request still carries canonical per-target confirmation and directory tokens
+for backend validation; no authentication or worker safety check has changed.
