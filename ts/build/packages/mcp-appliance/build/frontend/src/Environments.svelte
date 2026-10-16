@@ -2,6 +2,7 @@
   import {onMount} from 'svelte';
   import {api,json} from './lib/api.js';
   import CreateEnvironment from './CreateEnvironment.svelte';
+  import {confirmationState} from './lib/environment-confirmation.js';
   import {activeStates,terminalStates,actionLabels,splitInventory,actionState,updateState,
           filterRows,chooseTargets,toggleVisible,timeLabel,stageLabel} from './lib/environment-state.js';
   import './operator.css';
@@ -26,7 +27,8 @@
   $: selectedDelete=chooseTargets(inventory.installed,selected,'delete');
   $: stageDelete=chooseTargets(inventory.staging,stageSelected,'delete');
   $: visibleStages=staging.filter(row=>actionState(row,'delete').enabled);
-  $: deleteExpected=confirmation?.action==='delete'?(confirmation.rows.length===1?'DELETE '+confirmation.rows[0].name:'DELETE '+confirmation.rows.length+' ITEMS'):'';
+  $: confirmationGate=confirmationState(confirmation,acknowledged,deletePhrase,disabled);
+  $: deleteExpected=confirmationGate.expected;
   $: allCheck=inventory.installed.filter(row=>actionState(row,'check').enabled);
   $: sourcesDirty=fedoraUrl!==sourceBase.fedora_url||updatesUrl!==sourceBase.updates_url;
   $: disabled=loading||!!loadError||queueRunning||submitting||!!creator;
@@ -88,6 +90,11 @@
     if(disabled||!rows.length)return;
     if(action==='check'){runQueue(action,rows);return;}
     confirmation={action,rows:[...rows]};acknowledged=false;deletePhrase='';
+  }
+  async function confirmOperation() {
+    if(!confirmationState(confirmation,acknowledged,deletePhrase,disabled).ready)return;
+    const {action,rows}=confirmation;
+    await runQueue(action,rows);
   }
   async function runQueue(action,rows) {
     pending=rows.map(row=>({name:row.name,action,...(action==='delete'?{delete_token:row.delete_token,confirmation:'DELETE '+row.name}:{})}));
@@ -218,6 +225,28 @@
 </div>
 
 {#if menu}<div class="env-menu" use:focusMenu role="group" aria-label={'Actions for '+menu.row.name} style:left={menu.left+'px'} style:top={menu.top+'px'}><button on:click={()=>{expanded=menu.row.name;closeMenu(true);}}>View details</button>{#each ['check','update','rebuild'] as action}{@const permission=actionState(menu.row,action)}<button disabled={disabled||!permission.enabled} title={permission.reason} on:click={()=>propose(action,[menu.row])}>{actionLabels[action]}</button>{/each}<hr/><button class="danger" title={menu.row.delete_reason} disabled={disabled||!actionState(menu.row,'delete').enabled} on:click={()=>propose('delete',[menu.row])}>Delete</button><small>Active mounts or processes block deletion. Redeploy requires a stored definition.</small></div>{/if}
-{#if confirmation}<div class="modal-backdrop"><div class="panel modal env-confirm" role="dialog" aria-modal="true" aria-labelledby="env-confirm-title" tabindex="-1" bind:this={dialog} use:focusDialog><div class="panel-head"><h2 id="env-confirm-title">{actionLabels[confirmation.action]} {confirmation.rows.length} environment{confirmation.rows.length===1?'':'s'}?</h2></div><div class="panel-body"><p>{confirmation.action==='delete'?'Permanently removes only these selected root directories, including packages and local files inside them. Stored definitions are archived. External paths are not deleted. Mounted or active roots are refused.':confirmation.action==='rebuild'?'Redeploy recreates each environment from its stored definition. Local customizations may be lost. Workers must pass their existing checks before replacing an environment.':'Package updates modify each selected environment and may affect tools used by active workloads.'}</p><ul>{#each confirmation.rows as row}<li>{row.title||row.name} <code>{row.title!==row.name?row.name:''}</code></li>{/each}</ul><p class="env-caption">Operations are submitted one at a time. Keep this page open; a failed job stops the remaining queue.</p><label><input type="checkbox" bind:checked={acknowledged}/><span>I have reviewed these targets and the effect of this operation.</span></label>{#if confirmation.action==='delete'}<label class="field"><span>Type {deleteExpected} to confirm</span><input bind:value={deletePhrase} autocomplete="off" spellcheck="false"/></label>{/if}</div><div class="modal-actions"><button class="btn" on:click={cancelConfirmation}>Cancel</button><span class="spacer"></span><button class="btn primary" disabled={!acknowledged||(confirmation.action==='delete'&&deletePhrase!==deleteExpected)} on:click={()=>runQueue(confirmation.action,confirmation.rows)}>Confirm {actionLabels[confirmation.action].toLowerCase()}</button></div></div></div>{/if}
+{#if confirmation}
+  <div class="modal-backdrop">
+    <div class="panel modal env-confirm" role="dialog" aria-modal="true" aria-labelledby="env-confirm-title" tabindex="-1" bind:this={dialog} use:focusDialog>
+      <div class="panel-head"><h2 id="env-confirm-title">{actionLabels[confirmation.action]} {confirmation.rows.length} environment{confirmation.rows.length===1?'':'s'}?</h2></div>
+      <div class="panel-body">
+        <p>{confirmation.action==='delete'?'Permanently removes only these selected root directories, including packages and local files inside them. Stored definitions are archived. External paths are not deleted. Mounted or active roots are refused.':confirmation.action==='rebuild'?'Redeploy recreates each environment from its stored definition. Local customizations may be lost. Workers must pass their existing checks before replacing an environment.':'Package updates modify each selected environment and may affect tools used by active workloads.'}</p>
+        <ul aria-label="Selected targets">{#each confirmation.rows as row}<li>{#if row.title&&row.title!==row.name}{row.title} {/if}<code>{row.name}</code></li>{/each}</ul>
+        <p class="env-caption">Operations are submitted one at a time. Keep this page open; a failed job stops the remaining queue.</p>
+        <label for="env-confirm-reviewed" class="env-confirm-review"><input id="env-confirm-reviewed" type="checkbox" bind:checked={acknowledged}/><span>I have reviewed these targets and the effect of this operation.</span></label>
+        {#if confirmation.action==='delete'}
+          <div class="env-delete-challenge">
+            <p id="env-delete-instruction">Type or paste this entire confirmation phrase:</p>
+            <code class="env-confirm-phrase" data-testid="delete-confirmation-phrase">{deleteExpected}</code>
+            <label class="field" for="env-delete-phrase"><span>Deletion confirmation</span><input id="env-delete-phrase" type="text" bind:value={deletePhrase} autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="env-delete-help env-confirm-status" aria-invalid={deletePhrase.length>0&&!confirmationGate.phraseMatches}/></label>
+            <p id="env-delete-help" class="env-caption">Include DELETE and the name or item count. Extra space at either end and capitalization of DELETE or ITEMS are ignored. Environment names must still match exactly.</p>
+          </div>
+        {/if}
+        <p id="env-confirm-status" class="env-confirm-status" class:good={confirmationGate.ready} role="status" aria-live="polite">{confirmationGate.message}</p>
+      </div>
+      <div class="modal-actions"><button class="btn" on:click={cancelConfirmation}>Cancel</button><span class="spacer"></span><button class="btn" class:danger={confirmation.action==='delete'} class:primary={confirmation.action!=='delete'} disabled={!confirmationGate.ready} aria-describedby="env-confirm-status" on:click={confirmOperation}>Confirm {actionLabels[confirmation.action].toLowerCase()}</button></div>
+    </div>
+  </div>
+{/if}
 
 {#if creator}<CreateEnvironment profile={creator} existing={inventory.installed.map(row=>row.name)} onClose={()=>creator=null} onCreated={created}/>{/if}

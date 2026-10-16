@@ -85,3 +85,19 @@ Check-all continues after individual failures; mutating batches stop after a fai
 The creation wizard, typed deletion, staging selection and status persistence are
 covered by a local-only HTTP browser fixture. Destructive worker guards and package
 commands are tested with mocks; no existing appliance root is deleted in these tests.
+
+## Delete-confirmation feedback
+
+The dialog displays the complete phrase in a selectable block, lists each target
+once, and explains exactly which requirement is missing. Both review acknowledgment
+and the phrase are still required. Outer whitespace and action-word capitalization
+are normalized in the UI; target names and bulk counts remain exact. The API still
+receives the canonical per-target `DELETE <name>` confirmation and identity token.
+The click handler repeats the same validation used to enable the button, and stale
+inventory or pending submissions block confirmation. No backend deletion rules changed.
+
+The old UI was reproduced enabling the button only with exact text and the checked
+review box; a trailing space or lowercase action silently kept it disabled. This
+is a confirmed usability defect, not evidence of an always-disabled Svelte binding.
+Dedicated local-fixture tests cover single/bulk confirmation, mismatch feedback,
+acknowledgment, whitespace, stale state, disabled-button events and narrow viewports.
