@@ -91,6 +91,7 @@ class H(legacy['H']):
             elif path=='/api/operator/certificates/validate':self.js(200,certificates.validate(body))
             elif path=='/api/operator/certificates/action':self.js(202,certificates.action(body))
             elif path=='/api/operator/environments/sources/save':self.js(200,environments.save_sources(body))
+            elif path=='/api/operator/environments/plan':self.js(200,environments.plan_create(body))
             elif path=='/api/operator/environments/start':self.js(202,environments.start(body,self.user['username']))
             elif path=='/api/operator/storage/plan':self.js(200,storage.prepare(body,self.user['username']))
             elif path=='/api/operator/storage/apply':self.js(202,storage.apply(body,self.user['username']))

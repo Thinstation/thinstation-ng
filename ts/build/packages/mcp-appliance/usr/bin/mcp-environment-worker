@@ -1,62 +1,11 @@
 #!/usr/bin/python3
-import json,re,subprocess,sys,time,os
-from urllib.parse import urlsplit
+"""Execute one validated persistent environment job."""
+import sys
 from pathlib import Path
-S=Path('/var/prstnt/mcp-appliance/state/environments')
-R=Path('/var/prstnt/mcp-appliance/chroots')
-def run(i):
- if not re.fullmatch('[a-f0-9]{32}',i):return 2
- p=S/(i+'.json');d=json.loads(p.read_text());root=R/d['name']
- def save(**kw):
-  d.update(kw);t=p.with_suffix('.tmp');t.write_text(json.dumps(d));t.replace(p)
- if root.is_symlink() or (not root.is_dir() and d['action']!='rebuild'):save(state='failed',error='Missing or unsafe environment');return 1
- if d['action']=='rebuild':
-  manifest=Path('/var/prstnt/mcp-appliance/config/environment-manifests')/(d['name']+'.json')
-  try: release=str(json.loads(manifest.read_text()).get('release','44'))
-  except (OSError,ValueError):save(state='failed',error='Missing or invalid manifest');return 1
- else:
-  osrelease=(root/'etc/os-release').read_text()
-  release=next((v.split('=',1)[1].strip('"') for v in osrelease.splitlines() if v.startswith('VERSION_ID=')),'')
- if not (re.fullmatch('[0-9]{1,3}',release) or re.fullmatch('[0-9]{2}\\.[0-9]{2}',release)):save(state='failed');return 1
- manager='apt' if (root/'usr/bin/apt-get').exists() or (d['action']=='rebuild' and release.count('.')==1) else 'dnf'
- args=({'check':['-s','upgrade'],'update':['update'],'rebuild':[]} if manager=='apt' else {'check':['check-upgrade'],'update':['upgrade'],'rebuild':[]}).get(d['action'])
- if args is None:save(state='failed');return 1
- opts=[]
- try: override=json.loads(Path('/var/prstnt/mcp-appliance/config/package-sources.json').read_text())
- except (OSError,ValueError): override={}
- try: lines=Path('/etc/thinstation.defaults').read_text().splitlines()
- except OSError: lines=[]
- for key,repo in ([] if manager=='apt' else [('MCP_PACKAGE_FEDORA_URL','fedora'),('MCP_PACKAGE_UPDATES_URL','updates')]):
-  raw=next((line.partition('=')[2].strip().strip('"') for line in lines if line.startswith(key+'=')),'')
-  raw=override.get('fedora_url' if repo=='fedora' else 'updates_url',raw)
-  if not raw:continue
-  parsed=urlsplit(raw)
-  if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:
-   save(state='failed',error='Invalid repository override');return 1
-  url=raw.replace('$releasever',release).replace('$basearch','x86_64')
-  opts.extend(['--setopt='+repo+'.metalink=','--setopt='+repo+'.mirrorlist=','--setopt='+repo+'.baseurl='+url])
- save(state='running',progress=5,package_source='Ubuntu APT' if manager=='apt' else ('configured mirror' if opts else 'Fedora upstream'))
- with (S/(i+'.log')).open('w') as log:
-  cmd=(['/usr/bin/chroot',str(root),'/usr/bin/apt-get','-y']+args if manager=='apt' else ['/usr/bin/dnf','--installroot='+str(root),'--releasever='+release,'-y']+opts+args)
-  log.write('Source: '+('Ubuntu APT configuration' if manager=='apt' else ('configured mirror' if opts else 'Fedora upstream'))+'\n');log.flush()
-  if d['action']=='rebuild':
-   from mcp_environment_rebuild import rebuild
-   try:
-    previous=rebuild(d['name'],i,log,opts)
-    save(state='completed',progress=100,exit_code=0,previous_environment=previous)
-    return 0
-   except Exception as exc:
-    log.write('Rebuild failed: '+str(exc)+'\n')
-    save(state='failed',error=str(exc),exit_code=1)
-    return 1
-  if manager=='apt' and d['action']=='update':
-   refresh=subprocess.run(['/usr/bin/chroot',str(root),'/usr/bin/apt-get','update'],stdout=log,stderr=subprocess.STDOUT)
-   if refresh.returncode:save(state='failed',exit_code=refresh.returncode,error='APT index refresh failed');return 1
-  proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT)
-  while proc.poll() is None:
-   save(progress=10);time.sleep(2)
-  rc=proc.wait()
- good=rc==0 or (manager=='dnf' and d['action']=='check' and rc==100)
- save(state='completed' if good else 'failed',progress=100 if good else 0,exit_code=rc,updates_available=(rc==100 if d['action']=='check' and manager=='dnf' else None))
- return 0 if good else 1
-if __name__=='__main__':sys.exit(run(sys.argv[1]) if len(sys.argv)==2 else 2)
+from mcp_environment_actions import run_job
+
+if __name__ == '__main__':
+    sys.exit(run_job(sys.argv[1], Path('/var/prstnt/mcp-appliance/chroots'),
+                     Path('/var/prstnt/mcp-appliance/state/environments'),
+                     Path('/var/prstnt/mcp-appliance/config/environment-manifests'))
+             if len(sys.argv) == 2 else 2)
