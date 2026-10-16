@@ -42,3 +42,9 @@ test('untracked stage is not falsely reported as failed',()=>{
  assert.equal(stageLabel({name:'.stage-abc'}),'Staging / untracked');
  assert.equal(stageLabel({name:'.previous-abc'}),'Retained previous');
 });
+
+test('deletion requires explicit capability and target identity',()=>{assert(!actionState({...row,delete_available:true},'delete').enabled);assert(actionState({...row,delete_available:true,delete_token:'a'.repeat(64)},'delete').enabled);});
+test('old update result asks for a fresh check',()=>assert.equal(updateState({...row,operation_state:'completed',operation_action:'update'}).label,'Updated; check required'));
+test('failed checks remain visible after reload',()=>assert.equal(updateState({...row,check_state:'failed',operation_state:'failed',operation_action:'check'}).label,'Check failed'));
+test('counts and held packages are visible',()=>{assert.equal(updateState({...row,updates_available:true,update_count:2}).label,'2 updates available');assert.equal(updateState({...row,updates_available:true,update_count:0,held_count:2}).label,'Held packages remain');});
+test('staging deletion requires a managed internal name',()=>{assert(actionState({name:'.stage-'+ 'b'.repeat(32),delete_available:true,delete_token:'a'.repeat(64)},'delete').enabled);assert(!actionState({name:'.cache',delete_available:true,delete_token:'a'.repeat(64)},'delete').enabled);});

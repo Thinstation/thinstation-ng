@@ -62,18 +62,23 @@ def assert_inactive(target):
             try: linked=(proc/entry).resolve(strict=True)
             except (OSError,RuntimeError):continue
             if beneath(linked):raise RuntimeError('Environment is referenced by a running process')
-def rebuild(name, ident, log, options):
+def rebuild(name, ident, log, options, create_only=False):
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,62}',name):raise ValueError('Bad environment name')
     if not re.fullmatch(r'[a-f0-9]{32}',ident):raise ValueError('Invalid rebuild job identifier')
     file=MANIFEST/(name+'.json')
     data=json.loads(file.read_text())
     pkgs=data.get('packages')
-    if not isinstance(pkgs,list) or not pkgs or len(pkgs)>200 or any(not isinstance(p,str) or not re.fullmatch(r'[A-Za-z0-9_+.-]{1,100}',p) for p in pkgs):
+    if not isinstance(pkgs,list) or not pkgs or len(pkgs)>200 or any(not isinstance(p,str) or not re.fullmatch(r'[A-Za-z0-9_+][A-Za-z0-9_+.-]{0,99}',p) for p in pkgs):
         raise ValueError('Manifest must contain a validated package list')
     base=str(data.get('base','fedora')).lower()
     release=str(data.get('release','44'))
     source=resolve_source(base,release,data.get('source'))
     family=source['family']
+    components=data.get('components') or source.get('components','main')
+    if not isinstance(components,str) or not components.split() or any(c not in ('main','restricted','universe','multiverse') for c in components.split()):
+        raise ValueError('Unsupported repository component selection')
+    if create_only and ((ROOT/name).exists() or (ROOT/name).is_symlink()):
+        raise ValueError('Creation target already exists')
     if family=='apt' and not Path('/usr/bin/debootstrap').exists():
         raise ValueError('Debian-family provisioning requires debootstrap')
     stage=ROOT/('.stage-'+ident)
@@ -81,6 +86,8 @@ def rebuild(name, ident, log, options):
     target=ROOT/name
     if stage.exists() or old.exists() or target.is_symlink():raise ValueError('Unsafe environment path')
     if not ROOT.is_dir() or ROOT.is_symlink():raise ValueError('Unsafe environment root')
+    if create_only:
+        from mcp_environment_actions import rename_new
     stage.mkdir(mode=0o700)
     mounts=[]
     def mount_runtime():
@@ -131,6 +138,7 @@ def rebuild(name, ident, log, options):
                     errors.append('Missing trusted archive keyring: '+str(keyring))
                     continue
                 if any(stage.iterdir()):
+                    assert_inactive(stage)
                     shutil.rmtree(stage)
                     stage.mkdir(mode=0o700)
                 cmd=['/usr/bin/debootstrap','--arch=amd64','--variant=minbase','--keyring='+str(keyring),
@@ -165,7 +173,7 @@ def rebuild(name, ident, log, options):
                             with bundle.open('ab') as dst:
                                 dst.write(bytes([10])+cert+bytes([10]))
                     sources=stage/'etc/apt/sources.list'
-                    sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+source.get('components','main')+'\n')
+                    sources.write_text('deb [signed-by=/usr/share/keyrings/'+keyring.name+'] '+mirror['url']+' '+source['suite']+' '+components+'\n')
                     mount_runtime()
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','update'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=3600)
                     subprocess.run(['/usr/bin/chroot',str(stage),'/usr/bin/apt-get','-y','install']+pkgs,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=7200)
@@ -243,6 +251,10 @@ def rebuild(name, ident, log, options):
         stop_staged_gpg_agents()
         unmount_runtime()
         assert_inactive(target)
+        if create_only:
+            rename_new(stage,target)
+            log.write('New environment activated without replacing an existing root.\n');log.flush()
+            return None
         had_target=target.is_dir()
         if had_target:os.rename(target,old)
         try:os.rename(stage,target)
@@ -255,5 +267,8 @@ def rebuild(name, ident, log, options):
     finally:
         stop_staged_gpg_agents()
         unmount_runtime()
-        if stage.exists():shutil.rmtree(stage)
+        if stage.exists():
+            # Cleanup is allowed only after mounts and process references are gone.
+            assert_inactive(stage)
+            shutil.rmtree(stage)
 if __name__=='__main__':sys.exit(2)

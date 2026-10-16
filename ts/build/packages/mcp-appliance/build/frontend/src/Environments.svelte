@@ -1,13 +1,15 @@
 <script>
   import {onMount} from 'svelte';
   import {api,json} from './lib/api.js';
+  import CreateEnvironment from './CreateEnvironment.svelte';
   import {activeStates,terminalStates,actionLabels,splitInventory,actionState,updateState,
           filterRows,chooseTargets,toggleVisible,timeLabel,stageLabel} from './lib/environment-state.js';
   import './operator.css';
   import './environments.css';
 
   let data=null,loading=false,loadError='',error='',notice='',tab='installed';
-  let installedQuery='',catalogQuery='',stagingQuery='',selected=[],expanded='';
+  let installedQuery='',catalogQuery='',stagingQuery='',selected=[],stageSelected=[],expanded='';
+  let creator=null,deletePhrase='',queueFailures=[];
   let menu=null,menuTrigger=null,confirmation=null,acknowledged=false,dialog;
   let job=null,logError='',polling=false,disposed=false;
   let pending=[],queueJob=null,queueRunning=false,submitting=false,total=0,completed=0;
@@ -16,14 +18,18 @@
   $: installed=filterRows(inventory.installed,installedQuery);
   $: catalog=filterRows(data?.catalog||[],catalogQuery,['id','title','description']);
   $: staging=filterRows(inventory.staging,stagingQuery,['name','environment','kind','state']);
-  $: visibleSelectable=installed.filter(row=>actionState(row,'check').enabled||actionState(row,'rebuild').enabled);
+  $: visibleSelectable=installed.filter(row=>actionState(row,'check').enabled||actionState(row,'rebuild').enabled||actionState(row,'delete').enabled);
   $: allVisible=visibleSelectable.length>0&&visibleSelectable.every(row=>selected.includes(row.name));
   $: someVisible=visibleSelectable.some(row=>selected.includes(row.name));
   $: selectedUpdate=chooseTargets(inventory.installed,selected,'update');
   $: selectedRebuild=chooseTargets(inventory.installed,selected,'rebuild');
+  $: selectedDelete=chooseTargets(inventory.installed,selected,'delete');
+  $: stageDelete=chooseTargets(inventory.staging,stageSelected,'delete');
+  $: visibleStages=staging.filter(row=>actionState(row,'delete').enabled);
+  $: deleteExpected=confirmation?.action==='delete'?(confirmation.rows.length===1?'DELETE '+confirmation.rows[0].name:'DELETE '+confirmation.rows.length+' ITEMS'):'';
   $: allCheck=inventory.installed.filter(row=>actionState(row,'check').enabled);
   $: sourcesDirty=fedoraUrl!==sourceBase.fedora_url||updatesUrl!==sourceBase.updates_url;
-  $: disabled=loading||!!loadError||queueRunning||submitting;
+  $: disabled=loading||!!loadError||queueRunning||submitting||!!creator;
   $: jobs=data?.jobs||[];
   $: tabs=[['installed','Installed',inventory.installed.length],['catalog','Catalog',data?.catalog?.length||0],
            ['staging','Staging & recovery',inventory.staging.length],['operations','Operations',jobs.length],['settings','Settings',null]];
@@ -42,6 +48,7 @@
       data=next;loadError='';
       const names=new Set(splitInventory(next).installed.map(row=>row.name));
       selected=selected.filter(name=>names.has(name));
+      const stages=new Set(splitInventory(next).staging.map(row=>row.name));stageSelected=stageSelected.filter(name=>stages.has(name));
     } catch(e) {loadError=e.message;} finally {loading=false;}
   }
   function chooseTab(value) {tab=value;closeMenu();expanded='';}
@@ -80,16 +87,17 @@
     closeMenu();error='';notice='';
     if(disabled||!rows.length)return;
     if(action==='check'){runQueue(action,rows);return;}
-    confirmation={action,rows:[...rows]};acknowledged=false;
+    confirmation={action,rows:[...rows]};acknowledged=false;deletePhrase='';
   }
   async function runQueue(action,rows) {
-    pending=rows.map(row=>({name:row.name,action}));
+    pending=rows.map(row=>({name:row.name,action,...(action==='delete'?{delete_token:row.delete_token,confirmation:'DELETE '+row.name}:{})}));
+    queueFailures=[];
     total=pending.length;completed=0;queueRunning=true;confirmation=null;error='';
     await submitNext();
   }
   async function submitNext() {
     if(disposed||submitting||queueJob)return;
-    if(!pending.length){queueRunning=false;notice=`Finished ${completed} of ${total} environment operations.`;return;}
+    if(!pending.length){queueRunning=false;notice=`Finished ${completed} of ${total} environment operations.${queueFailures.length?' '+queueFailures.length+' failed; see Operations.':''}`;return;}
     const next=pending[0];pending=pending.slice(1);submitting=true;
     try {
       const result=await json('/api/operator/environments/start','POST',next);
@@ -98,8 +106,9 @@
       if(!disposed)await refresh();
     } catch(e) {
       error=`${next.name}: ${e.message} Remaining operations were not submitted.`;
-      pending=[];queueRunning=false;
+      if(next.action==='check'){completed++;queueFailures=[...queueFailures,next.name];}else{pending=[];queueRunning=false;}
     } finally {submitting=false;}
+    if(queueRunning&&!queueJob&&!disposed)await submitNext();
   }
   function stopQueue() {pending=[];notice='No further operations will be submitted. The current worker will finish.';}
   async function viewJob(id) {
@@ -119,17 +128,20 @@
         if(terminalStates.has(result.state)){
           completed++;queueJob=null;
           if(result.state==='failed'||['canceled','cancelled'].includes(result.state)){
-            pending=[];queueRunning=false;error=`${result.name}: ${result.error||'operation failed'}. Remaining operations were not submitted.`;
+            queueFailures=[...queueFailures,result.name];
+            if(result.action==='check'){notice=`Check failed for ${result.name}; checking remaining environments.`;}
+            else{pending=[];queueRunning=false;error=`${result.name}: ${result.error||'operation failed'}. Remaining operations were not submitted.`;}
           }
           await refresh();if(queueRunning&&!disposed)await submitNext();
         }
       } else if(job?.id&&activeStates.has(job.state)) {
         await viewJob(job.id);
         if(job&&!activeStates.has(job.state))await refresh();
-      }
+      } else if((data?.jobs||[]).some(row=>activeStates.has(row.state)))await refresh();
     } catch(e) {logError='Job status is unavailable; the queue is paused until status can be verified. '+e.message;}
     finally {polling=false;}
   }
+  async function created(value){creator=null;job=value;notice='Creation queued for '+value.name+'. Track it in Operations.';await refresh();}
   async function saveSources() {
     if(saving||!sourcesDirty)return;
     saving=true;error='';notice='';
@@ -143,7 +155,7 @@
 
 <svelte:window on:click={outside} on:keydown={keydown} on:resize={()=>closeMenu()}/>
 <div class="page operator-page environment-page">
-  <div class="page-title"><div><h1>Environments</h1><p>Manage persistent execution environments independently of the appliance OS.</p></div><button class="btn" on:click={refresh} disabled={loading}>{loading?'Refreshing...':'Refresh'}</button></div>
+  <div class="page-title"><div><h1>Environments</h1><p>Manage persistent execution environments independently of the appliance OS.</p></div><div class="actions"><button class="btn primary" disabled={disabled||!data?.capabilities?.install} on:click={()=>chooseTab('catalog')}>New environment</button><button class="btn" on:click={refresh} disabled={loading}>{loading?'Refreshing...':'Refresh'}</button></div></div>
   {#if loadError}<div class="notice warn" role="alert">Could not refresh environments. {loadError} {data?'Showing the last inventory; environment actions are disabled.':''}</div>{/if}
   {#if error}<div class="notice bad" role="alert">{error}</div>{/if}
   {#if notice}<div class="notice" role="status">{notice}</div>{/if}
@@ -158,14 +170,14 @@
         <div class="panel-head"><div class="env-panel-title"><h2>Installed environments</h2><p>{inventory.installed.length} environments. Internal staging and retained copies are listed separately.</p></div></div>
         <div class="env-toolbar">
           <label class="field"><span>Find an environment</span><input type="search" bind:value={installedQuery} placeholder="Name, profile or operating system"/></label>
-          <div class="actions"><button class="btn small" disabled={disabled||!allCheck.length} on:click={()=>propose('check',allCheck)}>Check all updates</button><button class="btn small primary" disabled={disabled||!selectedUpdate.length} on:click={()=>propose('update',selectedUpdate)}>Update selected{selectedUpdate.length?` (${selectedUpdate.length})`:''}</button><button class="btn small" disabled={disabled||!selectedRebuild.length} on:click={()=>propose('rebuild',selectedRebuild)}>Redeploy selected{selectedRebuild.length?` (${selectedRebuild.length})`:''}</button></div>
+          <div class="actions"><button class="btn small" disabled={disabled||!allCheck.length} on:click={()=>propose('check',allCheck)}>Check all updates</button><button class="btn small primary" disabled={disabled||!selectedUpdate.length} on:click={()=>propose('update',selectedUpdate)}>Update selected{selectedUpdate.length?` (${selectedUpdate.length})`:''}</button><button class="btn small" disabled={disabled||!selectedRebuild.length} on:click={()=>propose('rebuild',selectedRebuild)}>Redeploy selected{selectedRebuild.length?` (${selectedRebuild.length})`:''}</button><button class="btn small danger" disabled={disabled||!selectedDelete.length} on:click={()=>propose('delete',selectedDelete)}>Delete selected{selectedDelete.length?` (${selectedDelete.length})`:''}</button></div>
           <div class="env-selection"><span>{selected.length} selected</span>{#if selected.length}<button class="btn subtle small" on:click={()=>selected=[]}>Clear selection</button>{/if}</div>
         </div>
         <div class="table-wrap"><table class="table env-table" aria-label="Installed environments">
           <colgroup><col class="env-check-col"/><col class="env-name-col"/><col class="env-os-col"/><col class="env-status-col"/><col class="env-action-col"/></colgroup>
           <thead><tr><th class="env-check-col"><input type="checkbox" aria-label="Select all visible eligible environments" checked={allVisible} indeterminate={someVisible&&!allVisible} disabled={!visibleSelectable.length||disabled} on:change={event=>selected=toggleVisible(selected,visibleSelectable,event.currentTarget.checked)}/></th><th scope="col">Environment</th><th scope="col" class="env-os-cell">Operating system</th><th scope="col">Update status</th><th scope="col" class="env-action-col">Actions</th></tr></thead>
-          <tbody>{#each installed as env (env.name)}{@const status=updateState(env)}{@const selectable=actionState(env,'check').enabled||actionState(env,'rebuild').enabled}
-            <tr class:selected={selected.includes(env.name)}><td class="env-check-col"><input type="checkbox" aria-label={'Select '+env.name} checked={selected.includes(env.name)} disabled={disabled||!selectable} on:change={event=>toggle(env.name,event.currentTarget.checked)}/></td><td><button class="env-name" aria-expanded={expanded===env.name} on:click={()=>expanded=expanded===env.name?'':env.name}>{env.title||env.name}</button>{#if env.title&&env.title!==env.name}<span class="env-meta mono">{env.name}</span>{/if}<span class="env-meta">{env.description}</span><span class="env-mobile-meta">{env.os} / {env.package_manager==='none'?'No package manager':env.package_manager?.toUpperCase()}</span></td><td class="env-os-cell">{env.os}<span class="env-meta">{env.package_manager==='none'?'Package manager unavailable':env.package_manager?.toUpperCase()}</span></td><td><span class="pill" class:good={status.tone==='good'} class:warn={status.tone==='warn'} class:bad={status.tone==='bad'}>{status.label}</span><span class="env-meta">{env.last_checked?'Checked '+timeLabel(env.last_checked):'No completed check recorded'}</span></td><td class="env-action-col"><button class="btn small env-row-menu" aria-label={'Actions for '+env.name} aria-expanded={menu?.row.name===env.name} on:click={event=>openMenu(event,env)}>&#8942;</button></td></tr>
+          <tbody>{#each installed as env (env.name)}{@const status=updateState(env)}{@const selectable=actionState(env,'check').enabled||actionState(env,'rebuild').enabled||actionState(env,'delete').enabled}
+            <tr class:selected={selected.includes(env.name)}><td class="env-check-col"><input type="checkbox" aria-label={'Select '+env.name} checked={selected.includes(env.name)} disabled={disabled||!selectable} on:change={event=>toggle(env.name,event.currentTarget.checked)}/></td><td><button class="env-name" aria-expanded={expanded===env.name} on:click={()=>expanded=expanded===env.name?'':env.name}>{env.title||env.name}</button>{#if env.title&&env.title!==env.name}<span class="env-meta mono">{env.name}</span>{/if}<span class="env-meta">{env.description}</span><span class="env-mobile-meta">{env.os} / {env.package_manager==='none'?'No package manager':env.package_manager?.toUpperCase()}</span></td><td class="env-os-cell">{env.os}<span class="env-meta">{env.package_manager==='none'?'Package manager unavailable':env.package_manager?.toUpperCase()}</span></td><td><span class="pill" class:good={status.tone==='good'} class:warn={status.tone==='warn'} class:bad={status.tone==='bad'}>{status.label}</span><span class="env-meta">{env.last_checked?'Checked '+timeLabel(env.last_checked):env.last_check_attempt?'Attempted '+timeLabel(env.last_check_attempt):'No completed check recorded'}</span></td><td class="env-action-col"><button class="btn small env-row-menu" aria-label={'Actions for '+env.name} aria-expanded={menu?.row.name===env.name} on:click={event=>openMenu(event,env)}>&#8942;</button></td></tr>
             {#if expanded===env.name}<tr class="env-detail-row"><td colspan="5"><div class="env-detail"><h3>Environment details</h3><dl><dt>Environment ID</dt><dd class="mono">{env.name}</dd><dt>Root directory</dt><dd class="mono">{data.root}/{env.name}</dd><dt>Definition</dt><dd>{env.rebuild_available?'Stored definition available for redeployment.':'No validated stored definition is available.'}</dd><dt>Profile tools</dt><dd><div class="env-tools">{#each env.key_packages||[] as tool}<code>{tool}</code>{/each}{#if !env.key_packages?.length}Not recorded{/if}</div></dd><dt>Latest operation</dt><dd>{env.operation_action?actionLabels[env.operation_action]||env.operation_action:'None recorded'}{env.operation_state?' / '+env.operation_state:''}{#if env.latest_job} <button class="btn small" on:click={()=>viewJob(env.latest_job)}>View latest log</button>{/if}</dd></dl></div></td></tr>{/if}
           {/each}</tbody>
         </table></div>
@@ -175,16 +187,16 @@
         <div class="panel-head"><div class="env-panel-title"><h2>Environment catalog</h2><p>Available profiles, their intended tools and supported base systems.</p></div></div>
         <div class="env-toolbar"><label class="field"><span>Find a profile</span><input type="search" bind:value={catalogQuery} placeholder="Profile name or purpose"/></label><span class="env-caption">{catalog.length} of {data.catalog?.length||0} profiles</span></div>
         <div class="table-wrap"><table class="table env-table" aria-label="Environment catalog"><colgroup><col class="env-name-col"/><col class="env-os-col"/><col class="env-status-col"/></colgroup><thead><tr><th scope="col">Profile</th><th scope="col" class="env-os-cell">Supported bases</th><th scope="col">Availability</th></tr></thead><tbody>
-          {#each catalog as item (item.id)}<tr><td><button class="env-name" aria-expanded={expanded===item.id} on:click={()=>expanded=expanded===item.id?'':item.id}>{item.title}</button><span class="env-meta">{item.description}</span><span class="env-mobile-meta">{item.supported_bases?.join(' / ')}</span></td><td class="env-os-cell">{item.supported_bases?.join(' / ')||'Not specified'}</td><td><span class="pill" class:good={item.installed}>{item.installed?'Installed':'Available profile'}</span><span class="env-meta">Open the profile name for details.</span></td></tr>
-            {#if expanded===item.id}<tr class="env-detail-row"><td colspan="3"><div class="env-detail"><h3>{item.title}</h3><dl><dt>Profile ID</dt><dd class="mono">{item.id}</dd><dt>Intended tools</dt><dd><div class="env-tools">{#each item.key_packages||[] as tool}<code>{tool}</code>{/each}</div></dd><dt>Provisioning</dt><dd>This catalog describes profiles. Direct profile installation is not exposed by the current backend.</dd></dl></div></td></tr>{/if}
+          {#each catalog as item (item.id)}<tr><td><button class="env-name" aria-expanded={expanded===item.id} on:click={()=>expanded=expanded===item.id?'':item.id}>{item.title}</button><span class="env-meta">{item.description}</span><span class="env-mobile-meta">{item.supported_bases?.join(' / ')}</span></td><td class="env-os-cell">{item.supported_bases?.join(' / ')||'Not specified'}</td><td><span class="pill" class:good={item.installed}>{item.installed?'Installed':'Available profile'}</span><span class="env-meta">{item.install_note}</span><button class="btn small primary" disabled={disabled||!item.install_available} on:click={()=>creator=item}>Create</button></td></tr>
+            {#if expanded===item.id}<tr class="env-detail-row"><td colspan="3"><div class="env-detail"><h3>{item.title}</h3><dl><dt>Profile ID</dt><dd class="mono">{item.id}</dd><dt>Intended tools</dt><dd><div class="env-tools">{#each item.key_packages||[] as tool}<code>{tool}</code>{/each}</div></dd><dt>Provisioning</dt><dd>{item.install_note} Use Create to choose a name and base, then review the exact package recipe.</dd></dl></div></td></tr>{/if}
           {/each}
         </tbody></table></div>{#if !catalog.length}<div class="env-empty">No profiles match this search.</div>{/if}
         <div class="env-footer">Profile contents describe the definition, not a live verification that every listed tool is installed.</div>
       {:else if tab==='staging'}
         <div class="panel-head"><div class="env-panel-title"><h2>Staging &amp; recovery</h2><p>In-progress or leftover build directories and retained previous copies. These are not installed environments.</p></div></div>
-        <div class="env-toolbar"><label class="field"><span>Find a staging entry</span><input type="search" bind:value={stagingQuery} placeholder="Directory, environment or state"/></label><span class="env-caption">{staging.length} entries / inspection only</span></div>
-        <div class="table-wrap"><table class="table env-table" aria-label="Staging and recovery entries"><colgroup><col class="env-name-col"/><col class="env-status-col"/><col class="env-os-col"/><col class="env-action-col"/></colgroup><thead><tr><th scope="col">Directory</th><th scope="col">Purpose / state</th><th scope="col" class="env-os-cell">Last modified</th><th scope="col">Log</th></tr></thead><tbody>
-          {#each staging as row (row.name)}<tr><td><span class="mono">{row.name}</span>{#if row.environment}<span class="env-meta">For {row.environment}</span>{/if}<span class="env-mobile-meta">{timeLabel(row.modified_at)}</span></td><td><span class="pill" class:bad={row.state==='failed'}>{stageLabel(row)}</span><span class="env-meta">{row.state||'No matching job recorded'}</span></td><td class="env-os-cell">{timeLabel(row.modified_at)}</td><td>{#if row.latest_job}<button class="btn small" on:click={()=>viewJob(row.latest_job)}>View</button>{:else}<span class="env-caption">None</span>{/if}</td></tr>{/each}
+        <div class="env-toolbar"><label class="field"><span>Find a staging entry</span><input type="search" bind:value={stagingQuery} placeholder="Directory, environment or state"/></label><span class="env-caption">{staging.length} entries / {stageSelected.length} selected</span><button class="btn small danger" disabled={disabled||!stageDelete.length} on:click={()=>propose('delete',stageDelete)}>Delete selected staging{stageDelete.length?` (${stageDelete.length})`:''}</button></div>
+        <div class="table-wrap"><table class="table env-table" aria-label="Staging and recovery entries"><colgroup><col class="env-check-col"/><col class="env-name-col"/><col class="env-status-col"/><col class="env-os-col"/><col class="env-action-col"/></colgroup><thead><tr><th class="env-check-col"><input type="checkbox" aria-label="Select all eligible staging entries" disabled={disabled||!visibleStages.length} checked={visibleStages.length>0&&visibleStages.every(row=>stageSelected.includes(row.name))} on:change={event=>stageSelected=toggleVisible(stageSelected,visibleStages,event.currentTarget.checked)}/></th><th scope="col">Directory</th><th scope="col">Purpose / state</th><th scope="col" class="env-os-cell">Last modified</th><th scope="col">Actions</th></tr></thead><tbody>
+          {#each staging as row (row.name)}<tr><td class="env-check-col"><input type="checkbox" aria-label={'Select staging '+row.name} disabled={disabled||!actionState(row,'delete').enabled} checked={stageSelected.includes(row.name)} on:change={event=>stageSelected=toggleVisible(stageSelected,[row],event.currentTarget.checked)}/></td><td><span class="mono">{row.name}</span>{#if row.environment}<span class="env-meta">For {row.environment}</span>{/if}<span class="env-mobile-meta">{timeLabel(row.modified_at)}</span></td><td><span class="pill" class:bad={row.state==='failed'}>{stageLabel(row)}</span><span class="env-meta">{row.state||'No matching job recorded'}</span></td><td class="env-os-cell">{timeLabel(row.modified_at)}</td><td>{#if row.latest_job}<button class="btn small" on:click={()=>viewJob(row.latest_job)}>View</button>{/if}<button class="btn small danger" title={row.delete_reason} disabled={disabled||!actionState(row,'delete').enabled} on:click={()=>propose('delete',[row])}>Delete</button></td></tr>{/each}
         </tbody></table></div>{#if !staging.length}<div class="env-empty">{inventory.staging.length?'No entries match this search.':'No staging or retained recovery directories found.'}</div>{/if}
         <div class="env-footer">No automatic cleanup is performed. A directory may still be mounted or referenced by a running process.</div>
       {:else if tab==='operations'}
@@ -205,5 +217,7 @@
   {#if job||logError}<section class="panel env-job" aria-label="Operation log"><div class="panel-head"><div class="env-panel-title"><h2>Operation log</h2>{#if job}<p>{job.name} / {actionLabels[job.action]||job.action}</p>{/if}</div>{#if job}<span class="pill" class:bad={job.state==='failed'}>{job.state}</span><button class="btn small" disabled={polling} on:click={()=>viewJob(job.id)}>Refresh log</button><button class="btn subtle small" on:click={()=>{job=null;logError='';}}>Close log</button>{/if}</div><div class="panel-body">{#if logError}<div class="notice warn" role="alert">{logError}</div>{/if}{#if job}<div class="env-caption">Job {job.id} / {job.package_source||'Package source not recorded'}</div>{#if activeStates.has(job.state)}<progress aria-label="Worker-reported progress" max="100" value={Number(job.progress)||0}></progress>{/if}{#if job.error}<p class="env-log-error">{job.error}</p>{/if}<pre aria-label="Worker log output">{job.log_tail||'No output recorded yet.'}</pre>{/if}</div></section>{/if}
 </div>
 
-{#if menu}<div class="env-menu" use:focusMenu role="group" aria-label={'Actions for '+menu.row.name} style:left={menu.left+'px'} style:top={menu.top+'px'}><button on:click={()=>{expanded=menu.row.name;closeMenu(true);}}>View details</button>{#each ['check','update','rebuild'] as action}{@const permission=actionState(menu.row,action)}<button disabled={disabled||!permission.enabled} title={permission.reason} on:click={()=>propose(action,[menu.row])}>{actionLabels[action]}</button>{/each}<hr/><button class="danger" disabled>Delete (not available)</button><small>Deletion is not exposed by the current worker. Redeploy requires a stored definition.</small></div>{/if}
-{#if confirmation}<div class="modal-backdrop"><div class="panel modal env-confirm" role="dialog" aria-modal="true" aria-labelledby="env-confirm-title" tabindex="-1" bind:this={dialog} use:focusDialog><div class="panel-head"><h2 id="env-confirm-title">{actionLabels[confirmation.action]} {confirmation.rows.length} environment{confirmation.rows.length===1?'':'s'}?</h2></div><div class="panel-body"><p>{confirmation.action==='rebuild'?'Redeploy recreates each environment from its stored definition. Local customizations may be lost. Workers must pass their existing checks before replacing an environment.':'Package updates modify each selected environment and may affect tools used by active workloads.'}</p><ul>{#each confirmation.rows as row}<li>{row.title||row.name} <code>{row.title!==row.name?row.name:''}</code></li>{/each}</ul><p class="env-caption">Operations are submitted one at a time. Keep this page open; a failed job stops the remaining queue.</p><label><input type="checkbox" bind:checked={acknowledged}/><span>I have reviewed these targets and the effect of this operation.</span></label></div><div class="modal-actions"><button class="btn" on:click={cancelConfirmation}>Cancel</button><span class="spacer"></span><button class="btn primary" disabled={!acknowledged} on:click={()=>runQueue(confirmation.action,confirmation.rows)}>Confirm {actionLabels[confirmation.action].toLowerCase()}</button></div></div></div>{/if}
+{#if menu}<div class="env-menu" use:focusMenu role="group" aria-label={'Actions for '+menu.row.name} style:left={menu.left+'px'} style:top={menu.top+'px'}><button on:click={()=>{expanded=menu.row.name;closeMenu(true);}}>View details</button>{#each ['check','update','rebuild'] as action}{@const permission=actionState(menu.row,action)}<button disabled={disabled||!permission.enabled} title={permission.reason} on:click={()=>propose(action,[menu.row])}>{actionLabels[action]}</button>{/each}<hr/><button class="danger" title={menu.row.delete_reason} disabled={disabled||!actionState(menu.row,'delete').enabled} on:click={()=>propose('delete',[menu.row])}>Delete</button><small>Active mounts or processes block deletion. Redeploy requires a stored definition.</small></div>{/if}
+{#if confirmation}<div class="modal-backdrop"><div class="panel modal env-confirm" role="dialog" aria-modal="true" aria-labelledby="env-confirm-title" tabindex="-1" bind:this={dialog} use:focusDialog><div class="panel-head"><h2 id="env-confirm-title">{actionLabels[confirmation.action]} {confirmation.rows.length} environment{confirmation.rows.length===1?'':'s'}?</h2></div><div class="panel-body"><p>{confirmation.action==='delete'?'Permanently removes only these selected root directories, including packages and local files inside them. Stored definitions are archived. External paths are not deleted. Mounted or active roots are refused.':confirmation.action==='rebuild'?'Redeploy recreates each environment from its stored definition. Local customizations may be lost. Workers must pass their existing checks before replacing an environment.':'Package updates modify each selected environment and may affect tools used by active workloads.'}</p><ul>{#each confirmation.rows as row}<li>{row.title||row.name} <code>{row.title!==row.name?row.name:''}</code></li>{/each}</ul><p class="env-caption">Operations are submitted one at a time. Keep this page open; a failed job stops the remaining queue.</p><label><input type="checkbox" bind:checked={acknowledged}/><span>I have reviewed these targets and the effect of this operation.</span></label>{#if confirmation.action==='delete'}<label class="field"><span>Type {deleteExpected} to confirm</span><input bind:value={deletePhrase} autocomplete="off" spellcheck="false"/></label>{/if}</div><div class="modal-actions"><button class="btn" on:click={cancelConfirmation}>Cancel</button><span class="spacer"></span><button class="btn primary" disabled={!acknowledged||(confirmation.action==='delete'&&deletePhrase!==deleteExpected)} on:click={()=>runQueue(confirmation.action,confirmation.rows)}>Confirm {actionLabels[confirmation.action].toLowerCase()}</button></div></div></div>{/if}
+
+{#if creator}<CreateEnvironment profile={creator} existing={inventory.installed.map(row=>row.name)} onClose={()=>creator=null} onCreated={created}/>{/if}

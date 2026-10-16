@@ -57,3 +57,31 @@ output outside the source tree. The tested viewports are 1440x1000, 844x390, and
 Deploy the UI and `mcp_environments.py` together for all metadata. With an older backend,
 dot directories still separate correctly, but history and definition-dependent redeploy
 controls remain unavailable until the metadata endpoint is updated.
+
+## Lifecycle completion
+
+Installed roots and recognized .stage-, .previous-, and .deleting- directories now
+expose individual and selected deletion. The server verifies the exact root identity
+and typed confirmation, refuses active jobs/mounts/processes/open files, and rechecks
+after an atomic no-replace quarantine rename. Definition files are archived with the
+job. No external mounted paths are intentionally removed. Deletion is irreversible.
+
+Catalog Create opens a naming/base/release wizard and a server-generated package
+review. Names cannot collide with a root or stored definition. Creation uses a
+pinned source-definition digest, signed repository recipes and atomic no-replace
+activation; it is not a rebuild of an existing environment. Profile notes explain
+base-only AI tools and separately installed engines, and supported distro limitations.
+Catalog installation does not run a downloaded initialization script.
+
+Package operations run the package manager inside its own root using its configured
+repositories, with private runtime mounts and bounded subprocess timeouts. Ubuntu
+Update now actually upgrades packages, after an index refresh, then simulates another
+upgrade to record remaining/held packages. DNF records 0/100 query results. Rocky
+minor versions are accepted and never receive Fedora mirror overrides. All terminal
+worker paths record completion times and errors. Old update jobs without a check are
+shown as Updated; check required. Failed checks are reported as failed, not unchecked.
+
+Check-all continues after individual failures; mutating batches stop after a failure.
+The creation wizard, typed deletion, staging selection and status persistence are
+covered by a local-only HTTP browser fixture. Destructive worker guards and package
+commands are tested with mocks; no existing appliance root is deleted in these tests.

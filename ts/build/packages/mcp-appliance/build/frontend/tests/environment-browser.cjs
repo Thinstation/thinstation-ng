@@ -74,7 +74,7 @@ function finish(state='completed'){
   const selectAll=page.getByRole('checkbox',{name:'Select all visible eligible environments'});
   assert(await selectAll.evaluate(node=>node.indeterminate));
   await page.getByRole('button',{name:'Actions for media-f44',exact:true}).click();
-  assert(await page.getByRole('button',{name:'Delete (not available)',exact:true}).isDisabled());
+  assert(await page.getByRole('button',{name:'Delete',exact:true}).isDisabled());
   await page.keyboard.press('Escape');assert.equal(await page.locator('.env-menu').count(),0);
   await page.getByRole('tab',{name:/^Installed/}).focus();
   await page.keyboard.press('ArrowRight');assert.equal(await page.getByRole('tab',{name:/^Catalog/}).getAttribute('aria-selected'),'true');
