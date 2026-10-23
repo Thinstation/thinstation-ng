@@ -3,6 +3,14 @@
 
 [**Join the ThinStation Discord community**](https://discord.gg/FVhXJgNZEE) — get help, discuss development, and follow project announcements. Choose a general channel in your language; messages translate to and from the English hub.
 
+## Support ThinStation development
+
+ThinStation is free and open source, but AI time and compute resources are not free. Donations help fund AI-assisted development, builds, and testing so we can finish features and deliver releases.
+
+If ThinStation is useful to you, please consider supporting its development. Any amount helps, and donating is entirely optional.
+
+[**Donate via PayPal on thinstation.org**](https://thinstation.org/) — click the **Donate** button on the official website.
+
 README - Displaying this file can be disabled by touching `/ts/etc/READ`
 
 Visit the ThinStation [Wiki](https://github.com/Thinstation/thinstation-ng/wiki/Getting-Started-with-ThinStation)
