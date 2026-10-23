@@ -1,6 +1,8 @@
 
 # ThinStation
 
+[**Join the ThinStation Discord community**](https://discord.gg/FVhXJgNZEE) — get help, discuss development, and follow project announcements. Choose a general channel in your language; messages translate to and from the English hub.
+
 README - Displaying this file can be disabled by touching `/ts/etc/READ`
 
 Visit the ThinStation [Wiki](https://github.com/Thinstation/thinstation-ng/wiki/Getting-Started-with-ThinStation)
@@ -173,5 +175,6 @@ For detailed instructions, troubleshooting, and additional resources, visit the 
 
 If you encounter issues or require assistance:
 - Open an issue on the [ThinStation GitHub repository](https://github.com/Thinstation/thinstation-ng/issues).
-- Join the discussion on the ThinStation mailing list or community forums.
+- Join the [ThinStation Discord community](https://discord.gg/FVhXJgNZEE) for troubleshooting, development discussions, and project announcements. Start in `#welcome`, read `#rules`, then choose your language's general channel.
+- Use GitHub issues for reproducible bugs and tracked development work.
 
