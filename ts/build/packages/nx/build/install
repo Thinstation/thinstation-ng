@@ -3,4 +3,29 @@ export PACKAGE=nx
 export RPM=`basename $1`
 repackage -e
 
-cp -av /usr/NX $TSWRKNG/packages/nx/usr/lib64/NX/
+# The NoMachine RPM ships its payload as tarballs that its scriptlets unpack
+# into /usr/NX. repackage only extracts RPM contents, so do the scriptlet's
+# work here instead of installing the RPM (which RPM 6 also refuses, as
+# NoMachine 8.x only carries MD5/SHA1 digests).
+PKG=$TSWRKNG/packages/nx
+NX=$PKG/usr/lib64/NX
+rm -rf $NX
+mkdir -p $PKG/usr/lib64
+for t in nxplayer nxrunner; do
+	tar xzf $PKG/etc/NX/player/packages/$t.tar.gz -C $PKG/usr/lib64 || exit 1
+done
+
+# What nxplayer --install does on a client: shim X libraries onto NX's own,
+# drop the legacy USB bits and the bundled libstdc++ (Fedora's is newer),
+# point nxusb at the var tree, and give the install an id.
+ln -sf /usr/NX/lib/libnxdixl.so $NX/lib/libX11.so.6
+ln -sf /usr/NX/lib/libnxdixl.so $NX/lib/libxcb.so.1
+ln -sf /usr/NX/lib/libnxdiex.so $NX/lib/libXext.so.6
+rm -f $NX/bin/nxusbd-legacy $NX/lib/libnxusb-legacy.so $NX/lib/libstdc++.so.6
+sed -i 's|NX_VAR_PATH="" "\$NXUSB_NAME_PATH"|NX_VAR_PATH="/usr/NX/var" "$NXUSB_NAME_PATH"|' $NX/scripts/restricted/nxusb.sh
+mkdir -p $NX/var/db/update $NX/var/log $NX/var/run
+cat /proc/sys/kernel/random/uuid > $NX/etc/uuid
+
+# libnxnws.so (web sessions) needs a libjsoncpp.so soname that no Fedora
+# package provides; the player does not use it.
+rm -f $NX/lib/libnxnws.so
