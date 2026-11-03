@@ -17,9 +17,13 @@ esac
 dnf_common_opts=(
 	--setopt=keepcache=1
 	--setopt=max_parallel_downloads="$MAX_PARALLEL_DOWNLOADS"
-	--setopt=max_downloads_per_mirror="$MAX_DOWNLOADS_PER_MIRROR"
 	--releasever="$DIST_VER"
 )
+
+# max_downloads_per_mirror is only known to newer dnf5 (not Fedora 42's 5.2.x)
+if dnf --setopt=max_downloads_per_mirror=1 --version >/dev/null 2>&1; then
+	dnf_common_opts+=(--setopt=max_downloads_per_mirror="$MAX_DOWNLOADS_PER_MIRROR")
+fi
 
 if [ "$CROSS_COMPILE" = "true" ]; then
 	dnf_common_opts+=(--forcearch="$TARGET_ARCH")
