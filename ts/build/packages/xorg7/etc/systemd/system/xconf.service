@@ -2,7 +2,7 @@
 Description=Configure Thinstation Xorg Settings
 DefaultDependencies=no
 Conflicts=shutdown.target
-After=profile-setup.service net.profile-setup.service console-keymap.service tsinit.target
+After=profile-setup.service net.profile-setup.service systemd-vconsole-setup-reload.service systemd-vconsole-setup.service tsinit.target
 Before=session-setup.service
 ConditionPathIsReadWrite=/etc
 
