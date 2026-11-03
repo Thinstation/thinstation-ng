@@ -6,13 +6,13 @@ start() {
     if [ -n "$NET_TIME_SERVER" ]; then
         # Check if the main time server is already in ntp.conf
         if ! grep -q "server $NET_TIME_SERVER" /etc/ntp.conf; then
-            echo "server $NET_TIME_SERVER" >> /etc/ntp.conf
+            echo "server $NET_TIME_SERVER iburst" >> /etc/ntp.conf
         fi
 
         if [ -n "$NET_TIME_SERVER_BACKUP" ]; then
             # Check if the backup time server is already in ntp.conf
             if ! grep -q "server $NET_TIME_SERVER_BACKUP" /etc/ntp.conf; then
-                echo "server $NET_TIME_SERVER_BACKUP" >> /etc/ntp.conf
+                echo "server $NET_TIME_SERVER_BACKUP iburst" >> /etc/ntp.conf
             fi
         fi
     fi
