@@ -346,6 +346,10 @@ class Collector:
         parts = PurePosixPath(logical).parts
         if not (info['RUNPATH'] or info['RPATH']) and len(parts) >= 6:
             result.append(origin)
+            # Private application trees (e.g. /usr/lib64/NX) keep executables
+            # in bin/ and the libraries their wrapper injects in ../lib.
+            if PurePosixPath(origin).name == 'bin':
+                result.append(str(PurePosixPath(origin).parent / 'lib'))
         return list(dict.fromkeys(result + self.config_dirs + ['/usr/lib64', '/lib64', '/usr/lib', '/lib']))
 
     def present(self, name, abi, logical, info):
