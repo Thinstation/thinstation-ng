@@ -140,7 +140,13 @@ iso()
 
 squash_loc()
 {
-	eval "`cat /proc/cmdline |cut -d ' ' -f1`"
+	# BOOT_IMAGE may be anywhere on the command line: syslinux passes it as
+	# the first argument, iPXE on UEFI passes the image name first.
+	for arg in $(cat /proc/cmdline); do
+		case "$arg" in
+			BOOT_IMAGE=*) BOOT_IMAGE="${arg#BOOT_IMAGE=}" ;;
+		esac
+	done
 	initrd="`dirname $BOOT_IMAGE`"/initrd
 	initrd=${initrd:=/boot/initrd}
 	squash_location=`dirname $initrd |sed -e 's|::/boot|/boot|g'`
